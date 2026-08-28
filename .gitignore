@@ -4,6 +4,7 @@ node_modules/
 dist/
 out/
 coverage/
+.translive-evidence/
 .env
 .env.*
 !.env.example

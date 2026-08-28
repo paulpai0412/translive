@@ -3,10 +3,33 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "main": "src/main.js",
   "scripts": {
+    "check": "node scripts/check.mjs",
+    "probe:codex": "node scripts/probe-codex-app-server.mjs",
+    "start": "electron .",
     "test": "node --test"
   },
   "engines": {
     "node": ">=24"
+  },
+  "knip": {
+    "entry": [
+      "src/main.js",
+      "src/preload.cjs",
+      "src/renderer-entry.js"
+    ],
+    "project": [
+      "src/**/*.{js,cjs}",
+      "scripts/**/*.mjs",
+      "fixtures/**/*.mjs"
+    ],
+    "ignore": [
+      "src/preload.cjs",
+      "src/renderer-entry.js"
+    ]
+  },
+  "devDependencies": {
+    "electron": "44.0.0"
   }
 }

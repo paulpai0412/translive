@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TransLive Phase 1 PoC</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <p class="eyebrow">Developer proof of concept</p>
+          <h1>TransLive · Phase 1</h1>
+          <p class="muted">
+            Traditional Chinese ↔ English · GPT-Live V3 · two isolated channels
+          </p>
+        </div>
+        <output id="run-status" class="status ready">Ready</output>
+      </header>
+
+      <section class="notice" aria-label="Phase 1 constraints">
+        Requires an already-authenticated, pinned Codex runtime and two VB-CABLE
+        pairs. Audio is sent to GPT-Live only after Start. Transcripts stay in
+        memory; only redacted timing evidence is written.
+      </section>
+
+      <section class="card" aria-labelledby="routing-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Manual routing</p>
+            <h2 id="routing-heading">Audio endpoints</h2>
+          </div>
+          <button id="refresh-devices" type="button">Refresh devices</button>
+        </div>
+        <div class="device-grid">
+          <label>
+            <span>Meeting app</span>
+            <select id="meeting-platform">
+              <option value="teams">Microsoft Teams</option>
+              <option value="zoom">Zoom</option>
+            </select>
+          </label>
+          <label>
+            <span>Physical microphone · TX source</span>
+            <select id="physical-mic" required></select>
+          </label>
+          <label>
+            <span>Cable-A Input · TX output sink</span>
+            <select id="cable-a-sink" required></select>
+          </label>
+          <label>
+            <span>Cable-B Output · RX source</span>
+            <select id="cable-b-source" required></select>
+          </label>
+          <label>
+            <span>Physical headphones · RX output sink</span>
+            <select id="headphones" required></select>
+          </label>
+          <div class="endpoint-note">
+            Cable-A/B labels are manual: select the exact endpoints created by
+            your two cable pairs.
+          </div>
+        </div>
+        <label class="checkbox-row">
+          <input id="headphones-confirmed" type="checkbox" />
+          <span
+            >I confirm this selected endpoint is headphones, not physical
+            speakers. Device names are not proof.</span
+          >
+        </label>
+        <div class="actions">
+          <button id="preflight" type="button">Route preflight</button>
+          <button id="test-headphones" type="button">Test headphones</button>
+          <button id="start" type="button" class="primary">
+            Start dual channel
+          </button>
+          <button id="stop" type="button" class="danger" disabled>Stop</button>
+        </div>
+        <p id="route-result" class="muted" role="status">
+          Refresh devices, choose all four endpoints, then run preflight.
+        </p>
+        <p id="meeting-instructions" class="instruction">
+          Teams/Zoom: choose Cable-A Output as microphone and Cable-B Input as
+          speaker. TransLive never changes these settings automatically.
+        </p>
+      </section>
+
+      <section class="channels" aria-label="Translation channels">
+        <article class="card channel" data-direction="tx">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">TX · me → meeting</p>
+              <h2>Traditional Chinese → English</h2>
+            </div>
+            <output id="tx-state" class="status connecting">Idle</output>
+          </div>
+          <p>Voice: <strong>Marin</strong> · output: Cable-A Input</p>
+          <label class="level-row"
+            >Mic level <meter id="tx-level" min="0" max="1" value="0"></meter
+          ></label>
+          <button id="tx-mute" type="button" disabled>Mute TX</button>
+          <p class="metric">
+            TTFA <output id="tx-ttfa">—</output> · RTT
+            <output id="tx-rtt">—</output>
+          </p>
+        </article>
+        <article class="card channel" data-direction="rx">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">RX · meeting → me</p>
+              <h2>English → Traditional Chinese</h2>
+            </div>
+            <output id="rx-state" class="status connecting">Idle</output>
+          </div>
+          <p>Voice: <strong>Cove</strong> · output: physical headphones</p>
+          <button id="rx-mute" type="button" disabled>Mute RX</button>
+          <p class="metric">
+            TTFA <output id="rx-ttfa">—</output> · RTT
+            <output id="rx-rtt">—</output>
+          </p>
+        </article>
+      </section>
+
+      <section class="card" aria-labelledby="transcript-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Ephemeral diagnostics</p>
+            <h2 id="transcript-heading">Live transcripts</h2>
+          </div>
+          <button id="clear-transcript" type="button">Clear display</button>
+        </div>
+        <p class="muted">
+          Displayed only while this window is open. No transcript or audio is
+          written to disk.
+        </p>
+        <div id="transcripts" class="transcripts" aria-live="polite"></div>
+      </section>
+
+      <section class="card diagnostics" aria-labelledby="diagnostics-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Redacted evidence</p>
+            <h2 id="diagnostics-heading">Timing and diagnostics</h2>
+          </div>
+        </div>
+        <dl>
+          <div>
+            <dt>TX input / output</dt>
+            <dd id="tx-timing">—</dd>
+          </div>
+          <div>
+            <dt>RX input / output</dt>
+            <dd id="rx-timing">—</dd>
+          </div>
+          <div>
+            <dt>WebRTC</dt>
+            <dd id="webrtc-summary">—</dd>
+          </div>
+          <div>
+            <dt>Last event</dt>
+            <dd id="last-event">—</dd>
+          </div>
+        </dl>
+      </section>
+    </main>
+    <script type="module" src="./renderer-entry.js"></script>
+  </body>
+</html>
