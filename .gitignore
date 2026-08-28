@@ -1,0 +1,12 @@
+.scratch/
+.pi/
+node_modules/
+dist/
+out/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
