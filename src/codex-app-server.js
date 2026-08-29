@@ -3,6 +3,13 @@ import { EventEmitter } from "node:events";
 
 import { codexLaunchOptions } from "./codex-runtime.js";
 
+export const DEFAULT_CODEX_APP_SERVER_ARGS = [
+  "app-server",
+  "--stdio",
+  "--enable",
+  "realtime_conversation",
+];
+
 class CodexRpcError extends Error {
   constructor(error) {
     super(error?.message ?? "Codex app-server request failed");
@@ -27,7 +34,7 @@ export class CodexAppServer extends EventEmitter {
 
   constructor({
     executable = process.env.TRANSLIVE_CODEX_BIN || "codex",
-    args = ["app-server", "--stdio"],
+    args = DEFAULT_CODEX_APP_SERVER_ARGS,
     cwd = process.cwd(),
     requestTimeoutMs = 15_000,
     spawn = defaultSpawn,

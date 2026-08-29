@@ -17,12 +17,14 @@ async function nextNotification(client, method) {
   }
 }
 
-test("uses a Windows shell when launching a trusted npm cmd shim", async () => {
+test("enables the experimental realtime feature when launching Codex", async () => {
+  let receivedArgs;
   let receivedOptions;
   const client = new CodexAppServer({
     executable: "codex.cmd",
     platform: "win32",
-    spawn: (_command, _args, options) => {
+    spawn: (_command, args, options) => {
+      receivedArgs = args;
       receivedOptions = options;
       const process = new EventEmitter();
       process.stdin = new PassThrough();
@@ -42,6 +44,12 @@ test("uses a Windows shell when launching a trusted npm cmd shim", async () => {
   });
 
   await client.start();
+  assert.deepEqual(receivedArgs, [
+    "app-server",
+    "--stdio",
+    "--enable",
+    "realtime_conversation",
+  ]);
   assert.equal(receivedOptions.shell, true);
   await client.close();
 });

@@ -1,4 +1,7 @@
-import { CodexAppServer } from "./codex-app-server.js";
+import {
+  CodexAppServer,
+  DEFAULT_CODEX_APP_SERVER_ARGS,
+} from "./codex-app-server.js";
 import { inspectCodexRuntime } from "./codex-runtime.js";
 import {
   startDualChannelRun,
@@ -130,7 +133,7 @@ export class PhaseOneController {
   constructor({
     appVersion,
     codexExecutable = process.env.TRANSLIVE_CODEX_BIN || "codex",
-    codexArgs = ["app-server", "--stdio"],
+    codexArgs = DEFAULT_CODEX_APP_SERVER_ARGS,
     codexVersion = process.env.TRANSLIVE_CODEX_VERSION || PINNED_CODEX_VERSION,
     cwd = process.cwd(),
     evidenceDirectory = process.env.TRANSLIVE_EVIDENCE_DIR ||
