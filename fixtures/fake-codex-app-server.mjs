@@ -134,9 +134,7 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
       10,
     );
     const deltas =
-      direction === "rx"
-        ? ["這是一段", "即時中文", "。"]
-        : ["fixture ", "translation."];
+      direction === "rx" ? ["這是一段", "即時中文。"] : ["fixture ", "translation."];
     deltas.forEach((delta, index) =>
       setTimeout(
         () =>
@@ -159,10 +157,7 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
   }
   if (request.method === "thread/realtime/appendSpeech") {
     const direction = realtimeThreads.get(request.params?.threadId);
-    if (
-      direction !== "rx" ||
-      !["這是一段即時中文，", "。"].includes(request.params?.text)
-    ) {
+    if (direction !== "rx" || request.params?.text !== "這是一段即時中文。") {
       reject(request.id, "Unexpected RX speech fallback text");
       return;
     }

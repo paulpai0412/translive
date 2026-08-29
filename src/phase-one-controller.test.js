@@ -113,10 +113,7 @@ test("keeps channels connecting until the renderer confirms both SDP answers", a
     events
       .filter((event) => event.type === "speech-fallback")
       .map(({ direction, characters }) => ({ direction, characters })),
-    [
-      { direction: "rx", characters: 9 },
-      { direction: "rx", characters: 1 },
-    ],
+    [{ direction: "rx", characters: 9 }],
   );
   await controller.answerApplied("tx");
   assert.deepEqual(controller.status(), { tx: "live", rx: "connecting" });
