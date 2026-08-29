@@ -177,6 +177,17 @@ function updateTimings(direction) {
   elements["webrtc-summary"].textContent = `TX ${formatMilliseconds(timings.tx.rtt)} · RX ${formatMilliseconds(timings.rx.rtt)}`;
 }
 
+function resetRunDisplay() {
+  for (const direction of ["tx", "rx"]) {
+    timings[direction] = {};
+    setChannelState(direction, "connecting");
+    updateTimings(direction);
+  }
+  transcriptLines.length = 0;
+  elements.transcripts.replaceChildren();
+  elements["tx-level"].value = 0;
+}
+
 function recordMetric(direction, type, stats) {
   const atMs = Date.now();
   const timing = timings[direction];
@@ -440,6 +451,7 @@ async function start() {
   try {
     if (!(await runPreflight())) return;
     config = routeConfig();
+    resetRunDisplay();
     setRunStatus("Preparing WebRTC", "connecting");
     tx = await createRealtimePeer({
       direction: "tx",
