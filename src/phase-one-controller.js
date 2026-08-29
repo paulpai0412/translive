@@ -100,12 +100,17 @@ function assertStartConfig(config) {
   }
 }
 
-function meetingInstructions(platform) {
+function meetingInstructions(platform, routeProfile) {
   const app = platform === "zoom" ? "Zoom" : "Microsoft Teams";
+  const voicemeeter = routeProfile === "voicemeeter";
   return {
     app,
-    microphone: "Select Cable-A Output as the microphone.",
-    speaker: "Select Cable-B Input as the speaker.",
+    microphone: voicemeeter
+      ? "Select Voicemeeter Out B2 as the microphone."
+      : "Select Cable-A Output as the microphone.",
+    speaker: voicemeeter
+      ? "Select Voicemeeter Input as the speaker."
+      : "Select Cable-B Input as the speaker.",
     note: "TransLive does not change meeting-app or Windows defaults.",
   };
 }
@@ -151,7 +156,7 @@ export class PhaseOneController {
       this.#assertRuntime(runtime);
       return {
         ok: true,
-        instructions: meetingInstructions(config.platform),
+        instructions: meetingInstructions(config.platform, config.routeProfile),
         codexVersion: runtime.version,
       };
     } catch (error) {
@@ -360,6 +365,7 @@ export class PhaseOneController {
       appVersion: this.#appVersion,
       codex: { ...runtime, pinnedVersion: this.#codexVersion },
       platform: config?.platform,
+      routeProfile: config?.routeProfile,
       model: MODEL,
       voices: VOICES,
       endpoints: endpointRecords(config),

@@ -11,6 +11,7 @@ function validConfig(overrides = {}) {
   const { tx: txOverrides = {}, rx: rxOverrides = {}, ...rest } = overrides;
   return {
     platform: "teams",
+    routeProfile: "vb-cable",
     headphonesConfirmed: true,
     ...rest,
     tx: {
@@ -180,6 +181,41 @@ test("rejects duplicate routes and swapped endpoint kinds before opening channel
   assert.equal(openCount, 0);
 });
 
+test("accepts the isolated VoiceMeeter VAIO and AUX route profile", async () => {
+  let openCount = 0;
+  const config = validConfig({
+    routeProfile: "voicemeeter",
+    tx: {
+      sinkEndpointId: "voicemeeter-aux-input",
+      sinkEndpointName: "Voicemeeter AUX Input (VB-Audio Voicemeeter VAIO)",
+    },
+    rx: {
+      sourceEndpointId: "voicemeeter-out-b1",
+      sourceEndpointName: "Voicemeeter Out B1 (VB-Audio Voicemeeter VAIO)",
+    },
+  });
+
+  const run = await startDualChannelRun(config, {
+    openChannel: async () => {
+      openCount += 1;
+      return { stop: async () => {} };
+    },
+  });
+
+  assert.equal(openCount, 2);
+  assert.equal(run.aggregateStatus(), "connecting");
+  await assert.rejects(
+    startDualChannelRun(
+      {
+        ...config,
+        rx: { ...config.rx, sourceEndpointName: "Voicemeeter Out B2" },
+      },
+      { openChannel: async () => ({ stop: async () => {} }) },
+    ),
+    /Voicemeeter Out B1/i,
+  );
+});
+
 test("stops each successful channel only once even if one stop request fails", async () => {
   const stops = { tx: 0, rx: 0 };
   const evidence = new RunEvidence({
@@ -251,6 +287,7 @@ test("records redacted aggregate evidence without transcripts, SDP, or tokens", 
       checksum: "abc",
     },
     platform: "teams",
+    routeProfile: "vb-cable",
     model: "gpt-live-1-codex",
     voices: { tx: "marin", rx: "cove" },
     endpoints: [
@@ -326,6 +363,7 @@ test("records redacted aggregate evidence without transcripts, SDP, or tokens", 
   const serialized = await readFile(file, "utf8");
   const persisted = JSON.parse(serialized);
 
+  assert.equal(persisted.route.routeProfile, "vb-cable");
   assert.equal(persisted.endpoints[0].kind, "audioinput");
   assert.notEqual(persisted.endpoints[0].idHash, "mic-secret-id");
   assert.equal(persisted.metrics.tx.ttfa.count, 1);

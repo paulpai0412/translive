@@ -15,6 +15,7 @@ function validConfig(overrides = {}) {
   const { tx: txOverrides = {}, rx: rxOverrides = {}, ...rest } = overrides;
   return {
     platform: "teams",
+    routeProfile: "vb-cable",
     headphonesConfirmed: true,
     ...rest,
     tx: {
@@ -67,6 +68,30 @@ function controllerFor({
     inspectRuntime,
   });
 }
+
+test("returns VoiceMeeter meeting endpoint instructions for the free route profile", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-voicemeeter-"),
+  );
+  const controller = controllerFor({ evidenceDirectory });
+  const result = await controller.preflight(
+    validConfig({
+      routeProfile: "voicemeeter",
+      tx: {
+        sinkEndpointId: "voicemeeter-aux-input",
+        sinkEndpointName: "Voicemeeter AUX Input",
+      },
+      rx: {
+        sourceEndpointId: "voicemeeter-out-b1",
+        sourceEndpointName: "Voicemeeter Out B1",
+      },
+    }),
+  );
+
+  assert.equal(result.ok, true);
+  assert.match(result.instructions.microphone, /Voicemeeter Out B2/i);
+  assert.match(result.instructions.speaker, /Voicemeeter Input/i);
+});
 
 test("keeps channels connecting until the renderer confirms both SDP answers", async () => {
   const evidenceDirectory = await mkdtemp(

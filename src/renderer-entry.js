@@ -1,6 +1,7 @@
 const elements = Object.fromEntries(
   [
     "meeting-platform",
+    "route-profile",
     "physical-mic",
     "cable-a-sink",
     "cable-b-source",
@@ -66,7 +67,7 @@ function setControls(isRunning) {
       !isRunning || !["live", "muted"].includes(state);
   }
   elements["test-headphones"].disabled = locked;
-  for (const id of ["meeting-platform", "physical-mic", "cable-a-sink", "cable-b-source", "headphones"]) {
+  for (const id of ["meeting-platform", "route-profile", "physical-mic", "cable-a-sink", "cable-b-source", "headphones"]) {
     elements[id].disabled = locked;
   }
 }
@@ -84,6 +85,7 @@ function routeConfig() {
   const headphones = selectDevice(elements.headphones);
   return {
     platform: elements["meeting-platform"].value,
+    routeProfile: elements["route-profile"].value,
     headphonesConfirmed: elements["headphones-confirmed"].checked,
     tx: {
       sourceEndpointId: physicalMic.id,
@@ -140,7 +142,10 @@ async function refreshDevices() {
 
 function updateMeetingInstructions() {
   const app = elements["meeting-platform"].value === "zoom" ? "Zoom" : "Microsoft Teams";
-  elements["meeting-instructions"].textContent = `${app}: select the paired Cable-A Output as microphone and Cable-B Input as speaker. TransLive never changes these settings automatically.`;
+  const voicemeeter = elements["route-profile"].value === "voicemeeter";
+  const microphone = voicemeeter ? "Voicemeeter Out B2" : "Cable-A Output";
+  const speaker = voicemeeter ? "Voicemeeter Input" : "Cable-B Input";
+  elements["meeting-instructions"].textContent = `${app}: select ${microphone} as microphone and ${speaker} as speaker. TransLive never changes these settings automatically.`;
 }
 
 function appendTranscript({ direction, role, text }) {
@@ -544,6 +549,7 @@ elements["clear-transcript"].addEventListener("click", () => {
   elements.transcripts.replaceChildren();
 });
 elements["meeting-platform"].addEventListener("change", updateMeetingInstructions);
+elements["route-profile"].addEventListener("change", updateMeetingInstructions);
 window.addEventListener("pagehide", () => {
   active?.tx.stop();
   active?.rx.stop();

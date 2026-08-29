@@ -46,15 +46,22 @@
             </select>
           </label>
           <label>
+            <span>Virtual routing profile</span>
+            <select id="route-profile">
+              <option value="voicemeeter">VoiceMeeter Banana · VAIO/AUX</option>
+              <option value="vb-cable">VB-CABLE A+B</option>
+            </select>
+          </label>
+          <label>
             <span>Physical microphone · TX source</span>
             <select id="physical-mic" required></select>
           </label>
           <label>
-            <span>Cable-A Input · TX output sink</span>
+            <span>TX virtual output sink</span>
             <select id="cable-a-sink" required></select>
           </label>
           <label>
-            <span>Cable-B Output · RX source</span>
+            <span>RX virtual input source</span>
             <select id="cable-b-source" required></select>
           </label>
           <label>
@@ -62,8 +69,8 @@
             <select id="headphones" required></select>
           </label>
           <div class="endpoint-note">
-            Cable-A/B labels are manual: select the exact endpoints created by
-            your two cable pairs.
+            VoiceMeeter: TX = AUX Input, RX = Out B1. VB-CABLE: TX = Cable-A
+            Input, RX = Cable-B Output.
           </div>
         </div>
         <label class="checkbox-row">
@@ -85,8 +92,8 @@
           Refresh devices, choose all four endpoints, then run preflight.
         </p>
         <p id="meeting-instructions" class="instruction">
-          Teams/Zoom: choose Cable-A Output as microphone and Cable-B Input as
-          speaker. TransLive never changes these settings automatically.
+          Teams/Zoom: choose Voicemeeter Out B2 as microphone and Voicemeeter
+          Input as speaker. TransLive never changes these settings automatically.
         </p>
       </section>
 
@@ -99,7 +106,7 @@
             </div>
             <output id="tx-state" class="status connecting">Idle</output>
           </div>
-          <p>Voice: <strong>Marin</strong> · output: Cable-A Input</p>
+          <p>Voice: <strong>Marin</strong> · output: selected TX virtual sink</p>
           <label class="level-row"
             >Mic level <meter id="tx-level" min="0" max="1" value="0"></meter
           ></label>

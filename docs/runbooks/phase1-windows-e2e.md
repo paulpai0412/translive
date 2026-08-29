@@ -24,24 +24,36 @@ This runbook verifies the Phase 1 question only: can one authenticated Codex acc
    ```
 
    `probe:codex` checks the pinned version, `codex login status`, app-server initialize, and an ephemeral `thread/start`; it does **not** start GPT‑Live or send audio. Login and version preflight do **not** prove GPT‑Live entitlement: only an explicit **Start dual channel** request can do that.
-4. Two separately configured VB-CABLE-style endpoint pairs. Do not redistribute a third-party driver without its license permission.
-5. Zoom Desktop and Teams Desktop installed. A second meeting participant or second machine is required to prove the remote path.
+4. One supported two-bus route:
+   - official VB-CABLE A+B; or
+   - VoiceMeeter Banana in its free evaluation/donationware mode. Commercial use requires the appropriate VB-Audio license.
+5. Zoom Desktop and Teams Desktop installed. Their built-in test calls cover the self-contained first pass; a second participant or machine is still required for final remote-path proof.
 
 ## Exact virtual routing
 
-Use two one-way cable pairs. Vendor suffixes may vary, but Phase 1 preflight requires the selected names to contain the recognizable `Cable-A Input` and `Cable-B Output` roles.
+Choose the matching routing profile in TransLive.
 
-| Bus | TransLive selection | Meeting-app selection | Direction |
+| Profile/bus | TransLive selection | Meeting-app selection | Direction |
 | --- | --- | --- | --- |
-| Cable A | **Cable-A Input** as TX output sink | **Cable-A Output** as Zoom/Teams microphone | translated TX → remote meeting |
-| Cable B | **Cable-B Output** as RX input source | **Cable-B Input** as Zoom/Teams speaker | remote meeting → translated RX |
+| VB-CABLE A | **Cable-A Input** as TX output sink | **Cable-A Output** as microphone | translated TX → meeting |
+| VB-CABLE B | **Cable-B Output** as RX input source | **Cable-B Input** as speaker | meeting → translated RX |
+| VoiceMeeter AUX/B2 | **Voicemeeter AUX Input** as TX output sink | **Voicemeeter Out B2** as microphone | translated TX → meeting |
+| VoiceMeeter VAIO/B1 | **Voicemeeter Out B1** as RX input source | **Voicemeeter Input** as speaker | meeting → translated RX |
+
+Before using VoiceMeeter, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\configure-voicemeeter.ps1
+```
+
+This configures VAIO → B1 and AUX → B2 while disabling physical A-bus monitoring, preventing the mixer from also playing untranslated meeting audio.
 
 Also select:
 
 - physical microphone as **TX source**;
 - physical headphones as **RX output sink**.
 
-Every one of the four selections must be different and have the expected Windows kind: TX/RX sources are `audioinput`; Cable-A/headphone sinks are `audiooutput`. Do not use system loopback or reuse Cable A for Cable B. Device names do not prove an endpoint is headphones; the operator must confirm the actual hardware.
+Every one of the four selections must be different and have the expected Windows kind: TX/RX sources are `audioinput`; virtual/headphone sinks are `audiooutput`. Do not use system loopback or select a VoiceMeeter/CABLE endpoint as the physical microphone or headphones. Device names do not prove an endpoint is headphones; the operator must confirm the actual hardware.
 
 ## Start the PoC
 
@@ -55,7 +67,7 @@ npm start
 3. Select the four endpoints shown in the routing table.
 4. Confirm the headphone checkbox, then click **Test headphones**. The user-gesture tone must play only through the selected headphone endpoint.
 5. Click **Route preflight**. It checks endpoint kinds, uniqueness, pinned Codex version, and login status. It must pass before starting.
-6. In Zoom/Teams manually set microphone and speaker exactly as shown above. TransLive intentionally does not alter Windows or meeting-app settings.
+6. In Zoom/Teams manually set microphone and speaker for the selected profile exactly as shown above. TransLive intentionally does not alter Windows or meeting-app settings.
 7. Click **Start dual channel**. The app starts with each channel in `connecting`; it becomes `live` only after its WebRTC answer is applied. Fixed voices are TX Marin and RX Cove.
 
 A blocked start (missing Codex entitlement, login/version mismatch, permission denial, rejected V3 request, or SDP/output-routing failure) is a valid Phase 1 no-go result. The app writes redacted blocked-attempt evidence; do not substitute another model.

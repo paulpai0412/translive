@@ -18,12 +18,20 @@ function matchesCableRole(name, bus, side) {
   );
 }
 
-function isVirtualCable(name) {
+function isVirtualEndpoint(name) {
   const normalized = normalizedEndpointName(name);
   return (
-    normalized.includes("cable") &&
-    (normalized.includes("input") || normalized.includes("output"))
+    normalized.includes("voicemeeter") ||
+    (normalized.includes("cable") &&
+      (normalized.includes("input") || normalized.includes("output")))
   );
+}
+
+function matchesVoiceMeeterRole(name, role) {
+  const normalized = normalizedEndpointName(name);
+  return role === "tx-sink"
+    ? normalized.includes("voicemeeterauxinput")
+    : normalized.includes("voicemeeteroutb1");
 }
 
 function assertEndpoint(channel, direction) {
@@ -62,18 +70,33 @@ export function validateDualChannelConfig(config) {
   if (config.headphonesConfirmed !== true) {
     throw new Error("Headphones must be explicitly confirmed");
   }
-  if (isVirtualCable(config.tx.sourceEndpointName)) {
-    throw new Error("TX source must be a physical microphone, not a cable");
+  if (isVirtualEndpoint(config.tx.sourceEndpointName)) {
+    throw new Error("TX source must be a physical microphone, not a virtual endpoint");
   }
-  if (isVirtualCable(config.rx.sinkEndpointName)) {
-    throw new Error("RX sink must be physical headphones, not a cable");
+  if (isVirtualEndpoint(config.rx.sinkEndpointName)) {
+    throw new Error("RX sink must be physical headphones, not a virtual endpoint");
   }
-  if (!matchesCableRole(config.tx.sinkEndpointName, "a", "input")) {
-    throw new Error("TX sink must be the Cable-A Input playback endpoint");
+
+  const profile = config.routeProfile ?? "vb-cable";
+  if (profile === "vb-cable") {
+    if (!matchesCableRole(config.tx.sinkEndpointName, "a", "input")) {
+      throw new Error("TX sink must be the Cable-A Input playback endpoint");
+    }
+    if (!matchesCableRole(config.rx.sourceEndpointName, "b", "output")) {
+      throw new Error("RX source must be the Cable-B Output recording endpoint");
+    }
+    return;
   }
-  if (!matchesCableRole(config.rx.sourceEndpointName, "b", "output")) {
-    throw new Error("RX source must be the Cable-B Output recording endpoint");
+  if (profile === "voicemeeter") {
+    if (!matchesVoiceMeeterRole(config.tx.sinkEndpointName, "tx-sink")) {
+      throw new Error("TX sink must be the Voicemeeter AUX Input endpoint");
+    }
+    if (!matchesVoiceMeeterRole(config.rx.sourceEndpointName, "rx-source")) {
+      throw new Error("RX source must be the Voicemeeter Out B1 endpoint");
+    }
+    return;
   }
+  throw new Error(`Unsupported route profile: ${profile}`);
 }
 
 function aggregateStatus(states) {
