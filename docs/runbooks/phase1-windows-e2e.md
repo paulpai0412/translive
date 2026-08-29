@@ -80,7 +80,7 @@ The RX source-language status is accessible in the UI and never persists source 
 2. Otherwise, two CJK characters → `zh`. Original remote audio is sent directly to headphones; assistant text is visible for diagnosis but never passed to `appendSpeech`.
 3. Otherwise → `unknown`. Original remote audio is sent directly to headphones.
 
-The renderer feeds the RX capture stream both to WebRTC and to an original-audio monitor with a 500 ms Web Audio delay. This provides enough time for an English classification to mute the monitor before most remote speech reaches the listener. RX mute mutes both translated and original monitor audio.
+The renderer feeds the RX capture stream both to WebRTC and to an original-audio monitor with a 900 ms Web Audio delay. Live testing showed that 500 ms leaked the first English words before classification; 900 ms provides more time to mute English while preserving same-language Chinese. RX mute mutes both translated and original monitor audio.
 
 A blocked start (missing Codex entitlement, login/version mismatch, permission denial, rejected V3 request, or SDP/output-routing failure) is a valid Phase 1 no-go result. The app writes redacted blocked-attempt evidence; do not substitute another model.
 

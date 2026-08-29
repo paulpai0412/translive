@@ -351,7 +351,7 @@ async function createOriginalMonitor(stream, sink) {
     }
     await context.setSinkId(sink.id);
     await context.resume();
-    delay.delayTime.value = 0.5;
+    delay.delayTime.value = 0.9;
     gain.gain.value = 1;
     source.connect(delay).connect(gain).connect(context.destination);
   } catch (error) {
