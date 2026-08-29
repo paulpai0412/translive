@@ -46,6 +46,8 @@ test("keeps raw event codes out of visible diagnostic summaries", () => {
   assert.equal(diagnosticEventLabel("sdp"), "音訊連線協商");
   assert.equal(diagnosticEventLabel("transcript"), "字幕更新");
   assert.equal(diagnosticEventLabel("blocked"), "連線受阻");
+  assert.equal(diagnosticEventLabel("meeting-setup"), "會議裝置設定");
+  assert.equal(diagnosticEventLabel("tray"), "系統匣操作");
 });
 
 test("names each selected mode in Traditional Chinese", () => {

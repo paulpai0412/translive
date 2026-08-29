@@ -42,6 +42,11 @@ try {
 }
 const html = await readFile("src/index.html", "utf8");
 const main = await readFile("src/main.js", "utf8");
+await readFile("assets/translive-brand/translive-tray.png");
+const windowsMeetingScript = await readFile(
+  "scripts/windows-meeting-devices.ps1",
+  "utf8",
+);
 if (!main.includes('preload: join(sourceDirectory, "preload.cjs")')) {
   throw new Error("main.js must load the restricted preload bridge");
 }
@@ -50,10 +55,27 @@ for (const required of [
   'ipcMain.handle("translive:account-login"',
   'ipcMain.handle("translive:account-login-cancel"',
   'ipcMain.handle("translive:cancel-start"',
+  'ipcMain.handle("translive:meeting-setup-apply"',
+  "sanitizeMeetingSetupRequest(setup)",
+  'ipcMain.handle("translive:tray-status"',
   "shell.openExternal(login.authUrl)",
+  "new TrayController",
+  "windows-meeting-devices.ps1",
 ]) {
   if (!main.includes(required)) {
     throw new Error(`main.js is missing account integration: ${required}`);
+  }
+}
+for (const required of [
+  'ValidateSet("detect", "resolve", "snapshot", "apply", "restore")',
+  "ResolveActiveEndpointId",
+  "$CaptureName",
+  "$RenderName",
+]) {
+  if (!windowsMeetingScript.includes(required)) {
+    throw new Error(
+      `windows-meeting-devices.ps1 is missing native endpoint resolution: ${required}`,
+    );
   }
 }
 if (!html.includes('src="./renderer-entry.js"')) {
@@ -61,18 +83,20 @@ if (!html.includes('src="./renderer-entry.js"')) {
 }
 for (const required of [
   "../assets/translive-brand/translive-mark.svg",
-  "data-mode-button=\"meeting\"",
-  "data-mode-button=\"media\"",
-  "data-mode-button=\"microphone\"",
-  "id=\"account-login-button\"",
-  "id=\"account-login-cancel\"",
-  "id=\"meeting-platform\"",
-  "id=\"route-profile\"",
-  "id=\"tx-sink\"",
-  "id=\"diagnostics-drawer\"",
-  "id=\"mini-overlay\"",
-  "aria-live=\"polite\"",
-  "role=\"alert\"",
+  'data-mode-button="meeting"',
+  'data-mode-button="media"',
+  'data-mode-button="microphone"',
+  'id="account-login-button"',
+  'id="account-login-cancel"',
+  'id="meeting-platform"',
+  'id="route-profile"',
+  'id="tx-sink"',
+  'id="diagnostics-drawer"',
+  'id="mini-overlay"',
+  'id="quick-setup-modal"',
+  'id="tray-close-behavior"',
+  'aria-live="polite"',
+  'role="alert"',
 ]) {
   if (!html.includes(required)) {
     throw new Error(`index.html is missing formal UI contract: ${required}`);

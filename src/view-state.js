@@ -23,12 +23,14 @@ export function diagnosticEventLabel(type) {
     {
       account: "帳戶狀態更新",
       blocked: "連線受阻",
+      "meeting-setup": "會議裝置設定",
       error: "錯誤",
       run: "翻譯連線已建立",
       sdp: "音訊連線協商",
       state: "通道狀態更新",
       stopped: "翻譯已停止",
       transcript: "字幕更新",
+      tray: "系統匣操作",
     }[type] ?? "系統事件"
   );
 }

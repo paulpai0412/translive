@@ -5,6 +5,7 @@
 | Asset | Path | Use |
 | --- | --- | --- |
 | Primary mark | `assets/translive-brand/translive-mark.svg` | App icon、top bar、OAuth 畫面 |
+| Tray raster | `assets/translive-brand/translive-tray.png` | Windows Tray、BrowserWindow icon |
 
 ## Mark concept
 
@@ -37,4 +38,5 @@
 - 四周保留至少 mark 寬度 20% 的空白；
 - 不增加陰影、漸層、外框或旋轉；
 - 單色環境可將兩條聲波與底色統一為黑／白；
-- v0 為產品識別起點，正式發布前應再輸出 ICO、PNG 與 Windows app tile 尺寸。
+- `translive-tray.png` 為 64px dev raster；
+- 正式發布前仍應輸出多尺寸 ICO、PNG 與 Windows app tile 尺寸。

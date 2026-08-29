@@ -14,6 +14,16 @@ contextBridge.exposeInMainWorld("translive", {
   cancelStart: () => ipcRenderer.invoke("translive:cancel-start"),
   setMuted: (direction, muted) =>
     ipcRenderer.invoke("translive:set-muted", direction, muted),
+  meetingSetupApply: (setup) =>
+    ipcRenderer.invoke("translive:meeting-setup-apply", setup),
+  meetingSetupRestore: () =>
+    ipcRenderer.invoke("translive:meeting-setup-restore"),
+  meetingSetupOpenSettings: (appName) =>
+    ipcRenderer.invoke("translive:meeting-setup-open-settings", appName),
+  trayStatus: () => ipcRenderer.invoke("translive:tray-status"),
+  traySetCloseBehavior: (behavior) =>
+    ipcRenderer.invoke("translive:tray-set-close-behavior", behavior),
+  trayShow: () => ipcRenderer.invoke("translive:tray-show"),
   recordMetric: (metric) => ipcRenderer.send("translive:metric", metric),
   rendererError: (direction, message) =>
     ipcRenderer.send("translive:renderer-error", { direction, message }),

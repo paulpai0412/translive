@@ -168,6 +168,8 @@ body[data-app-state="auth-waiting"] #account-login-cancel { display: inline-bloc
 .field-grid label { color: var(--muted); display: grid; font-size: 13px; gap: 7px; }
 select { appearance: none; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; color: var(--text); min-height: 42px; padding: 9px 34px 9px 12px; }
 .mode-help { color: var(--muted); line-height: 1.55; margin: 12px 0 0; }
+.quick-setup-row { align-items: center; display: flex; gap: 12px; margin-top: 14px; }
+.quick-setup-row span { color: var(--muted); font-size: 13px; }
 .checkbox-row { align-items: center; color: var(--muted); display: flex; gap: 9px; margin-top: 14px; }
 .checkbox-row input { accent-color: var(--primary-solid); }
 .health-row { align-items: center; border-bottom: 1px solid var(--border); border-top: 1px solid var(--border); color: var(--muted); display: flex; flex-wrap: wrap; gap: 20px; padding: 15px 0; }
@@ -236,6 +238,24 @@ body[data-mode="microphone"] #single-target-label::before { content: "對方將�
 .settings-list button { align-items: center; background: transparent; border: 0; border-bottom: 1px solid var(--border); color: var(--text); cursor: pointer; display: grid; grid-template-columns: 1fr auto; min-height: 58px; padding: 16px; text-align: left; width: 100%; }
 .settings-list button:last-child { border-bottom: 0; }
 .settings-list span { color: var(--muted); font-size: 13px; }
+.settings-toggle { align-items: center; border-bottom: 1px solid var(--border); display: grid; gap: 14px; grid-template-columns: 1fr minmax(220px, auto); min-height: 64px; padding: 10px 16px; }
+.settings-toggle > span { color: var(--text); }
+
+.quick-setup-modal { background: var(--surface); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: var(--shadow); display: none; left: 50%; max-width: 520px; padding: 22px; position: fixed; top: 50%; transform: translate(-50%, -50%); width: calc(100% - 40px); z-index: 70; }
+.quick-setup-modal.is-open { display: block; }
+.quick-setup-modal > header, .quick-setup-modal > footer { align-items: center; display: flex; justify-content: space-between; }
+.quick-app-switch { background: var(--surface-raised); border: 1px solid var(--border); border-radius: 9px; display: grid; gap: 4px; grid-template-columns: 1fr 1fr; margin: 20px 0 14px; padding: 4px; }
+.quick-app-switch button { background: transparent; border: 1px solid transparent; border-radius: 7px; color: var(--muted); cursor: pointer; min-height: 36px; }
+.quick-app-switch button.is-active { background: var(--surface); border-color: var(--border); color: var(--text); }
+.quick-steps { list-style: none; margin: 0; padding: 0; }
+.quick-steps li { align-items: center; border-bottom: 1px solid var(--border); display: grid; gap: 5px 12px; grid-template-columns: 1fr auto; min-height: 54px; padding: 9px 2px; }
+.quick-steps li span::before { color: var(--subtle); content: "○"; margin-right: 9px; }
+.quick-steps li.done span::before { color: var(--live); content: "✓"; }
+.quick-steps li.active span::before { color: var(--primary); content: "●"; }
+.quick-steps small, .quick-note { color: var(--muted); }
+.restore-device-option { align-items: center; display: flex; gap: 9px; margin-top: 16px; }
+.restore-device-option input { accent-color: var(--primary-solid); }
+.quick-note { font-size: 13px; line-height: 1.5; margin: 14px 0 20px; }
 
 .diagnostics-drawer { background: var(--surface); border-left: 1px solid var(--border); bottom: 0; box-shadow: var(--shadow); max-width: 420px; padding: 22px; position: fixed; right: 0; top: 0; transform: translateX(105%); transition: transform 180ms ease; width: min(420px, 92vw); z-index: 60; }
 .diagnostics-drawer.is-open { transform: translateX(0); }

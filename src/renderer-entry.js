@@ -29,6 +29,19 @@ const elements = Object.fromEntries(
     "connect-route-step",
     "connect-runtime-step",
     "connect-session-step",
+    "quick-setup-button",
+    "quick-setup-modal",
+    "quick-setup-title",
+    "quick-setup-note",
+    "quick-detect-step",
+    "quick-microphone-step",
+    "quick-speaker-step",
+    "quick-verify-step",
+    "quick-restore-option",
+    "apply-quick-setup",
+    "quick-open-settings",
+    "close-quick-setup",
+    "tray-close-behavior",
     "close-diagnostics",
     "close-mini",
     "copy-diagnostics",
@@ -84,6 +97,7 @@ const elements = Object.fromEntries(
     "single-target-label",
     "start-button",
     "stop-button",
+    "stopped-copy",
     "theme-button",
     "theme-label",
     "tx-sink",
@@ -105,6 +119,8 @@ const ui = {
   },
   mode: "meeting",
   muted: { tx: false, rx: false },
+  quickApp: "teams",
+  devices: { inputs: [], outputs: [] },
   runtime: "尚未檢查",
 };
 
@@ -129,7 +145,9 @@ function setAppState(state) {
   for (const button of document.querySelectorAll("[data-mode-button]")) {
     button.disabled = state !== "ready";
   }
-  for (const field of document.querySelectorAll(".configuration select, .configuration input")) {
+  for (const field of document.querySelectorAll(
+    ".configuration select, .configuration input",
+  )) {
     field.disabled = state !== "ready";
   }
   elements["refresh-devices"].disabled = state !== "ready";
@@ -164,7 +182,8 @@ function setMode(mode) {
     elements["single-channel-id"].textContent = "TX";
     elements["single-source-label"].textContent = "我說 Source";
     elements["single-target-label"].textContent = "對方將聽到 Translation";
-    elements["live-route-summary"].textContent = "麥克風 → VoiceMeeter B2 · Cove";
+    elements["live-route-summary"].textContent =
+      "麥克風 → VoiceMeeter B2 · Cove";
   } else {
     elements["live-route-summary"].textContent = "VoiceMeeter · Cove";
   }
@@ -178,31 +197,141 @@ function activeSingleDirection() {
 
 function setAccountState(state) {
   ui.account = state;
-  const text = {
-    checking: "檢查登入狀態…",
-    connected: "ChatGPT 已連線",
-    waiting: "等待瀏覽器確認",
-    failed: "登入未完成",
-    "logged-out": "尚未連線",
-  }[state] ?? "尚未連線";
+  const text =
+    {
+      checking: "檢查登入狀態…",
+      connected: "ChatGPT 已連線",
+      waiting: "等待瀏覽器確認",
+      failed: "登入未完成",
+      "logged-out": "尚未連線",
+    }[state] ?? "尚未連線";
   elements["account-status"].textContent = text;
   elements["auth-status"].textContent = text;
   elements["diag-account"].textContent = text;
-  elements["health-account"].className =
-    state === "connected" ? "ok" : "warn";
+  elements["health-account"].className = state === "connected" ? "ok" : "warn";
   elements["settings-account-status"].textContent = text;
+}
+
+function setScrim() {
+  const open =
+    elements["diagnostics-drawer"].classList.contains("is-open") ||
+    elements["quick-setup-modal"].classList.contains("is-open");
+  elements["drawer-scrim"].classList.toggle("is-open", open);
 }
 
 function setDrawer(open) {
   elements["diagnostics-drawer"].classList.toggle("is-open", open);
   elements["diagnostics-drawer"].setAttribute("aria-hidden", String(!open));
-  elements["drawer-scrim"].classList.toggle("is-open", open);
+  setScrim();
+}
+
+function setQuickSetup(open) {
+  elements["quick-setup-modal"].classList.toggle("is-open", open);
+  elements["quick-setup-modal"].setAttribute("aria-hidden", String(!open));
+  setScrim();
 }
 
 function selectedDevice(select) {
   const option = select.selectedOptions[0];
-  if (!option?.value) throw new Error(`請選擇「${select.labels[0].textContent}」`);
-  return { id: option.value, kind: option.dataset.kind, name: option.textContent };
+  if (!option?.value)
+    throw new Error(`請選擇「${select.labels[0].textContent}」`);
+  return {
+    id: option.value,
+    kind: option.dataset.kind,
+    name: option.textContent,
+  };
+}
+
+function quickSetupEndpoints() {
+  const profile = elements["route-profile"].value;
+  const expected =
+    profile === "voicemeeter"
+      ? {
+          microphone: /Voicemeeter Out B2\b/i,
+          speaker: /^Voicemeeter Input\b/i,
+        }
+      : {
+          microphone: /Cable-A Output/i,
+          speaker: /Cable-B Input/i,
+        };
+  const microphone = ui.devices.inputs.find((device) =>
+    expected.microphone.test(device.label),
+  );
+  const speaker = ui.devices.outputs.find((device) =>
+    expected.speaker.test(device.label),
+  );
+  if (!microphone || !speaker) {
+    throw new Error(
+      "找不到 Teams／Zoom 需要的虛擬裝置，請先檢查 VoiceMeeter 或 VB-CABLE。",
+    );
+  }
+  return {
+    microphone: { name: microphone.label },
+    speaker: { name: speaker.label },
+  };
+}
+
+function setQuickStep(id, state, detail) {
+  const step = elements[id];
+  step.className = state;
+  step.querySelector("small").textContent = detail;
+}
+
+function setQuickApp(appName) {
+  ui.quickApp = appName;
+  for (const button of document.querySelectorAll("[data-quick-app]")) {
+    button.classList.toggle("is-active", button.dataset.quickApp === appName);
+  }
+  elements["quick-setup-title"].textContent =
+    `快速設定 ${appName === "teams" ? "Microsoft Teams" : "Zoom"}`;
+}
+
+async function openQuickManualSettings() {
+  try {
+    await window.translive.meetingSetupOpenSettings(ui.quickApp);
+    elements["quick-setup-note"].textContent =
+      "已開啟 Windows 音訊設定。請依上方裝置名稱完成選擇後再驗證。";
+  } catch {
+    elements["quick-setup-note"].textContent =
+      "無法開啟系統設定，請手動前往 Windows 設定 > 系統 > 音效。";
+  }
+}
+
+async function applyQuickSetup() {
+  try {
+    const endpoints = quickSetupEndpoints();
+    setQuickStep("quick-detect-step", "active", "正在偵測…");
+    setQuickStep("quick-microphone-step", "pending", endpoints.microphone.name);
+    setQuickStep("quick-speaker-step", "pending", endpoints.speaker.name);
+    setQuickStep("quick-verify-step", "pending", "等待套用");
+    elements["apply-quick-setup"].disabled = true;
+    const result = await window.translive.meetingSetupApply({
+      app: ui.quickApp,
+      endpoints,
+      restoreOnStop: elements["quick-restore-option"].checked,
+    });
+    if (result.state === "windows-defaults-updated") {
+      setQuickStep("quick-detect-step", "done", "已偵測並正在執行");
+      setQuickStep("quick-microphone-step", "done", result.microphoneName);
+      setQuickStep("quick-speaker-step", "done", result.speakerName);
+      setQuickStep("quick-verify-step", "done", "Windows 通訊預設已更新");
+      elements["quick-setup-note"].textContent =
+        "已更新 Windows 通訊預設；請在 Teams／Zoom 裝置設定確認它實際選取這兩個裝置。停止翻譯後會依選項還原原本裝置。";
+      elements["ready-message"].textContent =
+        "Windows 通訊預設已更新，請在 Teams／Zoom 確認裝置。";
+    } else {
+      setQuickStep("quick-detect-step", "pending", "需要人工確認");
+      setQuickStep("quick-verify-step", "pending", "未變更目前裝置");
+      elements["quick-setup-note"].textContent =
+        "TransLive 無法確認會議 App 實際使用的裝置。請開啟其裝置設定，手動選擇上方裝置名稱。";
+    }
+  } catch (error) {
+    elements["quick-setup-note"].textContent =
+      `快速設定無法完成：${error.message}`;
+    setQuickStep("quick-verify-step", "pending", "需要人工確認");
+  } finally {
+    elements["apply-quick-setup"].disabled = false;
+  }
 }
 
 function routeConfig() {
@@ -266,10 +395,19 @@ async function refreshDevices() {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const inputs = devices.filter((device) => device.kind === "audioinput");
     const outputs = devices.filter((device) => device.kind === "audiooutput");
-    populateSelect(elements["physical-mic"], inputs, elements["physical-mic"].value);
+    ui.devices = { inputs, outputs };
+    populateSelect(
+      elements["physical-mic"],
+      inputs,
+      elements["physical-mic"].value,
+    );
     populateSelect(elements["rx-source"], inputs, elements["rx-source"].value);
     populateSelect(elements["tx-sink"], outputs, elements["tx-sink"].value);
-    populateSelect(elements["headphones"], outputs, elements["headphones"].value);
+    populateSelect(
+      elements["headphones"],
+      outputs,
+      elements["headphones"].value,
+    );
     elements["health-devices"].className = "ok";
     updateReadyMessage();
   } catch (error) {
@@ -295,7 +433,9 @@ function setChannelState(direction, state) {
   if (direction === singleDirection) {
     elements["single-channel-state"].textContent = channelStateLabel(state);
   }
-  const button = document.querySelector(`.mute-button[data-direction="${direction}"]`);
+  const button = document.querySelector(
+    `.mute-button[data-direction="${direction}"]`,
+  );
   if (button) {
     button.disabled = !["live", "muted"].includes(state);
     button.textContent = ui.muted[direction] ? "取消靜音" : "靜音";
@@ -329,14 +469,13 @@ function renderCaptions() {
   }
   const direction = activeSingleDirection();
   const captions = ui.captions[direction];
-  elements["single-source-caption"].textContent = captions.source || "等待輸入音訊…";
+  elements["single-source-caption"].textContent =
+    captions.source || "等待輸入音訊…";
   elements["single-target-caption"].textContent = captions.target || "—";
   const targetText = captions.target || captions.source || "等待翻譯字幕…";
   elements["mini-primary"].textContent = targetText;
   elements["mini-secondary"].textContent =
-    ui.mode === "meeting"
-      ? ui.captions.tx.target || ""
-      : "";
+    ui.mode === "meeting" ? ui.captions.tx.target || "" : "";
 }
 
 function resetLiveDisplay() {
@@ -384,7 +523,10 @@ function createInputProbe(stream, direction) {
     }
     frame = requestAnimationFrame(sample);
   };
-  context.resume().then(sample).catch(() => {});
+  context
+    .resume()
+    .then(sample)
+    .catch(() => {});
   return () => {
     closed = true;
     cancelAnimationFrame(frame);
@@ -425,8 +567,10 @@ async function summarizeStats(peerConnection) {
       report.type === "inbound-rtp" &&
       (report.kind === "audio" || report.mediaType === "audio")
     ) {
-      if (Number.isFinite(report.jitter)) stats.jitterMs = report.jitter * 1_000;
-      if (Number.isFinite(report.packetsLost)) stats.packetsLost = report.packetsLost;
+      if (Number.isFinite(report.jitter))
+        stats.jitterMs = report.jitter * 1_000;
+      if (Number.isFinite(report.packetsLost))
+        stats.packetsLost = report.packetsLost;
     }
   }
   return stats;
@@ -483,7 +627,10 @@ async function createRealtimePeer({ direction, source, sink }) {
 
     peerConnection.addEventListener("connectionstatechange", () => {
       if (["failed", "disconnected"].includes(peerConnection.connectionState)) {
-        window.translive.rendererError(direction, `WebRTC connection ${peerConnection.connectionState}`);
+        window.translive.rendererError(
+          direction,
+          `WebRTC connection ${peerConnection.connectionState}`,
+        );
       }
     });
     peerConnection.addEventListener("track", async (event) => {
@@ -493,18 +640,34 @@ async function createRealtimePeer({ direction, source, sink }) {
           throw new Error("此 Electron 版本不支援指定音訊輸出裝置");
         }
         await audio.setSinkId(sink.id);
-        event.track.addEventListener("unmute", () => recordMetric(direction, "output-audio", {}), { once: true });
-        audio.addEventListener("playing", () => recordMetric(direction, "output-audio", {}), { once: true });
+        event.track.addEventListener(
+          "unmute",
+          () => recordMetric(direction, "output-audio", {}),
+          { once: true },
+        );
+        audio.addEventListener(
+          "playing",
+          () => recordMetric(direction, "output-audio", {}),
+          { once: true },
+        );
         await audio.play();
       } catch (error) {
-        window.translive.rendererError(direction, `無法播放翻譯音訊：${error.message}`);
+        window.translive.rendererError(
+          direction,
+          `無法播放翻譯音訊：${error.message}`,
+        );
       }
     });
 
     stopInputProbe = createInputProbe(stream, direction);
     statsTimer = setInterval(async () => {
       try {
-        if (!cleaned) recordMetric(direction, "webrtc", await summarizeStats(peerConnection));
+        if (!cleaned)
+          recordMetric(
+            direction,
+            "webrtc",
+            await summarizeStats(peerConnection),
+          );
       } catch {}
     }, 1_000);
 
@@ -542,7 +705,12 @@ function setConnectionStep(id, state, detail) {
 }
 
 async function startTranslation() {
-  if (ui.startup || Object.keys(ui.active).length > 0 || ui.app === "connecting") return;
+  if (
+    ui.startup ||
+    Object.keys(ui.active).length > 0 ||
+    ui.app === "connecting"
+  )
+    return;
   let config;
   const startup = createStartupSession({
     directions: directionsForMode(),
@@ -564,7 +732,11 @@ async function startTranslation() {
     setAppState("connecting");
     resetLiveDisplay();
     setConnectionStep("connect-account-step", "done", "ChatGPT 已連線");
-    setConnectionStep("connect-runtime-step", "active", "正在檢查 Codex runtime");
+    setConnectionStep(
+      "connect-runtime-step",
+      "active",
+      "正在檢查 Codex runtime",
+    );
     setConnectionStep("connect-session-step", "pending", "等待路由預檢");
     setConnectionStep("connect-route-step", "pending", "等待路由預檢");
 
@@ -576,13 +748,22 @@ async function startTranslation() {
     setConnectionStep("connect-runtime-step", "done", "Codex runtime 已驗證");
     elements["diag-codex"].textContent = preflight.codexVersion;
     elements["settings-runtime-status"].textContent = preflight.codexVersion;
-    elements["diag-route"].textContent = `${config.platform} · ${config.routeProfile} · ${ui.mode}`;
+    elements["diag-route"].textContent =
+      `${config.platform} · ${config.routeProfile} · ${ui.mode}`;
     setConnectionStep("connect-route-step", "done", "音訊路由已驗證");
-    setConnectionStep("connect-session-step", "active", "正在建立 GPT‑Live session");
+    setConnectionStep(
+      "connect-session-step",
+      "active",
+      "正在建立 GPT‑Live session",
+    );
 
     const { result } = await startup.start(config);
     if (startup.isCanceled()) return;
-    setConnectionStep("connect-session-step", "done", "GPT‑Live session 已建立");
+    setConnectionStep(
+      "connect-session-step",
+      "done",
+      "GPT‑Live session 已建立",
+    );
     applyAggregate(result.aggregate);
   } catch (error) {
     const canceled = error?.name === "AbortError" || startup.isCanceled();
@@ -615,7 +796,14 @@ async function stopTranslation() {
   ui.active = {};
   for (const peer of Object.values(peers)) peer.stop();
   try {
-    await window.translive.stop();
+    const result = await window.translive.stop();
+    if (result.meetingRestore?.reason) {
+      elements["stopped-copy"].textContent =
+        "翻譯已停止，但 Windows 通訊裝置尚未還原。TransLive 會在下次啟動時重試；你也可以在設定中手動確認。";
+    } else {
+      elements["stopped-copy"].textContent =
+        "音訊連線已釋放。逐字稿與摘要將於下一階段提供。";
+    }
   } finally {
     setAppState("stopped");
   }
@@ -633,7 +821,8 @@ async function toggleMute(direction) {
 
 function showBlocked(title, detail) {
   elements["blocked-title"].textContent = title;
-  elements["blocked-copy"].textContent = "請檢查登入、音訊裝置和路由設定。音訊尚未繼續傳送。";
+  elements["blocked-copy"].textContent =
+    "請檢查登入、音訊裝置和路由設定。音訊尚未繼續傳送。";
   elements["blocked-detail"].textContent = detail || "NO_DETAILS";
   elements["blocked-action"].textContent =
     ui.account === "connected" ? "返回設定" : "重新連接 ChatGPT";
@@ -642,7 +831,11 @@ function showBlocked(title, detail) {
 
 function appendTranscript({ direction, role, text, final = false }) {
   const key = captionKey(role);
-  ui.captions[direction][key] = mergeCaption(ui.captions[direction][key], text, final);
+  ui.captions[direction][key] = mergeCaption(
+    ui.captions[direction][key],
+    text,
+    final,
+  );
   renderCaptions();
 }
 
@@ -653,6 +846,19 @@ function updateDiagnostics(event) {
     : event.type;
   if (event.type === "state") {
     elements[`diag-${event.direction}`].textContent = event.state;
+  }
+}
+
+async function initializeTray() {
+  try {
+    const tray = await window.translive.trayStatus();
+    elements["tray-close-behavior"].value = tray.closeBehavior;
+    elements["tray-close-behavior"].disabled = !tray.supported;
+    if (!tray.supported) {
+      elements["tray-close-behavior"].title = "系統匣僅支援 Windows";
+    }
+  } catch {
+    elements["tray-close-behavior"].disabled = true;
   }
 }
 
@@ -707,20 +913,46 @@ elements["blocked-action"].addEventListener("click", () => {
   else void startAccountLogin();
 });
 elements["start-button"].addEventListener("click", startTranslation);
-elements["cancel-connect-button"].addEventListener("click", () =>
-  void cancelTranslationStartup(),
+elements["cancel-connect-button"].addEventListener(
+  "click",
+  () => void cancelTranslationStartup(),
 );
 elements["stop-button"].addEventListener("click", stopTranslation);
-elements["restart-button"].addEventListener("click", () => setAppState("ready"));
+elements["restart-button"].addEventListener("click", () =>
+  setAppState("ready"),
+);
 for (const button of document.querySelectorAll(".mute-button")) {
   button.addEventListener("click", () =>
     toggleMute(button.dataset.direction || activeSingleDirection()),
   );
 }
 elements["diagnostics-button"].addEventListener("click", () => setDrawer(true));
-elements["diagnostics-button-live"].addEventListener("click", () => setDrawer(true));
+elements["diagnostics-button-live"].addEventListener("click", () =>
+  setDrawer(true),
+);
 elements["close-diagnostics"].addEventListener("click", () => setDrawer(false));
-elements["drawer-scrim"].addEventListener("click", () => setDrawer(false));
+elements["drawer-scrim"].addEventListener("click", () => {
+  setDrawer(false);
+  setQuickSetup(false);
+});
+elements["quick-setup-button"].addEventListener("click", () => {
+  if (ui.mode !== "meeting") return;
+  setQuickSetup(true);
+});
+elements["close-quick-setup"].addEventListener("click", () =>
+  setQuickSetup(false),
+);
+elements["apply-quick-setup"].addEventListener(
+  "click",
+  () => void applyQuickSetup(),
+);
+elements["quick-open-settings"].addEventListener(
+  "click",
+  () => void openQuickManualSettings(),
+);
+for (const button of document.querySelectorAll("[data-quick-app]")) {
+  button.addEventListener("click", () => setQuickApp(button.dataset.quickApp));
+}
 elements["mini-overlay-button"].addEventListener("click", () => {
   elements["mini-overlay"].classList.add("is-open");
   elements["mini-overlay"].setAttribute("aria-hidden", "false");
@@ -730,7 +962,10 @@ elements["close-mini"].addEventListener("click", () => {
   elements["mini-overlay"].setAttribute("aria-hidden", "true");
 });
 elements["account-button"].addEventListener("click", () => setView("settings"));
-elements["settings-account-button"].addEventListener("click", startAccountLogin);
+elements["settings-account-button"].addEventListener(
+  "click",
+  startAccountLogin,
+);
 elements["settings-logout-button"].addEventListener("click", async () => {
   await window.translive.accountLogout();
   setAccountState("logged-out");
@@ -738,11 +973,20 @@ elements["settings-logout-button"].addEventListener("click", async () => {
   setAppState("logged-out");
 });
 elements["theme-button"].addEventListener("click", () => {
-  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  const next =
+    document.documentElement.dataset.theme === "dark" ? "light" : "dark";
   document.documentElement.dataset.theme = next;
   elements["theme-label"].textContent = next === "dark" ? "深色" : "淺色";
 });
-elements["settings-runtime-button"].addEventListener("click", () => setDrawer(true));
+elements["settings-runtime-button"].addEventListener("click", () =>
+  setDrawer(true),
+);
+elements["tray-close-behavior"].addEventListener("change", async (event) => {
+  const result = await window.translive.traySetCloseBehavior(
+    event.target.value,
+  );
+  event.target.value = result.closeBehavior;
+});
 elements["copy-diagnostics"].addEventListener("click", async () => {
   const detail = `mode=${ui.mode}\naccount=${ui.account}\nruntime=${ui.runtime}`;
   try {
@@ -763,6 +1007,20 @@ window.addEventListener("pagehide", () => {
 
 window.translive.onEvent(async (event) => {
   updateDiagnostics(event);
+  if (event.type === "meeting-setup") {
+    if (event.state === "restore-failed") {
+      elements["quick-setup-note"].textContent =
+        event.message || "Windows 通訊裝置尚未還原，請在設定中手動確認。";
+      elements["stopped-copy"].textContent =
+        "翻譯已停止，但 Windows 通訊裝置尚未還原。請在設定中手動確認。";
+    }
+    return;
+  }
+  if (event.type === "tray") {
+    if (event.action === "diagnostics") setDrawer(true);
+    if (event.action === "stopped") setAppState("stopped");
+    return;
+  }
   if (event.type === "account") {
     setAccountState(event.state);
     if (event.state === "connected") setAppState("ready");
@@ -787,7 +1045,10 @@ window.translive.onEvent(async (event) => {
       const result = await window.translive.answerApplied(event.direction);
       applyAggregate(result.aggregate);
     } catch {
-      window.translive.rendererError(event.direction, "無法套用 GPT‑Live WebRTC 回應。");
+      window.translive.rendererError(
+        event.direction,
+        "無法套用 GPT‑Live WebRTC 回應。",
+      );
     }
     return;
   }
@@ -821,4 +1082,5 @@ window.translive.onEvent(async (event) => {
 
 setMode("meeting");
 setView("translate");
+initializeTray();
 initializeAccount();

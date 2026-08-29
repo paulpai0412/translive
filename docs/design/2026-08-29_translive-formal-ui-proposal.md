@@ -254,25 +254,28 @@ Live 顯示兩條通道：
 Meeting Ready 畫面提供單一「快速設定 Teams／Zoom」動作，採安全的三層策略：
 
 1. 偵測 Teams／Zoom 是否已安裝及正在執行；
-2. 保存目前 Windows 預設通訊 Mic／Speaker，暫時切換為 TransLive 虛擬端點；
-3. 驗證會議 App 是否跟隨系統預設；若 App 固定使用其他裝置，直接開啟其裝置設定並顯示需要選取的兩個名稱。
+2. 以顯示名稱把瀏覽器裝置解析為 Windows 原生 IMMDevice ID；
+3. 保存目前 Windows 預設通訊 Mic／Speaker，暫時切換為 TransLive 虛擬端點；
+4. 驗證 **Windows 通訊預設** 已改為預期的原生端點；
+5. 開啟 Teams／Zoom 裝置設定並要求使用者確認 App 實際選取相同裝置。
 
-不以脆弱的滑鼠座標自動點擊 proprietary UI 作為唯一方案。已知版本可提供 UI Automation best-effort，但失敗時必須回退到清楚的人工確認流程。
+Windows 預設已變更不等於 Teams／Zoom 一定正在使用它；UI 絕不將前者顯示為會議 App 已設定成功。不以脆弱的滑鼠座標自動點擊 proprietary UI 作為唯一方案。已知版本可提供 UI Automation best-effort，但失敗時必須回退到清楚的人工確認流程。
 
 ```text
 快速設定 Microsoft Teams
 
 ✓ 已偵測 Teams
-✓ 麥克風：Voicemeeter Out B2
-✓ 喇叭：Voicemeeter Input
-● 驗證音訊路由
+✓ Windows 通訊麥克風：Voicemeeter Out B2
+✓ Windows 通訊喇叭：Voicemeeter Input
+● 驗證 Windows 預設
+○ 請在 Teams 確認實際裝置
 
 ☑ 停止翻譯後還原原本裝置
 
-[套用快速設定] [只開啟 Teams 裝置設定]
+[套用 Windows 預設] [開啟 Teams 裝置設定]
 ```
 
-狀態：未安裝、未執行、套用中、已套用、需要人工確認、還原完成、還原失敗。Live 開始前必須顯示最終使用中的實際裝置，不以「按過按鈕」等同設定成功。
+狀態：未安裝、未執行、解析原生端點中、Windows 預設已更新、需要 App 人工確認、還原完成、還原失敗。Live 開始前必須顯示 Windows 實際預設與會議 App 待確認狀態，不以「按過按鈕」等同 App 設定成功。
 
 ### 7.3 媒體翻譯
 
