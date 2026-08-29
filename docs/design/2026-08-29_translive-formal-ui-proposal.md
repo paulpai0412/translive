@@ -1,6 +1,6 @@
 # TransLive 正式版 UI 設計方案
 
-> **階段：**UI v0 已產出（待視覺與操作確認）
+> **階段：**UI v0 與新增需求已確認，正式實作開始
 >
 > **語言：**繁體中文為主；英文作為模式副標、技術名詞與錯誤碼輔助
 >
@@ -596,3 +596,21 @@ v0 不接真實 GPT‑Live，不修改 Phase 1 音訊核心；目的是先確認
 4. Meeting Live 採雙欄、Media／Microphone 採單欄；
 5. 是否接受系統 light／dark theme；
 6. v0 使用已建立的 `assets/translive-brand/translive-mark.svg`，正式發布前再輸出完整 Windows ICO／PNG asset set。
+
+## 19. 正式實作切片與 TDD seam
+
+正式版以垂直切片交付，不先建立完整元件庫或一次重寫所有 POC 畫面。
+
+| Slice | 可交付能力 | 驗證 |
+| --- | --- | --- |
+| 1. Mode runtime | Meeting 啟動 TX＋RX、Media 只啟動 RX、Microphone 只啟動 TX | 既有 translation orchestration seam 的行為測試 |
+| 2. Formal shell | Logo、繁中導覽、OAuth 狀態、Ready／Connecting／Live／Blocked | Electron IPC＋畫面 state 的高層測試 |
+| 3. Mode setup | 各模式只要求必要裝置；字幕與控制依模式切換 | mode config 驗證與 renderer state |
+| 4. Quick setup | Teams／Zoom 偵測、暫存／還原裝置、人工 fallback | Windows adapter fixture＋Windows 實測 |
+| 5. Tray | 隱藏／顯示、動態 menu、mute／stop、退出 | Electron Tray adapter＋手動 Windows 驗證 |
+| 6. Records | 本機逐字稿、單場摘要、跨場摘要匯整 | 檔案 schema、摘要輸入／輸出契約 |
+| 7. Hardening | 診斷、可及性、錯誤狀態、Windows 打包 | 自動檢查＋真實使用流程 |
+
+主要自動測試 seam 沿用 Phase 1 的 translation orchestration contract：給定模式、路由與外部 adapter，從公開 Start／Mute／Stop／State 觀察行為，不測 private helper。Electron、Windows 裝置與會議 App 行為在 adapter 邊界做少量整合測試，最後以 Windows 真機驗證。
+
+第一個 tracer bullet 是 Mode runtime；它必須在不要求多餘裝置的情況下，只建立目前模式需要的 GPT‑Live session。
