@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-labelledby="title desc">
+  <title id="title">TransLive</title>
+  <desc id="desc">Two opposing audio wave paths representing live translation in both directions.</desc>
+  <rect x="2" y="2" width="44" height="44" rx="13" fill="#2F6FED"/>
+  <path d="M8 16h8l4-6v12l4-6h16" fill="none" stroke="#FFFFFF" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M40 32h-8l-4 6V26l-4 6H8" fill="none" stroke="#8CE1C7" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

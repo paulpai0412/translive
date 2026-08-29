@@ -1,6 +1,6 @@
 # TransLive 正式版 UI 設計方案
 
-> **階段：**UI 方向確認（尚未開始實作）
+> **階段：**UI v0 已產出（待視覺與操作確認）
 >
 > **語言：**繁體中文為主；英文作為模式副標、技術名詞與錯誤碼輔助
 >
@@ -27,8 +27,9 @@
 - 來源字幕與目標字幕；
 - 即時狀態、mute、停止與錯誤復原；
 - 延遲、網路、音訊與裝置診斷；
-- 本機逐字稿、會議摘要及刪除；
+- 本機逐字稿、單場摘要、跨場摘要匯整及刪除；
 - 置頂迷你字幕窗；
+- 可縮至 Windows 系統匣（Tray），不中斷進行中的翻譯；
 - 繁體中文優先、英文輔助；
 - 不顯示沒有實際資料的信心分數或假指標。
 
@@ -131,11 +132,17 @@ TransLive
 │  ├─ 隱私與儲存
 │  ├─ 快捷鍵
 │  └─ 開發者設定
-└─ 診斷抽屜
-   ├─ 快速健康檢查
-   ├─ TX／RX 指標
-   ├─ 版本與 session
-   └─ 匯出遮罩診斷包
+├─ 診斷抽屜
+│  ├─ 快速健康檢查
+│  ├─ TX／RX 指標
+│  ├─ 版本與 session
+│  └─ 匯出遮罩診斷包
+└─ Windows 系統匣
+   ├─ 顯示／隱藏主視窗
+   ├─ 翻譯狀態與目前模式
+   ├─ mute／開始／停止
+   ├─ 開啟診斷
+   └─ 完全結束
 ```
 
 桌面導覽採頂部三個文字入口，不使用永久大型側欄：
@@ -413,7 +420,44 @@ RX          ● Live
 - 鍵盤可聚焦；
 - Stop 需確認或長按，避免誤觸。
 
-## 12. 紀錄與摘要
+## 12. Windows 系統匣 Tray
+
+關閉主視窗時預設縮至系統匣，不中止正在進行的 session。第一次操作必須提示「縮至系統匣後翻譯仍會繼續」。設定中可改為「關閉視窗即結束」。
+
+Tray icon 使用 `assets/translive-brand/translive-mark.svg` 產生的 Windows ICO／PNG 尺寸，並以小型狀態 badge 區分：
+
+- 無 badge：Ready／Stopped；
+- 綠點：Live；
+- 黃點：Degraded；
+- 紅點：Blocked／Disconnected。
+
+右鍵選單依狀態動態顯示：
+
+```text
+TransLive · 雙向會議 · Live
+─────────────────────────
+顯示 TransLive
+TX 靜音
+RX 靜音
+停止翻譯
+開啟診斷
+─────────────────────────
+完全結束
+```
+
+非 Live 狀態改為：
+
+```text
+TransLive · Ready
+開始上次模式
+顯示 TransLive
+設定
+完全結束
+```
+
+Tray tooltip 必須顯示目前模式與通道狀態；斷線時送出 Windows notification，但不得在通知中顯示逐字稿或敏感會議內容。
+
+## 13. 紀錄與摘要
 
 紀錄頁採列表＋內容雙欄，不做 dashboard：
 
@@ -427,13 +471,24 @@ RX          ● Live
 - 逐字稿 tab；
 - 摘要 tab；
 - 重點、決策、待辦、未決問題與時間戳；
-- 產生／重新產生摘要；
+- 產生／重新產生單場摘要；
 - 開啟資料夾；
 - 刪除單場／全部刪除。
 
+摘要匯整：
+
+- 歷史列表可多選 2 個以上紀錄；
+- 頂部顯示「匯整摘要」動作；
+- 使用同一 Codex OAuth 的文字模型，不占用 GPT‑Live session；
+- 固定輸出：跨場共同主題、決策演變、未完成待辦、重複問題、衝突資訊、來源場次與時間戳；
+- 不推測未指定的負責人、期限或結論；
+- 生成前明確提示將選取的逐字稿再次送至模型；
+- 結果保存為獨立 Markdown，可重新產生、匯出或刪除；
+- 單場摘要與跨場匯整必須視覺區分，避免誤認為原始會議紀錄。
+
 正式版應在 UI 明確標示目前儲存策略。現有 Beta 的永久明文保存屬高風險；正式發布前應改為本機加密或要求使用者再次確認。
 
-## 13. Responsive 與 Accessibility
+## 14. Responsive 與 Accessibility
 
 - 建議最小視窗 820×620；
 - ≥1100px：Meeting 雙欄；
@@ -446,7 +501,7 @@ RX          ● Live
 - 字幕字級可在 90–160% 調整；
 - 支援 reduced motion、light／dark system theme。
 
-## 14. Preserved／Improved／Removed
+## 15. Preserved／Improved／Removed
 
 ### Preserve
 
@@ -474,7 +529,7 @@ RX          ● Live
 - 技術 thread ID 出現在主畫面；
 - Zoom／Teams 作為使用能力限制。
 
-## 15. 需要保護的技術契約
+## 16. 需要保護的技術契約
 
 正式 UI 重構不能破壞：
 
@@ -487,7 +542,7 @@ RX          ● Live
 - Stop 必須釋放 MediaStream、AudioContext、PeerConnection 與 app-server；
 - 未獲使用者操作前不可啟動 live audio session。
 
-## 16. v0 原型範圍
+## 17. v0 原型範圍
 
 確認本方案後，第一個可點擊 v0 只做：
 
@@ -498,11 +553,13 @@ RX          ● Live
 5. Live 字幕；
 6. Degraded／Blocked；
 7. 診斷抽屜；
-8. 置頂迷你窗示意。
+8. 置頂迷你窗示意；
+9. 系統匣右鍵選單示意；
+10. 紀錄多選與摘要匯整示意。
 
 v0 不接真實 GPT‑Live，不修改 Phase 1 音訊核心；目的是先確認資訊架構、密度與視覺方向。
 
-## 17. 設計確認點
+## 18. 設計確認點
 
 開始 v0 前需確認：
 
@@ -511,4 +568,4 @@ v0 不接真實 GPT‑Live，不修改 Phase 1 音訊核心；目的是先確認
 3. 是否接受三種 mode-first 操作方式；
 4. Meeting Live 採雙欄、Media／Microphone 採單欄；
 5. 是否接受系統 light／dark theme；
-6. TransLive 正式 logo／icon 尚未提供，v0 將使用明確的 `[Logo]` placeholder，不自行繪製假 logo。
+6. v0 使用已建立的 `assets/translive-brand/translive-mark.svg`，正式發布前再輸出完整 Windows ICO／PNG asset set。
