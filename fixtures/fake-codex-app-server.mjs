@@ -29,7 +29,8 @@ function directionFor(params) {
     params.voice === "cove" &&
     /Traditional Chinese used in Taiwan/.test(params.prompt) &&
     /English interpretation/.test(params.prompt) &&
-    /Speak every interpretation aloud/.test(params.prompt)
+    /Speak every interpretation aloud/.test(params.prompt) &&
+    /Do not wait for sentence completion/.test(params.prompt)
   ) {
     return "tx";
   }
@@ -37,7 +38,8 @@ function directionFor(params) {
     params.voice === "cove" &&
     /spoken English/.test(params.prompt) &&
     /Traditional Chinese interpretation/.test(params.prompt) &&
-    /Speak every interpretation aloud/.test(params.prompt)
+    /Speak every interpretation aloud/.test(params.prompt) &&
+    /Do not wait for sentence completion/.test(params.prompt)
   ) {
     return "rx";
   }
