@@ -488,11 +488,10 @@ export class PhaseOneController {
       state.sawDelta = true;
       state.buffer += notification.params.delta ?? "";
       const characters = [...state.buffer].length;
-      if (
-        /[，。！？；,.!?;]\s*$/.test(state.buffer) ||
-        characters >= RX_SPEECH_CHUNK_CHARACTERS
-      ) {
+      if (/[，。！？；,.!?;]\s*$/.test(state.buffer)) {
         this.#flushRxSpeechFallback(context);
+      } else if (characters >= RX_SPEECH_CHUNK_CHARACTERS) {
+        this.#flushRxSpeechFallback(context, true);
       }
       return;
     }
@@ -506,11 +505,12 @@ export class PhaseOneController {
     }
   }
 
-  #flushRxSpeechFallback(context) {
+  #flushRxSpeechFallback(context, addPause = false) {
     const state = context.speechFallback;
     if (!state) return;
-    const text = state.buffer.trim();
+    let text = state.buffer.trim();
     state.buffer = "";
+    if (text && addPause) text += "，";
     if (text) this.#enqueueRxSpeech(context, text);
   }
 

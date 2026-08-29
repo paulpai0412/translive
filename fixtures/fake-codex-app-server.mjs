@@ -161,7 +161,7 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
     const direction = realtimeThreads.get(request.params?.threadId);
     if (
       direction !== "rx" ||
-      !["這是一段即時中文", "。"].includes(request.params?.text)
+      !["這是一段即時中文，", "。"].includes(request.params?.text)
     ) {
       reject(request.id, "Unexpected RX speech fallback text");
       return;
