@@ -340,46 +340,38 @@ async function createOriginalMonitor(stream, sink) {
   const context = new AudioContext();
   const source = context.createMediaStreamSource(stream);
   const delay = context.createDelay(1);
-  const destination = context.createMediaStreamDestination();
-  const audio = document.createElement("audio");
+  const gain = context.createGain();
   let stopped = false;
 
   try {
-    await context.resume();
-    delay.delayTime.value = 0.5;
-    source.connect(delay).connect(destination);
-    audio.autoplay = true;
-    audio.playsInline = true;
-    audio.hidden = true;
-    document.body.append(audio);
-    if (typeof audio.setSinkId !== "function") {
+    if (typeof context.setSinkId !== "function") {
       throw new Error(
-        "This Electron build does not support output device routing",
+        "This Electron build does not support AudioContext output routing",
       );
     }
-    await audio.setSinkId(sink.id);
-    audio.srcObject = destination.stream;
-    await audio.play();
+    await context.setSinkId(sink.id);
+    await context.resume();
+    delay.delayTime.value = 0.5;
+    gain.gain.value = 1;
+    source.connect(delay).connect(gain).connect(context.destination);
   } catch (error) {
     source.disconnect();
     delay.disconnect();
-    audio.remove();
+    gain.disconnect();
     void context.close();
     throw error;
   }
 
   return {
     setMuted: (muted) => {
-      audio.muted = muted;
+      gain.gain.setValueAtTime(muted ? 0 : 1, context.currentTime);
     },
     stop: () => {
       if (stopped) return;
       stopped = true;
-      audio.pause();
-      audio.srcObject = null;
-      audio.remove();
       source.disconnect();
       delay.disconnect();
+      gain.disconnect();
       void context.close();
     },
   };
