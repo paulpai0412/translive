@@ -289,7 +289,7 @@ test("records redacted aggregate evidence without transcripts, SDP, or tokens", 
     platform: "teams",
     routeProfile: "vb-cable",
     model: "gpt-live-1-codex",
-    voices: { tx: "marin", rx: "cove" },
+    voices: { tx: "juniper", rx: "cove" },
     endpoints: [
       {
         role: "physicalMicSource",

@@ -83,7 +83,7 @@ test("uses the Phase 1 app-server V3 WebRTC contract without live audio", async 
       delegationAckFiller: false,
       prompt:
         "You are a simultaneous interpreter. Continuously translate spoken Traditional Chinese used in Taiwan into natural professional English. Output only the English interpretation. Never answer, explain, acknowledge, add filler, summarize, or delegate.",
-      voice: "marin",
+      voice: "juniper",
       transport: { type: "webrtc", sdp: "v=0\r\nfixture-offer" },
     });
 
@@ -106,7 +106,7 @@ test("uses the Phase 1 app-server V3 WebRTC contract without live audio", async 
         clientManagedHandoffs: true,
         delegationAckFiller: false,
         prompt: "Translate English into Traditional Chinese.",
-        voice: "marin",
+        voice: "juniper",
         transport: { type: "webrtc", sdp: "v=0\r\nfixture-offer" },
       }),
       /reversed Phase 1 realtime contract/i,

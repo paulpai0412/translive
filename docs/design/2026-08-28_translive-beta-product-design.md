@@ -175,7 +175,7 @@ Wizard 步驟：
 │                                                                        │
 │ 我的語言 [繁中（台灣）▼]  ⇄  對方語言 [英文▼]                          │
 │                                                                        │
-│ 實體 Mic [Headset Microphone ▼]  對方聽到的音色 [Marin ▼]              │
+│ 實體 Mic [Headset Microphone ▼]  對方聽到的音色 [Juniper ▼]            │
 │ 我的耳機 [USB Headphones ▼]      我聽到的音色   [Cove ▼]               │
 │                                                                        │
 │ Virtual OUT  Cable A ✓       Virtual IN  Cable B ✓       耳機 ✓       │
@@ -195,7 +195,7 @@ Wizard 步驟：
 ├───────────────────────────────────┬────────────────────────────────────┤
 │ TX｜我 → 對方                    │ RX｜對方 → 我                       │
 │ Live ●   1.2s   ▂▅▇▃             │ Reconnecting ◐  2/3                 │
-│ 繁中 → 英文   Voice: Marin       │ 英文 → 繁中   Voice: Cove           │
+│ 繁中 → 英文   Voice: Juniper     │ 英文 → 繁中   Voice: Cove           │
 │ [TX 靜音]                         │ [RX 靜音] [立即重試]                 │
 ├───────────────────────────────────┴────────────────────────────────────┤
 │ 我說                                                               │
@@ -256,7 +256,7 @@ Live 狀態不顯示可編輯 dropdown，避免誤以為可無縫切換。若只
 | 平台 | Zoom／Teams | Teams | 鎖定 |
 | 我的語言 | 繁中／英文／日文 | 繁中 | 鎖定 |
 | 對方語言 | 英文／日文／繁中，依支援矩陣限制 | 英文 | 鎖定 |
-| TX voice | bundled Codex runtime 驗證通過的 voice enum | Marin | 鎖定 |
+| TX voice | bundled Codex runtime 驗證通過的 voice enum | Juniper | 鎖定 |
 | RX voice | bundled Codex runtime 驗證通過的 voice enum | Cove | 鎖定 |
 | 實體 Mic | Windows capture endpoints | Windows 通訊預設 | 鎖定 |
 | 實體耳機 | Windows render endpoints；排除 virtual cable | Windows 通訊預設 | 鎖定 |
@@ -264,7 +264,7 @@ Live 狀態不顯示可編輯 dropdown，避免誤以為可無縫切換。若只
 | 迷你浮窗 | 開／關 | 關 | 可調 |
 | 逐字稿路徑 | 使用者資料夾 | `%LOCALAPPDATA%\TransLive\meetings` | 不可改 |
 
-Codex pinned source 暴露的 voice 集合包含 Alloy、Arbor、Ash、Ballad、Breeze、Cedar、Coral、Cove、Echo、Ember、Juniper、Maple、Marin、Sage、Shimmer、Sol、Spruce、Vale、Verse。App 啟動時以 bundled runtime schema 驗證，不能只相信硬編碼清單。
+Voice 必須以目前 bundled runtime 的 V3 支援清單為準。Windows Codex `0.150.0-alpha.8` 的實測 V3 清單為 Juniper、Maple、Spruce、Ember、Vale、Breeze、Arbor、Sol、Cove；Marin 雖存在於較廣的 enum，不能用於此 V3 session。
 
 ### 5.2 固定安全參數
 

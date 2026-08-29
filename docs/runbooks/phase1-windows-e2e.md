@@ -68,7 +68,7 @@ npm start
 4. Confirm the headphone checkbox, then click **Test headphones**. The user-gesture tone must play only through the selected headphone endpoint.
 5. Click **Route preflight**. It checks endpoint kinds, uniqueness, pinned Codex version, and login status. It must pass before starting.
 6. In Zoom/Teams manually set microphone and speaker for the selected profile exactly as shown above. TransLive intentionally does not alter Windows or meeting-app settings.
-7. Click **Start dual channel**. The app starts with each channel in `connecting`; it becomes `live` only after its WebRTC answer is applied. Fixed voices are TX Marin and RX Cove.
+7. Click **Start dual channel**. The app starts with each channel in `connecting`; it becomes `live` only after its WebRTC answer is applied. Fixed V3-supported voices are TX Juniper and RX Cove.
 
 A blocked start (missing Codex entitlement, login/version mismatch, permission denial, rejected V3 request, or SDP/output-routing failure) is a valid Phase 1 no-go result. The app writes redacted blocked-attempt evidence; do not substitute another model.
 
