@@ -26,7 +26,7 @@ function reject(id, message) {
 
 function directionFor(params) {
   if (
-    params.voice === "juniper" &&
+    params.voice === "cove" &&
     /Traditional Chinese used in Taiwan/.test(params.prompt) &&
     /English interpretation/.test(params.prompt)
   ) {

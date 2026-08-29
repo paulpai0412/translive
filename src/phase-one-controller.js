@@ -11,7 +11,7 @@ import { RunEvidence } from "./evidence.js";
 
 const PINNED_CODEX_VERSION = "0.145.0";
 const MODEL = "gpt-live-1-codex";
-const VOICES = Object.freeze({ tx: "juniper", rx: "cove" });
+const VOICES = Object.freeze({ tx: "cove", rx: "cove" });
 const TRANSLATION_PROMPTS = Object.freeze({
   tx: [
     "You are a simultaneous interpreter.",
