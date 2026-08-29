@@ -107,8 +107,14 @@ test("keeps channels connecting until the renderer confirms both SDP answers", a
   assert.deepEqual(result.status, { tx: "connecting", rx: "connecting" });
   assert.equal(result.aggregate, "connecting");
 
-  await new Promise((resolve) => setTimeout(resolve, 40));
+  await new Promise((resolve) => setTimeout(resolve, 80));
   assert.equal(events.filter((event) => event.type === "sdp").length, 2);
+  assert.deepEqual(
+    events
+      .filter((event) => event.type === "speech-fallback")
+      .map(({ direction, characters }) => ({ direction, characters })),
+    [{ direction: "rx", characters: 9 }],
+  );
   await controller.answerApplied("tx");
   assert.deepEqual(controller.status(), { tx: "live", rx: "connecting" });
   await controller.answerApplied("rx");

@@ -202,6 +202,13 @@ export class PhaseOneController {
         threads: new Map(),
         buffered: [],
         finalized: false,
+        speechFallback: {
+          buffer: "",
+          sawDelta: false,
+          lastText: "",
+          count: 0,
+          queue: Promise.resolve(),
+        },
       };
       client.on("notification", (notification) =>
         this.#receiveNotification(context, notification),
@@ -229,11 +236,9 @@ export class PhaseOneController {
       context.run = run;
       // Install the active run before forwarding buffered SDP notifications to the renderer.
       this.#active = { context, run };
-      context.buffered
-        .splice(0)
-        .forEach((notification) =>
-          this.#receiveNotification(context, notification),
-        );
+      for (const notification of context.buffered.splice(0)) {
+        this.#receiveNotification(context, notification);
+      }
       if (run.allFailed()) {
         context.evidence.recordBlockedAttempt(
           "controller-start",
@@ -300,6 +305,7 @@ export class PhaseOneController {
     if (!active)
       return { status: { tx: "stopped", rx: "stopped" }, aggregate: "stopped" };
     this.#active = undefined;
+    this.#flushRxSpeechFallback(active.context);
     await this.#finalize(active.context, { reason, outcome: "stopped" });
     this.#publish({ type: "stopped", status: active.run.status() });
     return { status: active.run.status(), aggregate: "stopped" };
@@ -451,6 +457,7 @@ export class PhaseOneController {
         role: notification.params.role,
         text: notification.params.delta ?? notification.params.text,
       });
+      this.#handleRxSpeechFallback(context, direction, notification);
     }
     if (
       notification.method === "thread/realtime/error" ||
@@ -469,6 +476,79 @@ export class PhaseOneController {
           this.#publish({ type: "error", message: safeMessage(error) }),
       );
     }
+  }
+
+  #handleRxSpeechFallback(context, direction, notification) {
+    if (direction !== "rx" || notification.params?.role !== "assistant") return;
+    const state = context.speechFallback;
+    if (!state || state.disabled) return;
+
+    if (notification.method === "thread/realtime/transcript/delta") {
+      state.sawDelta = true;
+      state.buffer += notification.params.delta ?? "";
+      const characters = [...state.buffer].length;
+      if (/[，。！？；,.!?;]\s*$/.test(state.buffer) || characters >= 12) {
+        this.#flushRxSpeechFallback(context);
+      }
+      return;
+    }
+
+    if (notification.method === "thread/realtime/transcript/done") {
+      if (state.buffer.trim()) this.#flushRxSpeechFallback(context);
+      else if (!state.sawDelta) {
+        this.#enqueueRxSpeech(context, notification.params.text);
+      }
+      state.sawDelta = false;
+    }
+  }
+
+  #flushRxSpeechFallback(context) {
+    const state = context.speechFallback;
+    if (!state) return;
+    const text = state.buffer.trim();
+    state.buffer = "";
+    if (text) this.#enqueueRxSpeech(context, text);
+  }
+
+  #enqueueRxSpeech(context, value) {
+    const state = context.speechFallback;
+    const text = String(value ?? "").trim();
+    if (!state || state.disabled || !text || text === state.lastText) return;
+    const threadId = [...context.threads].find(
+      ([, direction]) => direction === "rx",
+    )?.[0];
+    if (!threadId) return;
+    if (state.count >= 100) {
+      state.disabled = true;
+      context.evidence.recordError(
+        "rx",
+        new Error("RX speech fallback stopped after 100 chunks"),
+      );
+      return;
+    }
+
+    state.lastText = text;
+    state.count += 1;
+    state.queue = state.queue.then(async () => {
+      try {
+        await context.client.appendSpeech(threadId, text);
+        this.#publish({
+          type: "speech-fallback",
+          direction: "rx",
+          characters: [...text].length,
+        });
+      } catch (error) {
+        context.evidence.recordError("rx", error, {
+          requestId: requestIdFrom(error),
+        });
+        this.#publish({
+          type: "error",
+          direction: "rx",
+          message: `Could not speak translated Chinese: ${safeMessage(error)}`,
+          aggregate: context.run?.aggregateStatus(),
+        });
+      }
+    });
   }
 
   #recordControllerError(context, error) {
@@ -513,6 +593,7 @@ export class PhaseOneController {
     if (this.#active?.context === context) this.#active = undefined;
     let writeError;
     try {
+      await context.speechFallback?.queue;
       await context.run?.stop();
       context.evidence.finish(Date.now(), termination);
       await context.evidence.write(this.#evidenceDirectory);

@@ -71,7 +71,7 @@ test("uses the Phase 1 app-server V3 WebRTC contract without live audio", async 
     const sdp = nextNotification(client, "thread/realtime/sdp");
     const transcript = nextNotification(
       client,
-      "thread/realtime/transcript/delta",
+      "thread/realtime/transcript/done",
     );
     await client.startRealtime({
       threadId: thread.id,
@@ -93,7 +93,7 @@ test("uses the Phase 1 app-server V3 WebRTC contract without live audio", async 
       `fixture-session-${thread.id}`,
     );
     assert.equal((await sdp).params.sdp, "v=0\r\nfixture-answer");
-    assert.equal((await transcript).params.delta, "fixture translation");
+    assert.equal((await transcript).params.text, "fixture translation.");
 
     const reversed = await client.startEphemeralThread();
     await assert.rejects(

@@ -104,6 +104,10 @@ export class CodexAppServer extends EventEmitter {
     return this.request("thread/realtime/stop", { threadId });
   }
 
+  appendSpeech(threadId, text) {
+    return this.request("thread/realtime/appendSpeech", { threadId, text });
+  }
+
   notify(method, params) {
     this.#write({ method, params });
   }
