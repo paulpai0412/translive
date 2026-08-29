@@ -28,14 +28,16 @@ function directionFor(params) {
   if (
     params.voice === "cove" &&
     /Traditional Chinese used in Taiwan/.test(params.prompt) &&
-    /English interpretation/.test(params.prompt)
+    /English interpretation/.test(params.prompt) &&
+    /Speak every interpretation aloud/.test(params.prompt)
   ) {
     return "tx";
   }
   if (
     params.voice === "cove" &&
     /spoken English/.test(params.prompt) &&
-    /Traditional Chinese interpretation/.test(params.prompt)
+    /Traditional Chinese interpretation/.test(params.prompt) &&
+    /Speak every interpretation aloud/.test(params.prompt)
   ) {
     return "rx";
   }
