@@ -17,7 +17,8 @@
   --danger-solid: #b9383e;
   --focus: #9bc0ff;
   --shadow: 0 20px 60px rgb(0 0 0 / 0.28);
-  --font-ui: "Segoe UI Variable", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  --font-ui:
+    "Segoe UI Variable", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
   --font-mono: "Cascadia Mono", "SFMono-Regular", monospace;
 }
 
@@ -178,7 +179,9 @@ button:disabled {
   width: 7px;
 }
 
-body:not([data-app-state="logged-out"]):not([data-app-state="auth-waiting"]) .account-chip .status-dot,
+body:not([data-app-state="logged-out"]):not([data-app-state="auth-waiting"])
+  .account-chip
+  .status-dot,
 .health-ok,
 .channel-state i,
 .live-pulse {
@@ -209,14 +212,22 @@ body:not([data-app-state="logged-out"]):not([data-app-state="auth-waiting"]) .ac
   display: none;
 }
 
-body[data-current-view="translate"][data-app-state="logged-out"] [data-state-show~="logged-out"],
-body[data-current-view="translate"][data-app-state="auth-waiting"] [data-state-show~="auth-waiting"],
-body[data-current-view="translate"][data-app-state="ready"] [data-state-show~="ready"],
-body[data-current-view="translate"][data-app-state="connecting"] [data-state-show~="connecting"],
-body[data-current-view="translate"][data-app-state="live"] [data-state-show~="live"],
-body[data-current-view="translate"][data-app-state="degraded"] [data-state-show~="degraded"],
-body[data-current-view="translate"][data-app-state="blocked"] [data-state-show~="blocked"],
-body[data-current-view="translate"][data-app-state="stopped"] [data-state-show~="stopped"],
+body[data-current-view="translate"][data-app-state="logged-out"]
+  [data-state-show~="logged-out"],
+body[data-current-view="translate"][data-app-state="auth-waiting"]
+  [data-state-show~="auth-waiting"],
+body[data-current-view="translate"][data-app-state="ready"]
+  [data-state-show~="ready"],
+body[data-current-view="translate"][data-app-state="connecting"]
+  [data-state-show~="connecting"],
+body[data-current-view="translate"][data-app-state="live"]
+  [data-state-show~="live"],
+body[data-current-view="translate"][data-app-state="degraded"]
+  [data-state-show~="degraded"],
+body[data-current-view="translate"][data-app-state="blocked"]
+  [data-state-show~="blocked"],
+body[data-current-view="translate"][data-app-state="stopped"]
+  [data-state-show~="stopped"],
 body[data-current-view="history"] [data-view-show="history"],
 body[data-current-view="settings"] [data-view-show="settings"] {
   display: block;
@@ -236,7 +247,8 @@ body[data-app-state="auth-waiting"] #diagnostics-button {
 }
 
 body[data-current-view="translate"][data-app-state="logged-out"] .login-screen,
-body[data-current-view="translate"][data-app-state="auth-waiting"] .login-screen {
+body[data-current-view="translate"][data-app-state="auth-waiting"]
+  .login-screen {
   display: grid;
 }
 
@@ -471,6 +483,18 @@ select {
   margin: 12px 0 0;
 }
 
+.quick-setup-row {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.quick-setup-row span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .health-row {
   align-items: center;
   border-bottom: 1px solid var(--border);
@@ -546,7 +570,9 @@ select {
 
 .progress-list li.active::before {
   border-color: var(--primary);
-  box-shadow: inset 0 0 0 5px var(--surface), 0 0 0 2px color-mix(in srgb, var(--primary) 28%, transparent);
+  box-shadow:
+    inset 0 0 0 5px var(--surface),
+    0 0 0 2px color-mix(in srgb, var(--primary) 28%, transparent);
 }
 
 .live-bar {
@@ -714,7 +740,8 @@ body[data-app-state="degraded"] .degraded-banner {
 
 body[data-mode="meeting"] [data-mode-show]:not([data-mode-show~="meeting"]),
 body[data-mode="media"] [data-mode-show]:not([data-mode-show~="media"]),
-body[data-mode="microphone"] [data-mode-show]:not([data-mode-show~="microphone"]) {
+body[data-mode="microphone"]
+  [data-mode-show]:not([data-mode-show~="microphone"]) {
   display: none !important;
 }
 
@@ -730,7 +757,10 @@ body[data-mode="microphone"] .single-target-label::before {
 .caption-workspace,
 .mode-option,
 .screen {
-  transition: opacity 160ms ease, border-color 160ms ease, background-color 160ms ease;
+  transition:
+    opacity 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
 }
 
 .stopped-panel,
@@ -922,6 +952,113 @@ body[data-mode="microphone"] .single-target-label::before {
   align-items: center;
   grid-template-columns: 1fr auto;
   min-height: 58px;
+}
+
+.quick-setup-modal {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  display: none;
+  left: 50%;
+  max-width: 520px;
+  padding: 22px;
+  position: fixed;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: calc(100% - 40px);
+  z-index: 70;
+}
+
+.quick-setup-modal.is-open {
+  display: block;
+}
+
+.quick-setup-modal > header,
+.quick-setup-modal > footer {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.quick-app-switch {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: 1fr 1fr;
+  margin: 20px 0 14px;
+  padding: 4px;
+}
+
+.quick-app-switch button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--muted);
+  cursor: pointer;
+  min-height: 36px;
+}
+
+.quick-app-switch button.is-active {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.quick-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.quick-steps li {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 5px 12px;
+  grid-template-columns: 1fr auto;
+  min-height: 54px;
+  padding: 9px 2px;
+}
+
+.quick-steps li span::before {
+  color: var(--subtle);
+  content: "○";
+  margin-right: 9px;
+}
+
+.quick-steps li.done span::before {
+  color: var(--live);
+  content: "✓";
+}
+
+.quick-steps li.active span::before {
+  color: var(--primary);
+  content: "●";
+}
+
+.quick-steps small,
+.quick-note {
+  color: var(--muted);
+}
+
+.restore-device-option {
+  align-items: center;
+  display: flex;
+  gap: 9px;
+  margin-top: 16px;
+}
+
+.restore-device-option input {
+  accent-color: var(--primary-solid);
+}
+
+.quick-note {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 14px 0 20px;
 }
 
 .diagnostics-drawer {

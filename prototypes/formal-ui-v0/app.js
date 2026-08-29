@@ -1,6 +1,7 @@
 const body = document.body;
 const root = document.documentElement;
 const diagnosticsDrawer = document.querySelector("#diagnostics-drawer");
+const quickSetupModal = document.querySelector("#quick-setup-modal");
 const drawerScrim = document.querySelector("#drawer-scrim");
 const tweaksPanel = document.querySelector("#tweaks-panel");
 const trayMenu = document.querySelector("#tray-menu");
@@ -14,7 +15,8 @@ function setState(state) {
   document.querySelector("#state-select").value = state;
   const connected = !["logged-out", "auth-waiting"].includes(state);
   accountLabel.textContent = connected ? "ChatGPT 已連線" : "尚未連線";
-  if (state !== "live" && state !== "degraded") miniOverlay.classList.remove("is-open");
+  if (state !== "live" && state !== "degraded")
+    miniOverlay.classList.remove("is-open");
 }
 
 function setMode(mode) {
@@ -52,10 +54,23 @@ function setView(view) {
   });
 }
 
+function updateScrim() {
+  const open =
+    diagnosticsDrawer.classList.contains("is-open") ||
+    quickSetupModal.classList.contains("is-open");
+  drawerScrim.classList.toggle("is-open", open);
+}
+
 function setDrawer(open) {
   diagnosticsDrawer.classList.toggle("is-open", open);
   diagnosticsDrawer.setAttribute("aria-hidden", String(!open));
-  drawerScrim.classList.toggle("is-open", open);
+  updateScrim();
+}
+
+function setQuickSetup(open) {
+  quickSetupModal.classList.toggle("is-open", open);
+  quickSetupModal.setAttribute("aria-hidden", String(!open));
+  updateScrim();
 }
 
 function setTweaks(open) {
@@ -106,15 +121,63 @@ document.querySelector("#start-button").addEventListener("click", () => {
   window.setTimeout(() => setState("live"), 1400);
 });
 
-document.querySelector("#cancel-connect-button").addEventListener("click", () => setState("ready"));
-document.querySelector("#stop-button").addEventListener("click", () => setState("stopped"));
-document.querySelector("#restart-button").addEventListener("click", () => setState("ready"));
-document.querySelector("#reauth-button").addEventListener("click", () => setState("logged-out"));
+document
+  .querySelector("#cancel-connect-button")
+  .addEventListener("click", () => setState("ready"));
+document
+  .querySelector("#stop-button")
+  .addEventListener("click", () => setState("stopped"));
+document
+  .querySelector("#restart-button")
+  .addEventListener("click", () => setState("ready"));
+document
+  .querySelector("#reauth-button")
+  .addEventListener("click", () => setState("logged-out"));
 
-document.querySelector("#diagnostics-button").addEventListener("click", () => setDrawer(true));
-document.querySelectorAll(".diagnostics-trigger").forEach((button) => button.addEventListener("click", () => setDrawer(true)));
-document.querySelector("#close-diagnostics").addEventListener("click", () => setDrawer(false));
-drawerScrim.addEventListener("click", () => setDrawer(false));
+document
+  .querySelector("#diagnostics-button")
+  .addEventListener("click", () => setDrawer(true));
+document
+  .querySelectorAll(".diagnostics-trigger")
+  .forEach((button) => button.addEventListener("click", () => setDrawer(true)));
+document
+  .querySelector("#close-diagnostics")
+  .addEventListener("click", () => setDrawer(false));
+drawerScrim.addEventListener("click", () => {
+  setDrawer(false);
+  setQuickSetup(false);
+});
+
+document
+  .querySelector("#quick-setup-button")
+  .addEventListener("click", () => setQuickSetup(true));
+document
+  .querySelector("#close-quick-setup")
+  .addEventListener("click", () => setQuickSetup(false));
+document
+  .querySelector("#apply-quick-setup")
+  .addEventListener("click", (event) => {
+    const button = event.currentTarget;
+    const step = document.querySelector("#quick-verify-step");
+    step.className = "active";
+    step.querySelector("small").textContent = "驗證中…";
+    button.disabled = true;
+    window.setTimeout(() => {
+      step.className = "done";
+      step.querySelector("small").textContent = "已套用並驗證";
+      button.textContent = "完成";
+      button.disabled = false;
+    }, 900);
+  });
+document.querySelectorAll(".quick-app-switch button").forEach((button) => {
+  button.addEventListener("click", () => {
+    document
+      .querySelectorAll(".quick-app-switch button")
+      .forEach((item) => item.classList.toggle("is-active", item === button));
+    document.querySelector("#quick-setup-title").textContent =
+      `快速設定 ${button.textContent}`;
+  });
+});
 
 document.querySelector("#mini-overlay-button").addEventListener("click", () => {
   miniOverlay.classList.add("is-open");
@@ -125,22 +188,38 @@ document.querySelector("#close-mini").addEventListener("click", () => {
   miniOverlay.setAttribute("aria-hidden", "true");
 });
 
-document.querySelector("#tray-button").addEventListener("click", () => setTray(!trayMenu.classList.contains("is-open")));
-trayMenu.querySelector("button").addEventListener("click", () => setTray(false));
+document
+  .querySelector("#tray-button")
+  .addEventListener("click", () =>
+    setTray(!trayMenu.classList.contains("is-open")),
+  );
+trayMenu
+  .querySelector("button")
+  .addEventListener("click", () => setTray(false));
 trayMenu.querySelectorAll("button")[3].addEventListener("click", () => {
   setState("stopped");
   setTray(false);
 });
 
-document.querySelector("#aggregate-summary-button").addEventListener("click", showAggregateSummary);
+document
+  .querySelector("#aggregate-summary-button")
+  .addEventListener("click", showAggregateSummary);
 
-document.querySelector("#tweaks-toggle").addEventListener("click", () => setTweaks(!tweaksPanel.classList.contains("is-open")));
-document.querySelector("#close-tweaks").addEventListener("click", () => setTweaks(false));
+document
+  .querySelector("#tweaks-toggle")
+  .addEventListener("click", () =>
+    setTweaks(!tweaksPanel.classList.contains("is-open")),
+  );
+document
+  .querySelector("#close-tweaks")
+  .addEventListener("click", () => setTweaks(false));
 document.querySelector("#state-select").addEventListener("change", (event) => {
   setView("translate");
   setState(event.target.value);
 });
-document.querySelector("#mode-select").addEventListener("change", (event) => setMode(event.target.value));
+document
+  .querySelector("#mode-select")
+  .addEventListener("change", (event) => setMode(event.target.value));
 document.querySelector("#theme-select").addEventListener("change", (event) => {
   root.dataset.theme = event.target.value;
 });
@@ -148,6 +227,7 @@ document.querySelector("#theme-select").addEventListener("change", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   setDrawer(false);
+  setQuickSetup(false);
   setTweaks(false);
   setTray(false);
 });

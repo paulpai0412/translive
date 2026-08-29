@@ -18,29 +18,57 @@
           <span>TransLive</span>
         </a>
         <nav class="primary-nav" aria-label="主要導覽">
-          <button class="nav-item is-active" data-view="translate">即時翻譯</button>
+          <button class="nav-item is-active" data-view="translate">
+            即時翻譯
+          </button>
           <button class="nav-item" data-view="history">紀錄</button>
           <button class="nav-item" data-view="settings">設定</button>
         </nav>
         <div class="top-actions">
-          <button class="icon-button" id="tray-button" type="button" aria-label="縮至系統匣">▾</button>
+          <button
+            class="icon-button"
+            id="tray-button"
+            type="button"
+            aria-label="縮至系統匣"
+          >
+            ▾
+          </button>
           <button class="account-chip" id="account-button" type="button">
             <span class="status-dot"></span>
             <span class="account-label">尚未連線</span>
           </button>
-          <button class="icon-button" id="diagnostics-button" type="button" aria-label="開啟診斷">⋯</button>
+          <button
+            class="icon-button"
+            id="diagnostics-button"
+            type="button"
+            aria-label="開啟診斷"
+          >
+            ⋯
+          </button>
         </div>
       </header>
 
       <main class="main-content">
-        <section class="screen login-screen" data-state-show="logged-out auth-waiting">
+        <section
+          class="screen login-screen"
+          data-state-show="logged-out auth-waiting"
+        >
           <div class="auth-panel">
-            <img class="auth-logo" src="../../assets/translive-brand/translive-mark.svg" alt="TransLive" />
+            <img
+              class="auth-logo"
+              src="../../assets/translive-brand/translive-mark.svg"
+              alt="TransLive"
+            />
             <p class="section-kicker">安全登入</p>
             <h1>連接 ChatGPT</h1>
             <p class="english-label">Connect ChatGPT</p>
-            <p class="auth-copy">使用系統瀏覽器完成 OpenAI／ChatGPT 登入。TransLive 不會讀取或保存你的 OAuth token。</p>
-            <button class="primary-button" id="oauth-button" type="button">連接 ChatGPT</button>
+            <p class="auth-copy">
+              使用系統瀏覽器完成 OpenAI／ChatGPT 登入。TransLive
+              不會讀取或保存你的 OAuth token。
+            </p>
+            <button class="primary-button" id="oauth-button" type="button">
+              連接 ChatGPT
+            </button>
             <div class="auth-status" role="status">
               <span class="status-dot"></span>
               <span id="auth-status-text">尚未連線</span>
@@ -55,11 +83,17 @@
               <h1>選擇使用方式</h1>
               <p>只顯示目前模式需要的設定。</p>
             </div>
-            <button class="text-button" id="route-test-button" type="button">重新檢查裝置</button>
+            <button class="text-button" id="route-test-button" type="button">
+              重新檢查裝置
+            </button>
           </div>
 
           <div class="mode-switcher" role="tablist" aria-label="翻譯模式">
-            <button class="mode-option is-active" role="tab" data-mode="meeting">
+            <button
+              class="mode-option is-active"
+              role="tab"
+              data-mode="meeting"
+            >
               <span class="mode-title">雙向會議</span><span>Meeting</span>
             </button>
             <button class="mode-option" role="tab" data-mode="media">
@@ -76,23 +110,33 @@
               <div class="field-grid">
                 <label data-mode-show="meeting microphone">
                   <span>我說的語言</span>
-                  <select><option>繁體中文（台灣）</option></select>
+                  <select>
+                    <option>繁體中文（台灣）</option>
+                  </select>
                 </label>
                 <label data-mode-show="meeting microphone">
                   <span>對方聽到</span>
-                  <select><option>English</option></select>
+                  <select>
+                    <option>English</option>
+                  </select>
                 </label>
                 <label data-mode-show="meeting media">
                   <span>來源語言</span>
-                  <select><option>自動偵測 Auto</option></select>
+                  <select>
+                    <option>自動偵測 Auto</option>
+                  </select>
                 </label>
                 <label data-mode-show="meeting media">
                   <span>我聽到</span>
-                  <select><option>繁體中文（台灣）</option></select>
+                  <select>
+                    <option>繁體中文（台灣）</option>
+                  </select>
                 </label>
                 <label>
                   <span>翻譯聲音</span>
-                  <select><option>Cove</option></select>
+                  <select>
+                    <option>Cove</option>
+                  </select>
                 </label>
               </div>
             </section>
@@ -113,7 +157,14 @@
                   <strong>Poly BT600</strong>
                 </div>
               </div>
-              <p class="mode-help" data-mode-show="media">在 Windows 音量混音程式中，將 YouTube／瀏覽器輸出設為 VoiceMeeter Input。</p>
+              <p class="mode-help" data-mode-show="media">
+                在 Windows 音量混音程式中，將 YouTube／瀏覽器輸出設為
+                VoiceMeeter Input。
+              </p>
+              <div class="quick-setup-row" data-mode-show="meeting">
+                <button class="secondary-button" id="quick-setup-button" type="button">快速設定 Teams／Zoom</button>
+                <span>套用前保存目前裝置，停止翻譯後自動還原。</span>
+              </div>
             </section>
 
             <div class="health-row" aria-label="系統健康狀態">
@@ -125,7 +176,9 @@
           </div>
 
           <div class="primary-action-area">
-            <button class="start-button" id="start-button" type="button">開始翻譯<span>Start translating</span></button>
+            <button class="start-button" id="start-button" type="button">
+              開始翻譯<span>Start translating</span>
+            </button>
           </div>
         </section>
 
@@ -139,50 +192,114 @@
               <li class="active">建立 GPT‑Live session</li>
               <li>套用音訊路由</li>
             </ol>
-            <button class="secondary-button" id="cancel-connect-button" type="button">取消</button>
+            <button
+              class="secondary-button"
+              id="cancel-connect-button"
+              type="button"
+            >
+              取消
+            </button>
           </div>
         </section>
 
         <section class="screen live-screen" data-state-show="live degraded">
           <div class="live-bar">
-            <div class="live-identity"><span class="live-pulse"></span><strong>翻譯中</strong><span>Live</span></div>
+            <div class="live-identity">
+              <span class="live-pulse"></span><strong>翻譯中</strong
+              ><span>Live</span>
+            </div>
             <span class="live-duration">00:18:42</span>
             <span class="cloud-note">雲端傳輸中</span>
             <span class="save-note">逐字稿保存中</span>
-            <button class="danger-button" id="stop-button" type="button">停止</button>
+            <button class="danger-button" id="stop-button" type="button">
+              停止
+            </button>
           </div>
 
           <div class="degraded-banner" role="alert">
-            <div><strong>RX 已中斷，TX 仍正常。</strong><p>對方仍能聽到你的翻譯，但你暫時聽不到繁中翻譯。</p></div>
-            <div><button class="secondary-button">重新建立 RX</button><button class="text-button">診斷</button></div>
+            <div>
+              <strong>RX 已中斷，TX 仍正常。</strong>
+              <p>對方仍能聽到你的翻譯，但你暫時聽不到繁中翻譯。</p>
+            </div>
+            <div>
+              <button class="secondary-button">重新建立 RX</button
+              ><button class="text-button">診斷</button>
+            </div>
           </div>
 
-          <div class="caption-workspace meeting-captions" data-mode-show="meeting">
+          <div
+            class="caption-workspace meeting-captions"
+            data-mode-show="meeting"
+          >
             <article class="channel-column">
-              <header><div><span class="channel-label">我 → 對方</span><strong>TX</strong></div><div class="channel-state"><i></i>Live <button>靜音</button></div></header>
-              <div class="caption-group source"><span>我說</span><p>我們預計第三季開始正式量產。</p></div>
-              <div class="caption-group target"><span>對方聽到</span><p>We expect to begin mass production in the third quarter.</p></div>
+              <header>
+                <div>
+                  <span class="channel-label">我 → 對方</span
+                  ><strong>TX</strong>
+                </div>
+                <div class="channel-state">
+                  <i></i>Live <button>靜音</button>
+                </div>
+              </header>
+              <div class="caption-group source">
+                <span>我說</span>
+                <p>我們預計第三季開始正式量產。</p>
+              </div>
+              <div class="caption-group target">
+                <span>對方聽到</span>
+                <p>We expect to begin mass production in the third quarter.</p>
+              </div>
             </article>
             <article class="channel-column">
-              <header><div><span class="channel-label">對方 → 我</span><strong>RX</strong></div><div class="channel-state"><i></i>Live <button>靜音</button></div></header>
-              <div class="caption-group source"><span>對方說</span><p>Could you confirm the validation schedule?</p></div>
-              <div class="caption-group target"><span>我聽到</span><p>可以確認一下設備驗證時程嗎？</p></div>
+              <header>
+                <div>
+                  <span class="channel-label">對方 → 我</span
+                  ><strong>RX</strong>
+                </div>
+                <div class="channel-state">
+                  <i></i>Live <button>靜音</button>
+                </div>
+              </header>
+              <div class="caption-group source">
+                <span>對方說</span>
+                <p>Could you confirm the validation schedule?</p>
+              </div>
+              <div class="caption-group target">
+                <span>我聽到</span>
+                <p>可以確認一下設備驗證時程嗎？</p>
+              </div>
             </article>
           </div>
 
-          <div class="caption-workspace single-captions" data-mode-show="media microphone">
+          <div
+            class="caption-workspace single-captions"
+            data-mode-show="media microphone"
+          >
             <div class="single-live-heading">
-              <div><span class="channel-label mode-live-title">媒體翻譯</span><strong>RX</strong></div>
+              <div>
+                <span class="channel-label mode-live-title">媒體翻譯</span
+                ><strong>RX</strong>
+              </div>
               <div class="channel-state"><i></i>Live <button>靜音</button></div>
             </div>
-            <div class="caption-group source"><span class="single-source-label">原文 Source</span><p>We expect to begin mass production in the third quarter.</p></div>
-            <div class="caption-group target hero-caption"><span class="single-target-label">繁中 Translation</span><p>我們預計在第三季開始正式量產。</p></div>
+            <div class="caption-group source">
+              <span class="single-source-label">原文 Source</span>
+              <p>We expect to begin mass production in the third quarter.</p>
+            </div>
+            <div class="caption-group target hero-caption">
+              <span class="single-target-label">繁中 Translation</span>
+              <p>我們預計在第三季開始正式量產。</p>
+            </div>
           </div>
 
           <footer class="live-footer">
             <span class="mode-summary">VoiceMeeter · Cove</span>
-            <button class="text-button" id="mini-overlay-button" type="button">迷你字幕</button>
-            <button class="text-button diagnostics-trigger" type="button">開啟診斷</button>
+            <button class="text-button" id="mini-overlay-button" type="button">
+              迷你字幕
+            </button>
+            <button class="text-button diagnostics-trigger" type="button">
+              開啟診斷
+            </button>
           </footer>
         </section>
 
@@ -191,7 +308,12 @@
             <span class="success-mark">✓</span>
             <h1>翻譯已停止</h1>
             <p>逐字稿已保存至本機。沒有保存音訊。</p>
-            <div class="stopped-actions"><button class="primary-button" id="restart-button">再次開始</button><button class="secondary-button">查看逐字稿</button><button class="text-button">產生摘要</button></div>
+            <div class="stopped-actions">
+              <button class="primary-button" id="restart-button">
+                再次開始</button
+              ><button class="secondary-button">查看逐字稿</button
+              ><button class="text-button">產生摘要</button>
+            </div>
           </div>
         </section>
 
@@ -200,40 +322,159 @@
             <p class="section-kicker danger-text">無法開始</p>
             <h1>ChatGPT 登入已失效</h1>
             <p>重新登入後即可建立 GPT‑Live session。音訊尚未傳送。</p>
-            <button class="primary-button" id="reauth-button">重新連接 ChatGPT</button>
-            <details><summary>技術資訊</summary><code>AUTH_SESSION_EXPIRED · request_id unavailable</code></details>
+            <button class="primary-button" id="reauth-button">
+              重新連接 ChatGPT
+            </button>
+            <details>
+              <summary>技術資訊</summary>
+              <code>AUTH_SESSION_EXPIRED · request_id unavailable</code>
+            </details>
           </div>
         </section>
 
         <section class="screen placeholder-screen" data-view-show="history">
-          <div class="page-heading"><div><p class="section-kicker">本機資料</p><h1>紀錄</h1><p>逐字稿、摘要與刪除操作。</p></div></div>
-          <div class="history-bulk" id="history-bulk"><span>已選 2 場紀錄</span><button class="primary-button" id="aggregate-summary-button">匯整摘要</button></div>
-          <div class="history-layout"><div class="history-list"><label class="history-item is-active"><input type="checkbox" checked /><span><strong>08/29 · Teams</strong><small>24 分鐘 · 已摘要</small></span></label><label class="history-item"><input type="checkbox" checked /><span><strong>08/28 · Media</strong><small>18 分鐘 · 未摘要</small></span></label></div><div class="history-detail" id="history-detail"><div class="detail-tabs"><button class="is-active">逐字稿</button><button>單場摘要</button><button>匯整摘要</button></div><h2>Teams · 繁中↔英文</h2><p class="placeholder-copy">[逐字稿內容區域]</p></div></div>
+          <div class="page-heading">
+            <div>
+              <p class="section-kicker">本機資料</p>
+              <h1>紀錄</h1>
+              <p>逐字稿、摘要與刪除操作。</p>
+            </div>
+          </div>
+          <div class="history-bulk" id="history-bulk">
+            <span>已選 2 場紀錄</span
+            ><button class="primary-button" id="aggregate-summary-button">
+              匯整摘要
+            </button>
+          </div>
+          <div class="history-layout">
+            <div class="history-list">
+              <label class="history-item is-active"
+                ><input type="checkbox" checked /><span
+                  ><strong>08/29 · Teams</strong
+                  ><small>24 分鐘 · 已摘要</small></span
+                ></label
+              ><label class="history-item"
+                ><input type="checkbox" checked /><span
+                  ><strong>08/28 · Media</strong
+                  ><small>18 分鐘 · 未摘要</small></span
+                ></label
+              >
+            </div>
+            <div class="history-detail" id="history-detail">
+              <div class="detail-tabs">
+                <button class="is-active">逐字稿</button
+                ><button>單場摘要</button><button>匯整摘要</button>
+              </div>
+              <h2>Teams · 繁中↔英文</h2>
+              <p class="placeholder-copy">[逐字稿內容區域]</p>
+            </div>
+          </div>
         </section>
 
         <section class="screen placeholder-screen" data-view-show="settings">
-          <div class="page-heading"><div><p class="section-kicker">偏好設定</p><h1>設定</h1><p>帳戶、語言、音訊、隱私與開發者選項。</p></div></div>
-          <div class="settings-list"><button>帳戶與 ChatGPT OAuth<span>已連線</span></button><button>一般與語言<span>繁體中文</span></button><button>音訊與虛擬裝置<span>VoiceMeeter</span></button><button>隱私與儲存<span>本機保存</span></button><button>快捷鍵<span>3 組</span></button><button>開發者設定<span>關閉</span></button></div>
+          <div class="page-heading">
+            <div>
+              <p class="section-kicker">偏好設定</p>
+              <h1>設定</h1>
+              <p>帳戶、語言、音訊、隱私與開發者選項。</p>
+            </div>
+          </div>
+          <div class="settings-list">
+            <button>帳戶與 ChatGPT OAuth<span>已連線</span></button
+            ><button>一般與語言<span>繁體中文</span></button
+            ><button>音訊與虛擬裝置<span>VoiceMeeter</span></button
+            ><button>隱私與儲存<span>本機保存</span></button
+            ><button>快捷鍵<span>3 組</span></button
+            ><button>開發者設定<span>關閉</span></button>
+          </div>
         </section>
       </main>
     </div>
 
-    <aside class="diagnostics-drawer" id="diagnostics-drawer" aria-hidden="true">
-      <header><div><p class="section-kicker">健康狀態</p><h2>診斷 <span>Diagnostics</span></h2></div><button class="icon-button" id="close-diagnostics" aria-label="關閉診斷">×</button></header>
-      <dl class="health-list"><div><dt>帳戶</dt><dd><i class="health-ok"></i>ChatGPT 已連線</dd></div><div><dt>模型</dt><dd><i class="health-ok"></i>gpt-live-1-codex</dd></div><div><dt>TX</dt><dd><i class="health-ok"></i>Live</dd></div><div><dt>RX</dt><dd><i class="health-ok"></i>Live</dd></div><div><dt>音訊路由</dt><dd><i class="health-ok"></i>VoiceMeeter</dd></div></dl>
-      <details class="advanced-details"><summary>進階資訊</summary><div class="technical-grid"><span>Codex</span><code>0.150.0-alpha.8</code><span>RTT</span><code>實際 session 才顯示</code><span>Packet loss</span><code>實際 session 才顯示</code><span>Evidence</span><code>%LOCALAPPDATA%\TransLive</code></div></details>
+    <aside
+      class="diagnostics-drawer"
+      id="diagnostics-drawer"
+      aria-hidden="true"
+    >
+      <header>
+        <div>
+          <p class="section-kicker">健康狀態</p>
+          <h2>診斷 <span>Diagnostics</span></h2>
+        </div>
+        <button
+          class="icon-button"
+          id="close-diagnostics"
+          aria-label="關閉診斷"
+        >
+          ×
+        </button>
+      </header>
+      <dl class="health-list">
+        <div>
+          <dt>帳戶</dt>
+          <dd><i class="health-ok"></i>ChatGPT 已連線</dd>
+        </div>
+        <div>
+          <dt>模型</dt>
+          <dd><i class="health-ok"></i>gpt-live-1-codex</dd>
+        </div>
+        <div>
+          <dt>TX</dt>
+          <dd><i class="health-ok"></i>Live</dd>
+        </div>
+        <div>
+          <dt>RX</dt>
+          <dd><i class="health-ok"></i>Live</dd>
+        </div>
+        <div>
+          <dt>音訊路由</dt>
+          <dd><i class="health-ok"></i>VoiceMeeter</dd>
+        </div>
+      </dl>
+      <details class="advanced-details">
+        <summary>進階資訊</summary>
+        <div class="technical-grid">
+          <span>Codex</span><code>0.150.0-alpha.8</code><span>RTT</span
+          ><code>實際 session 才顯示</code><span>Packet loss</span
+          ><code>實際 session 才顯示</code><span>Evidence</span
+          ><code>%LOCALAPPDATA%\TransLive</code>
+        </div>
+      </details>
       <button class="secondary-button full-width">匯出遮罩診斷包</button>
     </aside>
     <div class="drawer-scrim" id="drawer-scrim"></div>
 
+    <section class="quick-setup-modal" id="quick-setup-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="quick-setup-title">
+      <header><div><p class="section-kicker">裝置設定</p><h2 id="quick-setup-title">快速設定 Microsoft Teams</h2></div><button class="icon-button" id="close-quick-setup" aria-label="關閉">×</button></header>
+      <div class="quick-app-switch"><button class="is-active">Microsoft Teams</button><button>Zoom</button></div>
+      <ol class="quick-steps">
+        <li class="done"><span>已偵測 Teams</span><small>正在執行</small></li>
+        <li class="done"><span>麥克風</span><small>Voicemeeter Out B2</small></li>
+        <li class="done"><span>喇叭</span><small>Voicemeeter Input</small></li>
+        <li id="quick-verify-step"><span>驗證音訊路由</span><small>尚未執行</small></li>
+      </ol>
+      <label class="restore-device-option"><input type="checkbox" checked />停止翻譯後還原原本裝置</label>
+      <p class="quick-note">若 Teams 固定使用其他裝置，TransLive 會開啟裝置設定並保留這份選擇清單。</p>
+      <footer><button class="text-button">只開啟 Teams 裝置設定</button><button class="primary-button" id="apply-quick-setup">套用快速設定</button></footer>
+    </section>
+
     <section class="mini-overlay" id="mini-overlay" aria-hidden="true">
-      <header><div><span class="live-pulse"></span><strong>Live</strong></div><div><button>靜音</button><button id="close-mini">展開</button></div></header>
+      <header>
+        <div><span class="live-pulse"></span><strong>Live</strong></div>
+        <div><button>靜音</button><button id="close-mini">展開</button></div>
+      </header>
       <p>我聽到：可以確認設備驗證時程嗎？</p>
       <p>對方聽到：We can begin production…</p>
     </section>
 
     <aside class="tray-menu" id="tray-menu" aria-hidden="true">
-      <header><img src="../../assets/translive-brand/translive-mark.svg" alt="" /><div><strong>TransLive</strong><span><i class="health-ok"></i>雙向會議 · Live</span></div></header>
+      <header>
+        <img src="../../assets/translive-brand/translive-mark.svg" alt="" />
+        <div>
+          <strong>TransLive</strong
+          ><span><i class="health-ok"></i>雙向會議 · Live</span>
+        </div>
+      </header>
       <button>顯示 TransLive</button>
       <button>TX 靜音</button>
       <button>RX 靜音</button>
@@ -243,12 +484,37 @@
       <button>完全結束</button>
     </aside>
 
-    <button class="tweaks-toggle" id="tweaks-toggle" type="button">v0 預覽</button>
+    <button class="tweaks-toggle" id="tweaks-toggle" type="button">
+      v0 預覽
+    </button>
     <aside class="tweaks-panel" id="tweaks-panel" aria-hidden="true">
-      <header><strong>Tweaks</strong><button id="close-tweaks">×</button></header>
-      <label>狀態<select id="state-select"><option value="logged-out">OAuth 未登入</option><option value="ready">Ready</option><option value="connecting">Connecting</option><option value="live">Live</option><option value="degraded">Degraded</option><option value="blocked">Blocked</option><option value="stopped">Stopped</option></select></label>
-      <label>模式<select id="mode-select"><option value="meeting">雙向會議</option><option value="media">媒體翻譯</option><option value="microphone">麥克風翻譯</option></select></label>
-      <label>主題<select id="theme-select"><option value="dark">Dark</option><option value="light">Light</option></select></label>
+      <header>
+        <strong>Tweaks</strong><button id="close-tweaks">×</button>
+      </header>
+      <label
+        >狀態<select id="state-select">
+          <option value="logged-out">OAuth 未登入</option>
+          <option value="ready">Ready</option>
+          <option value="connecting">Connecting</option>
+          <option value="live">Live</option>
+          <option value="degraded">Degraded</option>
+          <option value="blocked">Blocked</option>
+          <option value="stopped">Stopped</option>
+        </select></label
+      >
+      <label
+        >模式<select id="mode-select">
+          <option value="meeting">雙向會議</option>
+          <option value="media">媒體翻譯</option>
+          <option value="microphone">麥克風翻譯</option>
+        </select></label
+      >
+      <label
+        >主題<select id="theme-select">
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+        </select></label
+      >
     </aside>
 
     <script src="./app.js"></script>
