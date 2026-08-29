@@ -70,6 +70,8 @@ npm start
 6. In Zoom/Teams manually set microphone and speaker for the selected profile exactly as shown above. TransLive intentionally does not alter Windows or meeting-app settings.
 7. Click **Start dual channel**. The app starts with each channel in `connecting`; it becomes `live` only after its WebRTC answer is applied. Both directions use Cove in Phase 1 because the Windows `0.150.0-alpha.8` live test produced transcripts but no audio RTP with Juniper.
 
+RX uses `thread/realtime/appendSpeech` when native Traditional-Chinese audio is absent. Assistant transcript deltas are spoken in-order whenever the buffer reaches **8 Chinese characters** or a punctuation boundary. The 8-character setting favors lower latency over perfectly smooth phrasing; a 100-chunk circuit breaker prevents recursive speech loops.
+
 A blocked start (missing Codex entitlement, login/version mismatch, permission denial, rejected V3 request, or SDP/output-routing failure) is a valid Phase 1 no-go result. The app writes redacted blocked-attempt evidence; do not substitute another model.
 
 ## Test order

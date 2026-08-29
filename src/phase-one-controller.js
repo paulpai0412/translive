@@ -12,6 +12,7 @@ import { RunEvidence } from "./evidence.js";
 const PINNED_CODEX_VERSION = "0.145.0";
 const MODEL = "gpt-live-1-codex";
 const VOICES = Object.freeze({ tx: "cove", rx: "cove" });
+const RX_SPEECH_CHUNK_CHARACTERS = 8;
 const TRANSLATION_PROMPTS = Object.freeze({
   tx: [
     "You are a simultaneous interpreter.",
@@ -487,7 +488,10 @@ export class PhaseOneController {
       state.sawDelta = true;
       state.buffer += notification.params.delta ?? "";
       const characters = [...state.buffer].length;
-      if (/[，。！？；,.!?;]\s*$/.test(state.buffer) || characters >= 12) {
+      if (
+        /[，。！？；,.!?;]\s*$/.test(state.buffer) ||
+        characters >= RX_SPEECH_CHUNK_CHARACTERS
+      ) {
         this.#flushRxSpeechFallback(context);
       }
       return;
