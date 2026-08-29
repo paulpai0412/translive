@@ -127,6 +127,7 @@ export class RunEvidence {
       sessions: { tx: {}, rx: {} },
       blockedAttempts: [],
       stateTransitions: [],
+      languageDecisions: [],
       transcriptTimestamps: [],
       timing: {
         tx: { ttfaMs: [], activityGapMs: [], rttMs: [] },
@@ -202,6 +203,22 @@ export class RunEvidence {
       atMs: safeTime(atMs),
       direction,
       role: String(role ?? "unknown"),
+    });
+  }
+
+  recordLanguageDecision(direction, language, mode, atMs = Date.now()) {
+    if (
+      direction !== "rx" ||
+      !["en", "zh", "unknown"].includes(language) ||
+      !["translated", "original"].includes(mode)
+    ) {
+      return;
+    }
+    this.#data.languageDecisions.push({
+      atMs: safeTime(atMs),
+      direction,
+      language,
+      mode,
     });
   }
 

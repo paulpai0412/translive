@@ -72,6 +72,16 @@ npm start
 
 RX uses `thread/realtime/appendSpeech` when native Traditional-Chinese audio is absent. Assistant transcript deltas are spoken in-order whenever the buffer reaches **12 Chinese characters** or a punctuation boundary. Live testing showed that 8-character chunks were accepted but produced no audible speech, even with an added comma, so Phase 1 keeps the 12-character minimum. A 100-chunk circuit breaker prevents recursive speech loops.
 
+### RX language gate
+
+The RX source-language status is accessible in the UI and never persists source transcript text. It classifies each remote utterance in this order:
+
+1. Two Latin words → `en`, including mixed Latin/CJK input. The original monitor is muted and translated Traditional-Chinese audio is used.
+2. Otherwise, two CJK characters → `zh`. Original remote audio is sent directly to headphones; assistant text is visible for diagnosis but never passed to `appendSpeech`.
+3. Otherwise → `unknown`. Original remote audio is sent directly to headphones.
+
+The renderer feeds the RX capture stream both to WebRTC and to an original-audio monitor with a 500 ms Web Audio delay. This provides enough time for an English classification to mute the monitor before most remote speech reaches the listener. RX mute mutes both translated and original monitor audio.
+
 A blocked start (missing Codex entitlement, login/version mismatch, permission denial, rejected V3 request, or SDP/output-routing failure) is a valid Phase 1 no-go result. The app writes redacted blocked-attempt evidence; do not substitute another model.
 
 ## Test order

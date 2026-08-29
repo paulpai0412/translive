@@ -52,6 +52,18 @@ function requestIdFrom(error) {
   return typeof value === "string" ? value : undefined;
 }
 
+function classifyRxSourceLanguage(text) {
+  const latinWords = String(text).match(/[A-Za-z]+(?:['’-][A-Za-z]+)*/g) ?? [];
+  if (latinWords.length >= 2) return "en";
+  const cjkCharacters =
+    String(text).match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g) ?? [];
+  return cjkCharacters.length >= 2 ? "zh" : "unknown";
+}
+
+function modeForRxLanguage(language) {
+  return language === "en" ? "translated" : "original";
+}
+
 function endpointRecords(config = {}) {
   const tx = config.tx ?? {};
   const rx = config.rx ?? {};
@@ -207,7 +219,14 @@ export class PhaseOneController {
           sawDelta: false,
           lastText: "",
           count: 0,
+          generation: 0,
           queue: Promise.resolve(),
+        },
+        rxSource: {
+          buffer: "",
+          language: "unknown",
+          mode: "original",
+          announced: false,
         },
       };
       client.on("notification", (notification) =>
@@ -444,6 +463,7 @@ export class PhaseOneController {
       });
     }
     context.run.handleRealtimeEvent(direction, { ...notification, atMs });
+    this.#handleRxSourceLanguage(context, direction, notification, atMs);
     if (notification.method === "thread/realtime/sdp") {
       this.#publish({ type: "sdp", direction, sdp: notification.params.sdp });
     }
@@ -478,8 +498,44 @@ export class PhaseOneController {
     }
   }
 
+  #handleRxSourceLanguage(context, direction, notification, atMs) {
+    if (direction !== "rx" || notification.params?.role !== "user") return;
+    const state = context.rxSource;
+    if (notification.method === "thread/realtime/transcript/delta") {
+      state.buffer += notification.params.delta ?? "";
+    } else if (notification.method === "thread/realtime/transcript/done") {
+      if (!state.buffer) state.buffer = notification.params.text ?? "";
+    } else {
+      return;
+    }
+
+    const language = classifyRxSourceLanguage(state.buffer);
+    if (!state.announced || language !== state.language) {
+      state.announced = true;
+      state.language = language;
+      state.mode = modeForRxLanguage(language);
+      if (state.mode === "original") this.#invalidateRxSpeech(context);
+      context.evidence.recordLanguageDecision("rx", language, state.mode, atMs);
+      this.#publish({ type: "rx-language", language, mode: state.mode });
+    }
+    if (notification.method === "thread/realtime/transcript/done") {
+      state.buffer = "";
+      state.announced = false;
+    }
+  }
+
+  #invalidateRxSpeech(context) {
+    const state = context.speechFallback;
+    if (!state) return;
+    state.generation += 1;
+    state.buffer = "";
+    state.sawDelta = false;
+    state.lastText = "";
+  }
+
   #handleRxSpeechFallback(context, direction, notification) {
     if (direction !== "rx" || notification.params?.role !== "assistant") return;
+    if (context.rxSource.mode !== "translated") return;
     const state = context.speechFallback;
     if (!state || state.disabled) return;
 
@@ -529,7 +585,15 @@ export class PhaseOneController {
 
     state.lastText = text;
     state.count += 1;
+    const generation = state.generation;
     state.queue = state.queue.then(async () => {
+      if (
+        context.finalized ||
+        generation !== state.generation ||
+        context.rxSource.mode !== "translated"
+      ) {
+        return;
+      }
       try {
         await context.client.appendSpeech(threadId, text);
         this.#publish({
@@ -538,6 +602,7 @@ export class PhaseOneController {
           characters: [...text].length,
         });
       } catch (error) {
+        if (context.finalized || generation !== state.generation) return;
         context.evidence.recordError("rx", error, {
           requestId: requestIdFrom(error),
         });
@@ -590,10 +655,10 @@ export class PhaseOneController {
   async #finalize(context, termination) {
     if (context.finalized) return;
     context.finalized = true;
+    this.#invalidateRxSpeech(context);
     if (this.#active?.context === context) this.#active = undefined;
     let writeError;
     try {
-      await context.speechFallback?.queue;
       await context.run?.stop();
       context.evidence.finish(Date.now(), termination);
       await context.evidence.write(this.#evidenceDirectory);

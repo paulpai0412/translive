@@ -111,6 +111,15 @@ test("keeps channels connecting until the renderer confirms both SDP answers", a
   assert.equal(events.filter((event) => event.type === "sdp").length, 2);
   assert.deepEqual(
     events
+      .filter((event) => event.type === "rx-language")
+      .map(({ language, mode }) => ({ language, mode })),
+    [
+      { language: "unknown", mode: "original" },
+      { language: "en", mode: "translated" },
+    ],
+  );
+  assert.deepEqual(
+    events
       .filter((event) => event.type === "speech-fallback")
       .map(({ direction, characters }) => ({ direction, characters })),
     [{ direction: "rx", characters: 9 }],
@@ -136,6 +145,163 @@ test("keeps channels connecting until the renderer confirms both SDP answers", a
     JSON.stringify(evidence),
     /fixture-offer|fixture translation/,
   );
+});
+
+test("passes Chinese RX source audio through without appendSpeech", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-chinese-rx-"),
+  );
+  const events = [];
+  const controller = controllerFor({
+    evidenceDirectory,
+    publish: (event) => events.push(event),
+  });
+
+  await controller.start(validConfig({ rx: { sdp: "fixture-chinese" } }));
+  await new Promise((resolve) => setTimeout(resolve, 80));
+
+  assert.deepEqual(
+    events
+      .filter((event) => event.type === "rx-language")
+      .map(({ language, mode }) => ({ language, mode })),
+    [{ language: "zh", mode: "original" }],
+  );
+  assert.equal(
+    events.some((event) => event.type === "speech-fallback"),
+    false,
+  );
+  assert.equal(
+    events.some((event) => event.type === "error"),
+    false,
+  );
+
+  await controller.stop("user-stop");
+  const [file] = await readdir(evidenceDirectory);
+  const evidence = JSON.parse(
+    await readFile(join(evidenceDirectory, file), "utf8"),
+  );
+  assert.deepEqual(
+    evidence.languageDecisions.map(({ direction, language, mode }) => ({
+      direction,
+      language,
+      mode,
+    })),
+    [{ direction: "rx", language: "zh", mode: "original" }],
+  );
+  assert.doesNotMatch(JSON.stringify(evidence), /這是中文|模型回覆/);
+});
+
+test("treats mixed RX source with two Latin words as English", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-mixed-rx-"),
+  );
+  const events = [];
+  const controller = controllerFor({
+    evidenceDirectory,
+    publish: (event) => events.push(event),
+  });
+
+  await controller.start(validConfig({ rx: { sdp: "fixture-mixed" } }));
+  await new Promise((resolve) => setTimeout(resolve, 100));
+
+  assert.deepEqual(
+    events
+      .filter((event) => event.type === "rx-language")
+      .map(({ language, mode }) => ({ language, mode })),
+    [
+      { language: "unknown", mode: "original" },
+      { language: "en", mode: "translated" },
+    ],
+  );
+  assert.equal(
+    events.some((event) => event.type === "speech-fallback"),
+    true,
+  );
+
+  await controller.stop("user-stop");
+});
+
+test("resets delta-backed RX classification across English, Chinese, and unknown utterances", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-language-sequence-"),
+  );
+  const events = [];
+  const controller = controllerFor({
+    evidenceDirectory,
+    publish: (event) => events.push(event),
+  });
+
+  await controller.start(
+    validConfig({ rx: { sdp: "fixture-language-sequence" } }),
+  );
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 180));
+    assert.deepEqual(
+      events
+        .filter((event) => event.type === "rx-language")
+        .map(({ language, mode }) => ({ language, mode })),
+      [
+        { language: "unknown", mode: "original" },
+        { language: "en", mode: "translated" },
+        { language: "zh", mode: "original" },
+        { language: "unknown", mode: "original" },
+      ],
+    );
+    assert.equal(
+      events.filter((event) => event.type === "speech-fallback").length,
+      1,
+    );
+  } finally {
+    await controller.stop("user-stop");
+  }
+
+  const [file] = await readdir(evidenceDirectory);
+  const evidence = JSON.parse(
+    await readFile(join(evidenceDirectory, file), "utf8"),
+  );
+  assert.doesNotMatch(JSON.stringify(evidence), /Hello|world|這是中文/);
+});
+
+test("skips queued English speech after a Chinese source transition", async () => {
+  const directory = await mkdtemp(
+    join(tmpdir(), "translive-controller-stale-speech-"),
+  );
+  const appendMarker = join(directory, "append-count");
+  const controller = controllerFor({
+    evidenceDirectory: directory,
+    codexArgs: [fixture, "", "delayed-queue", appendMarker],
+  });
+
+  await controller.start(validConfig({ rx: { sdp: "fixture-delayed-queue" } }));
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    assert.equal(await readFile(appendMarker, "utf8"), "1");
+  } finally {
+    await controller.stop("user-stop");
+  }
+});
+
+test("does not wait for delayed speech while stopping", async () => {
+  const directory = await mkdtemp(
+    join(tmpdir(), "translive-controller-stop-speech-"),
+  );
+  const appendMarker = join(directory, "append-count");
+  const controller = controllerFor({
+    evidenceDirectory: directory,
+    codexArgs: [fixture, "", "delayed-stop", appendMarker],
+  });
+
+  await controller.start(validConfig({ rx: { sdp: "fixture-delayed-stop" } }));
+  await new Promise((resolve) => setTimeout(resolve, 90));
+  const stop = controller.stop("user-stop");
+  const result = await Promise.race([
+    stop.then(() => "stopped"),
+    new Promise((resolve) => setTimeout(() => resolve("timed out"), 200)),
+  ]);
+
+  assert.equal(result, "stopped");
+  await stop;
+  assert.equal(await readFile(appendMarker, "utf8"), "1");
 });
 
 test("rejects a re-entrant start without creating a second app-server run", async () => {
