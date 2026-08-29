@@ -70,17 +70,9 @@ npm start
 6. In Zoom/Teams manually set microphone and speaker for the selected profile exactly as shown above. TransLive intentionally does not alter Windows or meeting-app settings.
 7. Click **Start dual channel**. The app starts with each channel in `connecting`; it becomes `live` only after its WebRTC answer is applied. Both directions use Cove in Phase 1 because the Windows `0.150.0-alpha.8` live test produced transcripts but no audio RTP with Juniper.
 
+RX does not declare a source language. GPT-Live detects the source automatically and always renders the result in Taiwan Traditional Chinese. Non-Chinese speech is translated; input already in Traditional Chinese is faithfully reproduced instead of being silenced or routed through a separate language gate. Mixed-language speech follows the same target-only path.
+
 RX uses `thread/realtime/appendSpeech` when native Traditional-Chinese audio is absent. Assistant transcript deltas are spoken in-order whenever the buffer reaches **12 Chinese characters** or a punctuation boundary. Live testing showed that 8-character chunks were accepted but produced no audible speech, even with an added comma, so Phase 1 keeps the 12-character minimum. A 100-chunk circuit breaker prevents recursive speech loops.
-
-### RX language gate
-
-The RX source-language status is accessible in the UI and never persists source transcript text. It classifies each remote utterance in this order:
-
-1. Two Latin words → `en`, including mixed Latin/CJK input. The original monitor is muted and translated Traditional-Chinese audio is used.
-2. Otherwise, two CJK characters → `zh`. Original remote audio is sent directly to headphones; assistant text is visible for diagnosis but never passed to `appendSpeech`.
-3. Otherwise → `unknown`. Original remote audio is sent directly to headphones.
-
-The renderer feeds the RX capture stream both to WebRTC and to an original-audio monitor with a 900 ms Web Audio delay. Live testing showed that 500 ms leaked the first English words before classification; 900 ms provides more time to mute English while preserving same-language Chinese. RX mute mutes both translated and original monitor audio.
 
 A blocked start (missing Codex entitlement, login/version mismatch, permission denial, rejected V3 request, or SDP/output-routing failure) is a valid Phase 1 no-go result. The app writes redacted blocked-attempt evidence; do not substitute another model.
 

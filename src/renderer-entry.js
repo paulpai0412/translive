@@ -17,7 +17,6 @@ const elements = Object.fromEntries(
     "tx-level",
     "tx-state",
     "rx-state",
-    "rx-source-language",
     "tx-ttfa",
     "rx-ttfa",
     "tx-rtt",
@@ -57,16 +56,6 @@ function setChannelState(direction, state) {
     !controlsRunning || !["live", "muted"].includes(state);
 }
 
-function setRxSourceLanguage(language, mode) {
-  let source = "Unknown source";
-  if (language === "en") source = "English source";
-  else if (language === "zh") source = "Chinese source";
-  const playback =
-    mode === "translated" ? "translated Chinese" : "original audio monitor";
-  elements["rx-source-language"].textContent =
-    `Source: ${source} · ${playback}`;
-}
-
 function setControls(isRunning) {
   controlsRunning = isRunning;
   const locked = isRunning || starting;
@@ -78,14 +67,7 @@ function setControls(isRunning) {
       !isRunning || !["live", "muted"].includes(state);
   }
   elements["test-headphones"].disabled = locked;
-  for (const id of [
-    "meeting-platform",
-    "route-profile",
-    "physical-mic",
-    "cable-a-sink",
-    "cable-b-source",
-    "headphones",
-  ]) {
+  for (const id of ["meeting-platform", "route-profile", "physical-mic", "cable-a-sink", "cable-b-source", "headphones"]) {
     elements[id].disabled = locked;
   }
 }
@@ -93,11 +75,7 @@ function setControls(isRunning) {
 function selectDevice(select) {
   const option = select.selectedOptions[0];
   if (!option?.value) throw new Error(`Select ${select.labels[0].textContent}`);
-  return {
-    id: option.value,
-    name: option.textContent,
-    kind: option.dataset.kind,
-  };
+  return { id: option.value, name: option.textContent, kind: option.dataset.kind };
 }
 
 function routeConfig() {
@@ -145,49 +123,29 @@ function populateSelect(select, devices, previousValue) {
 }
 
 async function refreshDevices() {
-  elements["route-result"].textContent =
-    "Requesting microphone permission to list device labels…";
+  elements["route-result"].textContent = "Requesting microphone permission to list device labels…";
   try {
-    const permissionStream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: false,
-    });
+    const permissionStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     permissionStream.getTracks().forEach((track) => track.stop());
     const devices = await navigator.mediaDevices.enumerateDevices();
     const inputs = devices.filter((device) => device.kind === "audioinput");
     const outputs = devices.filter((device) => device.kind === "audiooutput");
-    populateSelect(
-      elements["physical-mic"],
-      inputs,
-      elements["physical-mic"].value,
-    );
-    populateSelect(
-      elements["cable-b-source"],
-      inputs,
-      elements["cable-b-source"].value,
-    );
-    populateSelect(
-      elements["cable-a-sink"],
-      outputs,
-      elements["cable-a-sink"].value,
-    );
+    populateSelect(elements["physical-mic"], inputs, elements["physical-mic"].value);
+    populateSelect(elements["cable-b-source"], inputs, elements["cable-b-source"].value);
+    populateSelect(elements["cable-a-sink"], outputs, elements["cable-a-sink"].value);
     populateSelect(elements.headphones, outputs, elements.headphones.value);
-    elements["route-result"].textContent =
-      `Found ${inputs.length} inputs and ${outputs.length} outputs. Select four distinct endpoints.`;
+    elements["route-result"].textContent = `Found ${inputs.length} inputs and ${outputs.length} outputs. Select four distinct endpoints.`;
   } catch (error) {
-    elements["route-result"].textContent =
-      `Cannot enumerate audio devices: ${error.message}`;
+    elements["route-result"].textContent = `Cannot enumerate audio devices: ${error.message}`;
   }
 }
 
 function updateMeetingInstructions() {
-  const app =
-    elements["meeting-platform"].value === "zoom" ? "Zoom" : "Microsoft Teams";
+  const app = elements["meeting-platform"].value === "zoom" ? "Zoom" : "Microsoft Teams";
   const voicemeeter = elements["route-profile"].value === "voicemeeter";
   const microphone = voicemeeter ? "Voicemeeter Out B2" : "Cable-A Output";
   const speaker = voicemeeter ? "Voicemeeter Input" : "Cable-B Input";
-  elements["meeting-instructions"].textContent =
-    `${app}: select ${microphone} as microphone and ${speaker} as speaker. TransLive never changes these settings automatically.`;
+  elements["meeting-instructions"].textContent = `${app}: select ${microphone} as microphone and ${speaker} as speaker. TransLive never changes these settings automatically.`;
 }
 
 function appendTranscript({ direction, role, text }) {
@@ -215,10 +173,8 @@ function updateTimings(direction) {
   const timing = timings[direction];
   elements[`${direction}-ttfa`].textContent = formatMilliseconds(timing.ttfa);
   elements[`${direction}-rtt`].textContent = formatMilliseconds(timing.rtt);
-  elements[`${direction}-timing`].textContent =
-    `input ${timing.inputAt ? new Date(timing.inputAt).toLocaleTimeString() : "—"} · output ${timing.outputAt ? new Date(timing.outputAt).toLocaleTimeString() : "—"}`;
-  elements["webrtc-summary"].textContent =
-    `TX ${formatMilliseconds(timings.tx.rtt)} · RX ${formatMilliseconds(timings.rx.rtt)}`;
+  elements[`${direction}-timing`].textContent = `input ${timing.inputAt ? new Date(timing.inputAt).toLocaleTimeString() : "—"} · output ${timing.outputAt ? new Date(timing.outputAt).toLocaleTimeString() : "—"}`;
+  elements["webrtc-summary"].textContent = `TX ${formatMilliseconds(timings.tx.rtt)} · RX ${formatMilliseconds(timings.rx.rtt)}`;
 }
 
 function resetRunDisplay() {
@@ -230,7 +186,6 @@ function resetRunDisplay() {
   transcriptLines.length = 0;
   elements.transcripts.replaceChildren();
   elements["tx-level"].value = 0;
-  setRxSourceLanguage("unknown", "original");
 }
 
 function recordMetric(direction, type, stats) {
@@ -239,11 +194,9 @@ function recordMetric(direction, type, stats) {
   if (type === "input-audio") timing.inputAt ??= atMs;
   if (type === "output-audio") {
     timing.outputAt ??= atMs;
-    if (timing.inputAt && timing.ttfa === undefined)
-      timing.ttfa = atMs - timing.inputAt;
+    if (timing.inputAt && timing.ttfa === undefined) timing.ttfa = atMs - timing.inputAt;
   }
-  if (type === "webrtc" && Number.isFinite(stats?.rttMs))
-    timing.rtt = stats.rttMs;
+  if (type === "webrtc" && Number.isFinite(stats?.rttMs)) timing.rtt = stats.rttMs;
   updateTimings(direction);
   window.translive.recordMetric({ direction, type, atMs, stats });
 }
@@ -275,10 +228,7 @@ function createActivityProbe(stream, direction, type, onLevel = () => {}) {
     }
     animationFrame = requestAnimationFrame(sample);
   };
-  context
-    .resume()
-    .then(sample)
-    .catch(() => {});
+  context.resume().then(sample).catch(() => {});
   return () => {
     if (closed) return;
     closed = true;
@@ -308,73 +258,18 @@ async function summarizeStats(peerConnection) {
   const reports = await peerConnection.getStats();
   const stats = {};
   for (const report of reports.values()) {
-    if (
-      report.type === "candidate-pair" &&
-      report.state === "succeeded" &&
-      (report.nominated || report.selected)
-    ) {
-      if (Number.isFinite(report.currentRoundTripTime))
-        stats.rttMs = report.currentRoundTripTime * 1_000;
+    if (report.type === "candidate-pair" && report.state === "succeeded" && (report.nominated || report.selected)) {
+      if (Number.isFinite(report.currentRoundTripTime)) stats.rttMs = report.currentRoundTripTime * 1_000;
     }
-    if (
-      report.type === "inbound-rtp" &&
-      (report.kind === "audio" || report.mediaType === "audio")
-    ) {
-      if (Number.isFinite(report.jitter))
-        stats.jitterMs = report.jitter * 1_000;
-      if (Number.isFinite(report.packetsLost))
-        stats.packetsLost = report.packetsLost;
+    if (report.type === "inbound-rtp" && (report.kind === "audio" || report.mediaType === "audio")) {
+      if (Number.isFinite(report.jitter)) stats.jitterMs = report.jitter * 1_000;
+      if (Number.isFinite(report.packetsLost)) stats.packetsLost = report.packetsLost;
     }
-    if (
-      report.type === "outbound-rtp" &&
-      (report.kind === "audio" || report.mediaType === "audio")
-    ) {
-      if (Number.isFinite(report.packetsSent))
-        stats.packetsSent = report.packetsSent;
+    if (report.type === "outbound-rtp" && (report.kind === "audio" || report.mediaType === "audio")) {
+      if (Number.isFinite(report.packetsSent)) stats.packetsSent = report.packetsSent;
     }
   }
   return stats;
-}
-
-async function createOriginalMonitor(stream, sink) {
-  const context = new AudioContext();
-  const source = context.createMediaStreamSource(stream);
-  const delay = context.createDelay(1);
-  const gain = context.createGain();
-  let stopped = false;
-
-  try {
-    if (typeof context.setSinkId !== "function") {
-      throw new Error(
-        "This Electron build does not support AudioContext output routing",
-      );
-    }
-    await context.setSinkId(sink.id);
-    await context.resume();
-    delay.delayTime.value = 0.9;
-    gain.gain.value = 1;
-    source.connect(delay).connect(gain).connect(context.destination);
-  } catch (error) {
-    source.disconnect();
-    delay.disconnect();
-    gain.disconnect();
-    void context.close();
-    throw error;
-  }
-
-  return {
-    setMuted: (muted) => {
-      gain.gain.setValueAtTime(muted ? 0 : 1, context.currentTime);
-    },
-    stop: () => {
-      if (stopped) return;
-      stopped = true;
-      source.disconnect();
-      delay.disconnect();
-      gain.disconnect();
-      void context.close();
-    },
-  };
 }
 
 async function createRealtimePeer({ direction, source, sink }) {
@@ -382,10 +277,6 @@ async function createRealtimePeer({ direction, source, sink }) {
   let peerConnection;
   let eventChannel;
   let audio;
-  let originalMonitor;
-  let originalMonitorMuted = false;
-  let translatedMonitorMuted = direction === "rx";
-  let rxUserMuted = false;
   let stopInputProbe = () => {};
   let stopOutputProbe = () => {};
   let statsTimer;
@@ -399,14 +290,9 @@ async function createRealtimePeer({ direction, source, sink }) {
     clearInterval(statsTimer);
     stopInputProbe();
     stopOutputProbe();
-    originalMonitor?.stop();
-    try {
-      eventChannel?.close();
-    } catch {}
+    try { eventChannel?.close(); } catch {}
     stream?.getTracks().forEach((track) => track.stop());
-    try {
-      peerConnection?.close();
-    } catch {}
+    try { peerConnection?.close(); } catch {}
     if (audio) {
       audio.pause();
       audio.srcObject = null;
@@ -431,28 +317,18 @@ async function createRealtimePeer({ direction, source, sink }) {
       },
       video: false,
     });
-    if (direction === "rx") {
-      originalMonitor = await createOriginalMonitor(stream, sink);
-    }
     peerConnection = new RTCPeerConnection();
-    stream
-      .getAudioTracks()
-      .forEach((track) => peerConnection.addTrack(track, stream));
+    stream.getAudioTracks().forEach((track) => peerConnection.addTrack(track, stream));
     // The source audio track and oai-events data channel are created before the SDP offer.
     eventChannel = peerConnection.createDataChannel("oai-events");
     audio = document.createElement("audio");
     audio.autoplay = true;
     audio.playsInline = true;
     audio.hidden = true;
-    audio.muted = translatedMonitorMuted;
     document.body.append(audio);
 
     peerConnection.addEventListener("connectionstatechange", () => {
-      if (
-        ["failed", "disconnected", "closed"].includes(
-          peerConnection.connectionState,
-        )
-      ) {
+      if (["failed", "disconnected", "closed"].includes(peerConnection.connectionState)) {
         fail(`WebRTC connection ${peerConnection.connectionState}`);
       }
     });
@@ -461,34 +337,15 @@ async function createRealtimePeer({ direction, source, sink }) {
         if (cleaned) return;
         const remoteStream = event.streams[0] || new MediaStream([event.track]);
         audio.srcObject = remoteStream;
-        if (typeof audio.setSinkId !== "function")
-          throw new Error(
-            "This Electron build does not support output device routing",
-          );
+        if (typeof audio.setSinkId !== "function") throw new Error("This Electron build does not support output device routing");
         await audio.setSinkId(sink.id);
         if (cleaned) return;
-        event.track.addEventListener(
-          "ended",
-          () => fail("Remote translated audio track ended"),
-          { once: true },
-        );
-        event.track.addEventListener(
-          "unmute",
-          () => recordMetric(direction, "output-audio"),
-          { once: true },
-        );
-        audio.addEventListener(
-          "playing",
-          () => recordMetric(direction, "output-audio"),
-          { once: true },
-        );
+        event.track.addEventListener("ended", () => fail("Remote translated audio track ended"), { once: true });
+        event.track.addEventListener("unmute", () => recordMetric(direction, "output-audio"), { once: true });
+        audio.addEventListener("playing", () => recordMetric(direction, "output-audio"), { once: true });
         stopOutputProbe();
         try {
-          stopOutputProbe = createActivityProbe(
-            remoteStream,
-            direction,
-            "output-audio",
-          );
+          stopOutputProbe = createActivityProbe(remoteStream, direction, "output-audio");
         } catch {
           // Output activity sampling is best-effort; do not drop working translated audio.
         }
@@ -499,26 +356,15 @@ async function createRealtimePeer({ direction, source, sink }) {
     });
 
     try {
-      stopInputProbe = createActivityProbe(
-        stream,
-        direction,
-        "input-audio",
-        (rms) => {
-          if (direction === "tx") elements["tx-level"].value = rms;
-        },
-      );
+      stopInputProbe = createActivityProbe(stream, direction, "input-audio", (rms) => {
+        if (direction === "tx") elements["tx-level"].value = rms;
+      });
     } catch {
-      elements["route-result"].textContent =
-        "Audio level sampling is unavailable; translation can still be tested.";
+      elements["route-result"].textContent = "Audio level sampling is unavailable; translation can still be tested.";
     }
     statsTimer = setInterval(async () => {
       try {
-        if (!cleaned)
-          recordMetric(
-            direction,
-            "webrtc",
-            await summarizeStats(peerConnection),
-          );
+        if (!cleaned) recordMetric(direction, "webrtc", await summarizeStats(peerConnection));
       } catch {
         // Statistics are diagnostic only.
       }
@@ -531,22 +377,8 @@ async function createRealtimePeer({ direction, source, sink }) {
     return {
       sdp: peerConnection.localDescription.sdp,
       setMuted(muted) {
-        if (direction === "tx") {
-          stream.getAudioTracks().forEach((track) => {
-            track.enabled = !muted;
-          });
-          return;
-        }
-        rxUserMuted = Boolean(muted);
-        audio.muted = rxUserMuted || translatedMonitorMuted;
-        originalMonitor?.setMuted(rxUserMuted || originalMonitorMuted);
-      },
-      setOriginalMonitorMuted(muted) {
-        if (direction !== "rx") return;
-        originalMonitorMuted = Boolean(muted);
-        translatedMonitorMuted = !originalMonitorMuted;
-        originalMonitor?.setMuted(rxUserMuted || originalMonitorMuted);
-        audio.muted = rxUserMuted || translatedMonitorMuted;
+        if (direction === "tx") stream.getAudioTracks().forEach((track) => { track.enabled = !muted; });
+        else audio.muted = muted;
       },
       async applyAnswer(sdp) {
         await peerConnection.setRemoteDescription({ type: "answer", sdp });
@@ -562,12 +394,9 @@ async function createRealtimePeer({ direction, source, sink }) {
 async function runPreflight() {
   try {
     const result = await window.translive.preflight(routeConfig());
-    elements["route-result"].textContent = result.ok
-      ? `Route preflight passed: ${result.codexVersion}`
-      : result.error;
+    elements["route-result"].textContent = result.ok ? `Route preflight passed: ${result.codexVersion}` : result.error;
     if (result.ok) {
-      elements["meeting-instructions"].textContent =
-        `${result.instructions.app}: ${result.instructions.microphone} ${result.instructions.speaker} ${result.instructions.note}`;
+      elements["meeting-instructions"].textContent = `${result.instructions.app}: ${result.instructions.microphone} ${result.instructions.speaker} ${result.instructions.note}`;
     }
     return result.ok;
   } catch (error) {
@@ -582,8 +411,7 @@ async function playHeadphoneTestTone() {
   let context;
   try {
     const sink = selectDevice(elements.headphones);
-    if (sink.kind !== "audiooutput")
-      throw new Error("Select an audio output for headphones");
+    if (sink.kind !== "audiooutput") throw new Error("Select an audio output for headphones");
     context = new AudioContext();
     await context.resume();
     const destination = context.createMediaStreamDestination();
@@ -595,10 +423,7 @@ async function playHeadphoneTestTone() {
     audio = document.createElement("audio");
     audio.autoplay = true;
     audio.srcObject = destination.stream;
-    if (typeof audio.setSinkId !== "function")
-      throw new Error(
-        "This Electron build does not support output device routing",
-      );
+    if (typeof audio.setSinkId !== "function") throw new Error("This Electron build does not support output device routing");
     await audio.setSinkId(sink.id);
     await audio.play();
     oscillator.start();
@@ -608,13 +433,11 @@ async function playHeadphoneTestTone() {
       audio.remove();
       void context.close();
     }, 350);
-    elements["route-result"].textContent =
-      "Headphone test tone played on the selected output.";
+    elements["route-result"].textContent = "Headphone test tone played on the selected output.";
   } catch (error) {
     audio?.remove();
     void context?.close();
-    elements["route-result"].textContent =
-      `Headphone test failed: ${error.message}`;
+    elements["route-result"].textContent = `Headphone test failed: ${error.message}`;
   }
 }
 
@@ -632,18 +455,12 @@ async function start() {
     setRunStatus("Preparing WebRTC", "connecting");
     tx = await createRealtimePeer({
       direction: "tx",
-      source: {
-        id: config.tx.sourceEndpointId,
-        name: config.tx.sourceEndpointName,
-      },
+      source: { id: config.tx.sourceEndpointId, name: config.tx.sourceEndpointName },
       sink: { id: config.tx.sinkEndpointId, name: config.tx.sinkEndpointName },
     });
     rx = await createRealtimePeer({
       direction: "rx",
-      source: {
-        id: config.rx.sourceEndpointId,
-        name: config.rx.sourceEndpointName,
-      },
+      source: { id: config.rx.sourceEndpointId, name: config.rx.sourceEndpointName },
       sink: { id: config.rx.sinkEndpointId, name: config.rx.sinkEndpointName },
     });
     config.tx.sdp = tx.sdp;
@@ -651,16 +468,10 @@ async function start() {
     // SDP notifications can arrive before the start RPC resolves.
     active = { tx, rx };
     const result = await window.translive.start(config);
-    Object.entries(result.status).forEach(([direction, state]) =>
-      setChannelState(direction, state),
-    );
+    Object.entries(result.status).forEach(([direction, state]) => setChannelState(direction, state));
     setControls(true);
-    setRunStatus(
-      result.aggregate === "degraded" ? "Degraded" : "Connecting",
-      result.aggregate === "degraded" ? "failed" : "connecting",
-    );
-    elements["route-result"].textContent =
-      `Codex ${result.codexVersion}; awaiting each WebRTC answer.`;
+    setRunStatus(result.aggregate === "degraded" ? "Degraded" : "Connecting", result.aggregate === "degraded" ? "failed" : "connecting");
+    elements["route-result"].textContent = `Codex ${result.codexVersion}; awaiting each WebRTC answer.`;
   } catch (error) {
     tx?.stop();
     rx?.stop();
@@ -694,9 +505,7 @@ async function toggleMute(direction) {
   const muted = !button.dataset.muted;
   active[direction].setMuted(muted);
   button.dataset.muted = muted ? "true" : "";
-  button.textContent = muted
-    ? `Unmute ${direction.toUpperCase()}`
-    : `Mute ${direction.toUpperCase()}`;
+  button.textContent = muted ? `Unmute ${direction.toUpperCase()}` : `Mute ${direction.toUpperCase()}`;
   await window.translive.setMuted(direction, muted);
 }
 
@@ -708,8 +517,7 @@ function applyAggregate(aggregate) {
 }
 
 window.translive.onEvent(async (event) => {
-  elements["last-event"].textContent =
-    `${event.type}${event.direction ? ` · ${event.direction.toUpperCase()}` : ""}`;
+  elements["last-event"].textContent = `${event.type}${event.direction ? ` · ${event.direction.toUpperCase()}` : ""}`;
   if (event.type === "state") {
     setChannelState(event.direction, event.state);
     applyAggregate(event.aggregate);
@@ -721,15 +529,8 @@ window.translive.onEvent(async (event) => {
       const result = await window.translive.answerApplied(event.direction);
       applyAggregate(result.aggregate);
     } catch {
-      window.translive.rendererError(
-        event.direction,
-        "Could not apply the GPT-Live WebRTC answer.",
-      );
+      window.translive.rendererError(event.direction, "Could not apply the GPT-Live WebRTC answer.");
     }
-  }
-  if (event.type === "rx-language") {
-    setRxSourceLanguage(event.language, event.mode);
-    active?.rx.setOriginalMonitorMuted(event.mode === "translated");
   }
   if (event.type === "transcript") appendTranscript(event);
   if (event.type === "error") {
@@ -745,9 +546,7 @@ window.translive.onEvent(async (event) => {
     setRunStatus("Blocked", "failed");
     elements["route-result"].textContent = event.message;
   }
-  if (event.type === "stopped")
-    elements["route-result"].textContent =
-      "Stopped. Redacted evidence was written locally.";
+  if (event.type === "stopped") elements["route-result"].textContent = "Stopped. Redacted evidence was written locally.";
 });
 
 elements["refresh-devices"].addEventListener("click", refreshDevices);
@@ -761,10 +560,7 @@ elements["clear-transcript"].addEventListener("click", () => {
   transcriptLines.length = 0;
   elements.transcripts.replaceChildren();
 });
-elements["meeting-platform"].addEventListener(
-  "change",
-  updateMeetingInstructions,
-);
+elements["meeting-platform"].addEventListener("change", updateMeetingInstructions);
 elements["route-profile"].addEventListener("change", updateMeetingInstructions);
 window.addEventListener("pagehide", () => {
   active?.tx.stop();
@@ -772,5 +568,4 @@ window.addEventListener("pagehide", () => {
 });
 
 updateMeetingInstructions();
-setRxSourceLanguage("unknown", "original");
 setControls(false);

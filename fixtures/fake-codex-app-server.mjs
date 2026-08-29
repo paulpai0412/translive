@@ -2,10 +2,6 @@ import { writeFileSync } from "node:fs";
 import readline from "node:readline";
 
 const exitMarker = process.argv[2];
-const scenario = process.argv[3];
-const appendMarker = process.argv[4];
-let appendCount = 0;
-
 function markClosed() {
   if (exitMarker) writeFileSync(exitMarker, "closed", "utf8");
 }
@@ -28,32 +24,6 @@ function reject(id, message) {
   send({ id, error: { code: -32602, message } });
 }
 
-function recordAppend() {
-  appendCount += 1;
-  if (appendMarker) writeFileSync(appendMarker, String(appendCount), "utf8");
-}
-
-function scheduleTranscript(threadId, role, deltas, startAt) {
-  deltas.forEach((delta, index) =>
-    setTimeout(
-      () =>
-        send({
-          method: "thread/realtime/transcript/delta",
-          params: { threadId, role, delta },
-        }),
-      startAt + index * 5,
-    ),
-  );
-  setTimeout(
-    () =>
-      send({
-        method: "thread/realtime/transcript/done",
-        params: { threadId, role, text: deltas.join("") },
-      }),
-    startAt + deltas.length * 5 + 5,
-  );
-}
-
 function directionFor(params) {
   if (
     params.voice === "cove" &&
@@ -66,8 +36,13 @@ function directionFor(params) {
   }
   if (
     params.voice === "cove" &&
-    /spoken English/.test(params.prompt) &&
-    /Traditional Chinese interpretation/.test(params.prompt) &&
+    /Detect the source language automatically/.test(params.prompt) &&
+    /Always render every spoken utterance in natural Traditional Chinese used in Taiwan/.test(
+      params.prompt,
+    ) &&
+    /If the input is already Traditional Chinese, reproduce it faithfully/.test(
+      params.prompt,
+    ) &&
     /Speak every interpretation aloud/.test(params.prompt) &&
     /Do not wait for sentence completion/.test(params.prompt)
   ) {
@@ -163,82 +138,73 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
         }),
       10,
     );
-    const sourceScenario = request.params.transport.sdp;
-    if (direction === "rx" && sourceScenario === "fixture-language-sequence") {
-      scheduleTranscript(threadId, "user", ["Hello ", "world."], 15);
-      scheduleTranscript(threadId, "assistant", ["這是一段", "即時中文。"], 40);
-      scheduleTranscript(threadId, "user", ["這是", "中文。"], 70);
-      scheduleTranscript(threadId, "assistant", ["模型", "回覆。"], 95);
-      scheduleTranscript(threadId, "user", ["42"], 120);
-      scheduleTranscript(threadId, "assistant", ["未知", "回覆。"], 140);
-      return;
-    }
-    if (direction === "rx" && sourceScenario === "fixture-delayed-queue") {
-      scheduleTranscript(threadId, "user", ["Hello ", "world."], 15);
-      scheduleTranscript(threadId, "assistant", ["第一段。"], 40);
-      scheduleTranscript(threadId, "assistant", ["第二段。"], 55);
-      scheduleTranscript(threadId, "user", ["這是", "中文。"], 70);
-      return;
-    }
-    if (direction === "rx" && sourceScenario === "fixture-delayed-stop") {
-      scheduleTranscript(threadId, "user", ["Hello ", "world."], 15);
-      scheduleTranscript(threadId, "assistant", ["第一段。"], 40);
-      return;
-    }
-
-    const chineseSource =
-      direction === "rx" && sourceScenario === "fixture-chinese";
-    const mixedSource =
-      direction === "rx" && sourceScenario === "fixture-mixed";
-    let sourceDeltas = [];
-    if (direction === "rx") {
-      if (chineseSource) sourceDeltas = ["這是", "中文。"];
-      else if (mixedSource) sourceDeltas = ["Hello ", "world 中文。"];
-      else sourceDeltas = ["Hello ", "world."];
-    }
-    if (sourceDeltas.length > 0) {
-      scheduleTranscript(threadId, "user", sourceDeltas, 15);
-    }
-    let deltas = ["fixture ", "translation."];
-    if (direction === "rx") {
-      deltas = chineseSource ? ["模型", "回覆。"] : ["這是一段", "即時中文。"];
-    }
-    scheduleTranscript(threadId, "assistant", deltas, 40);
-    return;
-  }
-  if (request.method === "thread/realtime/appendSpeech") {
-    const direction = realtimeThreads.get(request.params?.threadId);
-    const expectedText =
-      scenario === "delayed-queue" || scenario === "delayed-stop"
-        ? ["第一段。", "第二段。"]
-        : ["這是一段即時中文。"];
-    if (direction !== "rx" || !expectedText.includes(request.params?.text)) {
-      reject(request.id, "Unexpected RX speech fallback text");
-      return;
-    }
-    recordAppend();
-    const { threadId, text } = request.params;
-    const delay =
-      scenario === "delayed-queue" || scenario === "delayed-stop" ? 350 : 0;
-    setTimeout(() => respond(request.id, {}), delay);
-    if (delay === 0) {
+    if (
+      direction === "rx" &&
+      request.params.transport.sdp === "fixture-chinese-target"
+    ) {
       setTimeout(
         () =>
           send({
             method: "thread/realtime/transcript/delta",
-            params: { threadId, role: "assistant", delta: text },
+            params: { threadId, role: "user", delta: "這是中文輸入。" },
           }),
-        1,
+        12,
       );
       setTimeout(
         () =>
           send({
             method: "thread/realtime/transcript/done",
-            params: { threadId, role: "assistant", text },
+            params: { threadId, role: "user", text: "這是中文輸入。" },
           }),
-        2,
+        14,
       );
     }
+    const deltas =
+      direction === "rx" ? ["這是一段", "即時中文。"] : ["fixture ", "translation."];
+    deltas.forEach((delta, index) =>
+      setTimeout(
+        () =>
+          send({
+            method: "thread/realtime/transcript/delta",
+            params: { threadId, role: "assistant", delta },
+          }),
+        15 + index * 5,
+      ),
+    );
+    setTimeout(
+      () =>
+        send({
+          method: "thread/realtime/transcript/done",
+          params: { threadId, role: "assistant", text: deltas.join("") },
+        }),
+      30,
+    );
+    return;
+  }
+  if (request.method === "thread/realtime/appendSpeech") {
+    const direction = realtimeThreads.get(request.params?.threadId);
+    if (direction !== "rx" || request.params?.text !== "這是一段即時中文。") {
+      reject(request.id, "Unexpected RX speech fallback text");
+      return;
+    }
+    respond(request.id, {});
+    const { threadId, text } = request.params;
+    setTimeout(
+      () =>
+        send({
+          method: "thread/realtime/transcript/delta",
+          params: { threadId, role: "assistant", delta: text },
+        }),
+      1,
+    );
+    setTimeout(
+      () =>
+        send({
+          method: "thread/realtime/transcript/done",
+          params: { threadId, role: "assistant", text },
+        }),
+      2,
+    );
     return;
   }
   if (request.method === "thread/realtime/stop") {
