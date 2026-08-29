@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 const DIRECTIONS = ["tx", "rx"];
+const MODE_DIRECTIONS = Object.freeze({
+  meeting: DIRECTIONS,
+  media: ["rx"],
+  microphone: ["tx"],
+});
 const SOURCE_KIND = "audioinput";
 const SINK_KIND = "audiooutput";
 
@@ -55,43 +60,65 @@ function assertEndpoint(channel, direction) {
   }
 }
 
+export function directionsForMode(mode = "meeting") {
+  const directions = MODE_DIRECTIONS[mode];
+  if (!directions) throw new Error(`Unsupported translation mode: ${mode}`);
+  return directions;
+}
+
 export function validateDualChannelConfig(config) {
-  assertEndpoint(config?.tx, "tx");
-  assertEndpoint(config?.rx, "rx");
-  const endpoints = [
-    config.tx.sourceEndpointId,
-    config.tx.sinkEndpointId,
-    config.rx.sourceEndpointId,
-    config.rx.sinkEndpointId,
-  ];
+  const directions = directionsForMode(config.mode);
+  directions.forEach((direction) => assertEndpoint(config?.[direction], direction));
+  const endpoints = directions.flatMap((direction) => [
+    config[direction].sourceEndpointId,
+    config[direction].sinkEndpointId,
+  ]);
   if (new Set(endpoints).size !== endpoints.length) {
     throw new Error("Audio endpoints must be unique");
   }
-  if (config.headphonesConfirmed !== true) {
+  if (directions.includes("rx") && config.headphonesConfirmed !== true) {
     throw new Error("Headphones must be explicitly confirmed");
   }
-  if (isVirtualEndpoint(config.tx.sourceEndpointName)) {
+  if (
+    directions.includes("tx") &&
+    isVirtualEndpoint(config.tx.sourceEndpointName)
+  ) {
     throw new Error("TX source must be a physical microphone, not a virtual endpoint");
   }
-  if (isVirtualEndpoint(config.rx.sinkEndpointName)) {
+  if (
+    directions.includes("rx") &&
+    isVirtualEndpoint(config.rx.sinkEndpointName)
+  ) {
     throw new Error("RX sink must be physical headphones, not a virtual endpoint");
   }
 
   const profile = config.routeProfile ?? "vb-cable";
   if (profile === "vb-cable") {
-    if (!matchesCableRole(config.tx.sinkEndpointName, "a", "input")) {
+    if (
+      directions.includes("tx") &&
+      !matchesCableRole(config.tx.sinkEndpointName, "a", "input")
+    ) {
       throw new Error("TX sink must be the Cable-A Input playback endpoint");
     }
-    if (!matchesCableRole(config.rx.sourceEndpointName, "b", "output")) {
+    if (
+      directions.includes("rx") &&
+      !matchesCableRole(config.rx.sourceEndpointName, "b", "output")
+    ) {
       throw new Error("RX source must be the Cable-B Output recording endpoint");
     }
     return;
   }
   if (profile === "voicemeeter") {
-    if (!matchesVoiceMeeterRole(config.tx.sinkEndpointName, "tx-sink")) {
+    if (
+      directions.includes("tx") &&
+      !matchesVoiceMeeterRole(config.tx.sinkEndpointName, "tx-sink")
+    ) {
       throw new Error("TX sink must be the Voicemeeter AUX Input endpoint");
     }
-    if (!matchesVoiceMeeterRole(config.rx.sourceEndpointName, "rx-source")) {
+    if (
+      directions.includes("rx") &&
+      !matchesVoiceMeeterRole(config.rx.sourceEndpointName, "rx-source")
+    ) {
       throw new Error("RX source must be the Voicemeeter Out B1 endpoint");
     }
     return;
@@ -100,7 +127,7 @@ export function validateDualChannelConfig(config) {
 }
 
 function aggregateStatus(states) {
-  const values = Object.values(states);
+  const values = Object.values(states).filter((state) => state !== "disabled");
   if (values.every((state) => state === "failed")) return "blocked";
   if (values.includes("failed")) return "degraded";
   if (values.every((state) => state === "live" || state === "muted"))
@@ -114,9 +141,13 @@ export async function startDualChannelRun(
   { openChannel, evidence, onStateChange = () => {}, now = Date.now },
 ) {
   validateDualChannelConfig(config);
+  const activeDirections = directionsForMode(config.mode);
 
   const states = Object.fromEntries(
-    DIRECTIONS.map((direction) => [direction, "connecting"]),
+    DIRECTIONS.map((direction) => [
+      direction,
+      activeDirections.includes(direction) ? "connecting" : "disabled",
+    ]),
   );
   let stopping = false;
   const transition = (direction, state, detail) => {
@@ -132,9 +163,9 @@ export async function startDualChannelRun(
     });
   };
 
-  DIRECTIONS.forEach((direction) => transition(direction, "connecting"));
+  activeDirections.forEach((direction) => transition(direction, "connecting"));
   const outcomes = await Promise.allSettled(
-    DIRECTIONS.map((direction) => {
+    activeDirections.map((direction) => {
       const correlationId = `translive-${direction}-${randomUUID()}`;
       return openChannel({
         direction,
@@ -148,7 +179,7 @@ export async function startDualChannelRun(
 
   outcomes.forEach((outcome, index) => {
     if (outcome.status === "rejected") {
-      const direction = DIRECTIONS[index];
+      const direction = activeDirections[index];
       evidence?.recordError(direction, outcome.reason, { atMs: now() });
       transition(direction, "failed", outcome.reason?.message);
     }
@@ -156,7 +187,10 @@ export async function startDualChannelRun(
 
   let stopPromise;
   const liveChannels = outcomes
-    .map((outcome, index) => ({ outcome, direction: DIRECTIONS[index] }))
+    .map((outcome, index) => ({
+      outcome,
+      direction: activeDirections[index],
+    }))
     .filter(({ outcome }) => outcome.status === "fulfilled");
   const stopChannel = async ({ outcome, direction }) => {
     try {
@@ -171,7 +205,7 @@ export async function startDualChannelRun(
     status: () => ({ ...states }),
     aggregateStatus: () => aggregateStatus(states),
     allFailed: () =>
-      DIRECTIONS.every((direction) => states[direction] === "failed"),
+      activeDirections.every((direction) => states[direction] === "failed"),
     answerApplied: (direction) => {
       if (!DIRECTIONS.includes(direction) || states[direction] !== "connecting")
         return false;

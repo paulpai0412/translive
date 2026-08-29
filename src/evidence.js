@@ -93,6 +93,7 @@ export class RunEvidence {
     codex,
     endpoints,
     platform = "unknown",
+    mode = "meeting",
     routeProfile = "unknown",
     model = "gpt-live-1-codex",
     voices = {},
@@ -113,6 +114,7 @@ export class RunEvidence {
       app: { version: String(appVersion ?? "unknown") },
       route: {
         platform: String(platform),
+        mode: String(mode),
         routeProfile: String(routeProfile),
         model: String(model),
         voices: structuredClone(voices),

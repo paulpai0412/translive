@@ -79,6 +79,44 @@ test("starts independent TX and RX channels but waits for each WebRTC answer", a
   assert.deepEqual(run.status(), { tx: "live", rx: "live" });
 });
 
+test("media mode starts only RX without requiring TX devices", async () => {
+  const { tx: _tx, ...config } = validConfig({ mode: "media" });
+  const opened = [];
+
+  const run = await startDualChannelRun(config, {
+    openChannel: async ({ direction }) => {
+      opened.push(direction);
+      return { stop: async () => {} };
+    },
+  });
+
+  assert.deepEqual(opened, ["rx"]);
+  assert.deepEqual(run.status(), { tx: "disabled", rx: "connecting" });
+  run.answerApplied("rx");
+  assert.equal(run.aggregateStatus(), "live");
+});
+
+test("microphone mode starts only TX without requiring RX devices", async () => {
+  const {
+    rx: _rx,
+    headphonesConfirmed: _headphonesConfirmed,
+    ...config
+  } = validConfig({ mode: "microphone" });
+  const opened = [];
+
+  const run = await startDualChannelRun(config, {
+    openChannel: async ({ direction }) => {
+      opened.push(direction);
+      return { stop: async () => {} };
+    },
+  });
+
+  assert.deepEqual(opened, ["tx"]);
+  assert.deepEqual(run.status(), { tx: "connecting", rx: "disabled" });
+  run.answerApplied("tx");
+  assert.equal(run.aggregateStatus(), "live");
+});
+
 test("keeps a healthy channel connecting when its peer fails to start", async () => {
   let txStopped = false;
   const run = await startDualChannelRun(validConfig(), {
@@ -287,6 +325,7 @@ test("records redacted aggregate evidence without transcripts, SDP, or tokens", 
       checksum: "abc",
     },
     platform: "teams",
+    mode: "meeting",
     routeProfile: "vb-cable",
     model: "gpt-live-1-codex",
     voices: { tx: "cove", rx: "cove" },
@@ -363,6 +402,7 @@ test("records redacted aggregate evidence without transcripts, SDP, or tokens", 
   const serialized = await readFile(file, "utf8");
   const persisted = JSON.parse(serialized);
 
+  assert.equal(persisted.route.mode, "meeting");
   assert.equal(persisted.route.routeProfile, "vb-cable");
   assert.equal(persisted.endpoints[0].kind, "audioinput");
   assert.notEqual(persisted.endpoints[0].idHash, "mic-secret-id");

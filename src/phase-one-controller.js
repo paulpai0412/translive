@@ -4,6 +4,7 @@ import {
 } from "./codex-app-server.js";
 import { inspectCodexRuntime } from "./codex-runtime.js";
 import {
+  directionsForMode,
   startDualChannelRun,
   validateDualChannelConfig,
 } from "./dual-channel-run.js";
@@ -89,7 +90,7 @@ function endpointRecords(config = {}) {
 
 function assertRouteConfig(config) {
   validateDualChannelConfig(config);
-  for (const direction of ["tx", "rx"]) {
+  for (const direction of directionsForMode(config.mode)) {
     const channel = config[direction];
     for (const field of ["sourceEndpointName", "sinkEndpointName"]) {
       if (typeof channel[field] !== "string" || channel[field].length === 0) {
@@ -103,7 +104,7 @@ function assertRouteConfig(config) {
 
 function assertStartConfig(config) {
   assertRouteConfig(config);
-  for (const direction of ["tx", "rx"]) {
+  for (const direction of directionsForMode(config.mode)) {
     if (
       typeof config[direction].sdp !== "string" ||
       config[direction].sdp.length === 0
@@ -384,6 +385,7 @@ export class PhaseOneController {
       appVersion: this.#appVersion,
       codex: { ...runtime, pinnedVersion: this.#codexVersion },
       platform: config?.platform,
+      mode: config?.mode,
       routeProfile: config?.routeProfile,
       model: MODEL,
       voices: VOICES,

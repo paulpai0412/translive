@@ -93,6 +93,57 @@ test("returns VoiceMeeter meeting endpoint instructions for the free route profi
   assert.match(result.instructions.speaker, /Voicemeeter Input/i);
 });
 
+test("media mode creates only the RX realtime session", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-media-mode-"),
+  );
+  const { tx: _tx, ...config } = validConfig({ mode: "media" });
+  const events = [];
+  const controller = controllerFor({
+    evidenceDirectory,
+    publish: (event) => events.push(event),
+  });
+
+  const result = await controller.start(config);
+  assert.deepEqual(result.status, { tx: "disabled", rx: "connecting" });
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  assert.deepEqual(
+    events.filter((event) => event.type === "sdp").map((event) => event.direction),
+    ["rx"],
+  );
+  await controller.answerApplied("rx");
+  assert.equal(result.aggregate, "connecting");
+  assert.deepEqual(controller.status(), { tx: "disabled", rx: "live" });
+  await controller.stop("user-stop");
+});
+
+test("microphone mode creates only the TX realtime session", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-microphone-mode-"),
+  );
+  const {
+    rx: _rx,
+    headphonesConfirmed: _headphonesConfirmed,
+    ...config
+  } = validConfig({ mode: "microphone" });
+  const events = [];
+  const controller = controllerFor({
+    evidenceDirectory,
+    publish: (event) => events.push(event),
+  });
+
+  const result = await controller.start(config);
+  assert.deepEqual(result.status, { tx: "connecting", rx: "disabled" });
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  assert.deepEqual(
+    events.filter((event) => event.type === "sdp").map((event) => event.direction),
+    ["tx"],
+  );
+  await controller.answerApplied("tx");
+  assert.deepEqual(controller.status(), { tx: "live", rx: "disabled" });
+  await controller.stop("user-stop");
+});
+
 test("keeps channels connecting until the renderer confirms both SDP answers", async () => {
   const evidenceDirectory = await mkdtemp(
     join(tmpdir(), "translive-controller-evidence-"),
