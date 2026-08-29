@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import { mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -56,6 +57,7 @@ function controllerFor({
   publish = () => {},
   inspectRuntime = readyRuntime(),
   codexArgs = [fixture],
+  createClient,
 } = {}) {
   return new PhaseOneController({
     appVersion: "0.0.0-test",
@@ -66,7 +68,24 @@ function controllerFor({
     evidenceDirectory,
     publish,
     inspectRuntime,
+    createClient,
   });
+}
+
+class PendingStartClient extends EventEmitter {
+  closed = false;
+  #rejectStart;
+
+  start() {
+    return new Promise((_, reject) => {
+      this.#rejectStart = reject;
+    });
+  }
+
+  async close() {
+    this.closed = true;
+    this.#rejectStart?.(new Error("client closed"));
+  }
 }
 
 test("returns VoiceMeeter meeting endpoint instructions for the free route profile", async () => {
@@ -115,6 +134,12 @@ test("media mode creates only the RX realtime session", async () => {
   assert.equal(result.aggregate, "connecting");
   assert.deepEqual(controller.status(), { tx: "disabled", rx: "live" });
   await controller.stop("user-stop");
+  const [file] = await readdir(evidenceDirectory);
+  const evidence = JSON.parse(await readFile(join(evidenceDirectory, file), "utf8"));
+  assert.deepEqual(
+    evidence.endpoints.map((endpoint) => endpoint.role),
+    ["cableBRecordingSource", "headphonesSink"],
+  );
 });
 
 test("microphone mode creates only the TX realtime session", async () => {
@@ -154,7 +179,7 @@ test("keeps channels connecting until the renderer confirms both SDP answers", a
     publish: (event) => events.push(event),
   });
 
-  const result = await controller.start(validConfig());
+  const result = await controller.start(validConfig({ platform: "zoom" }));
   assert.deepEqual(result.status, { tx: "connecting", rx: "connecting" });
   assert.equal(result.aggregate, "connecting");
 
@@ -176,6 +201,7 @@ test("keeps channels connecting until the renderer confirms both SDP answers", a
   const evidence = JSON.parse(
     await readFile(join(evidenceDirectory, file), "utf8"),
   );
+  assert.equal(evidence.route.platform, "zoom");
   assert.equal(evidence.sessions.tx.threadId, "fixture-thread-1");
   assert.equal(evidence.sessions.rx.threadId, "fixture-thread-2");
   assert.notEqual(
@@ -224,6 +250,58 @@ test("uses the same target-only RX path when the source is already Chinese", asy
   );
 
   await controller.stop("user-stop");
+});
+
+test("cancels a main-side startup during runtime preflight without opening an app-server", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-cancel-preflight-"),
+  );
+  let resolveRuntime;
+  let createClientCalls = 0;
+  const controller = controllerFor({
+    evidenceDirectory,
+    createClient: () => {
+      createClientCalls++;
+      return new PendingStartClient();
+    },
+    inspectRuntime: () =>
+      new Promise((resolve) => {
+        resolveRuntime = resolve;
+      }),
+  });
+
+  const start = controller.start(validConfig());
+  await new Promise((resolve) => setImmediate(resolve));
+  await controller.cancelStart();
+  resolveRuntime({
+    executable: process.execPath,
+    version: `node ${process.versions.node}`,
+    semanticVersion: process.versions.node,
+    loggedIn: true,
+  });
+
+  await assert.rejects(start, { name: "AbortError" });
+  assert.equal(createClientCalls, 0);
+});
+
+test("cancels a main-side startup before a delayed app-server starts", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-cancel-start-"),
+  );
+  const client = new PendingStartClient();
+  const controller = controllerFor({
+    evidenceDirectory,
+    createClient: () => client,
+  });
+
+  const start = controller.start(validConfig());
+  await new Promise((resolve) => setImmediate(resolve));
+  const result = await controller.cancelStart();
+
+  assert.deepEqual(result, { canceled: true });
+  await assert.rejects(start, { name: "AbortError" });
+  assert.equal(client.closed, true);
+  assert.deepEqual(controller.status(), { tx: "stopped", rx: "stopped" });
 });
 
 test("rejects a re-entrant start without creating a second app-server run", async () => {

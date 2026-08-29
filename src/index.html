@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-Hant" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta
@@ -7,174 +7,234 @@
       content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>TransLive Phase 1 PoC</title>
+    <title>TransLive</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
-    <main>
-      <header>
-        <div>
-          <p class="eyebrow">Developer proof of concept</p>
-          <h1>TransLive · Phase 1</h1>
-          <p class="muted">
-            Traditional Chinese ↔ English · GPT-Live V3 · two isolated channels
-          </p>
-        </div>
-        <output id="run-status" class="status ready">Ready</output>
-      </header>
+  <body data-app-state="checking" data-mode="meeting" data-view="translate">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="TransLive 即時翻譯">
+        <img src="../assets/translive-brand/translive-mark.svg" alt="" />
+        <span>TransLive</span>
+      </a>
+      <nav class="primary-nav" aria-label="主要導覽">
+        <button class="nav-item is-active" data-view-button="translate">即時翻譯</button>
+        <button class="nav-item" data-view-button="settings">設定</button>
+        <button class="nav-item" aria-disabled="true" title="紀錄將於下一階段提供">紀錄</button>
+      </nav>
+      <div class="top-actions">
+        <button class="account-chip" id="account-button" type="button">
+          <span class="status-dot"></span>
+          <span id="account-status">檢查登入狀態…</span>
+        </button>
+        <button class="icon-button" id="diagnostics-button" type="button" aria-label="開啟診斷">⋯</button>
+      </div>
+    </header>
 
-      <section class="notice" aria-label="Phase 1 constraints">
-        Requires an already-authenticated, pinned Codex runtime and two VB-CABLE
-        pairs. Audio is sent to GPT-Live only after Start. Transcripts stay in
-        memory; only redacted timing evidence is written.
+    <main class="main-content">
+      <section class="screen auth-screen" data-state-show="checking logged-out auth-waiting">
+        <div class="auth-panel">
+          <img class="auth-logo" src="../assets/translive-brand/translive-mark.svg" alt="TransLive" />
+          <p class="section-kicker">安全登入</p>
+          <h1>連接 ChatGPT</h1>
+          <p class="english-label">Connect ChatGPT</p>
+          <p class="auth-copy">使用系統瀏覽器完成 OpenAI／ChatGPT 登入。TransLive 不會讀取、保存或顯示你的 OAuth token。</p>
+          <button class="primary-button" id="account-login-button" type="button">連接 ChatGPT</button>
+          <button class="text-button auth-cancel" id="account-login-cancel" type="button">取消登入</button>
+          <p class="auth-status" id="auth-status" role="status">正在確認登入狀態…</p>
+        </div>
       </section>
 
-      <section class="card" aria-labelledby="routing-heading">
-        <div class="section-heading">
+      <section class="screen ready-screen" data-state-show="ready">
+        <div class="page-heading">
           <div>
-            <p class="eyebrow">Manual routing</p>
-            <h2 id="routing-heading">Audio endpoints</h2>
+            <p class="section-kicker">即時翻譯</p>
+            <h1>選擇使用方式</h1>
+            <p>只顯示目前模式需要的設定。</p>
           </div>
-          <button id="refresh-devices" type="button">Refresh devices</button>
+          <button class="text-button" id="refresh-devices" type="button">重新檢查裝置</button>
         </div>
-        <div class="device-grid">
-          <label>
-            <span>Meeting app</span>
-            <select id="meeting-platform">
-              <option value="teams">Microsoft Teams</option>
-              <option value="zoom">Zoom</option>
-            </select>
-          </label>
-          <label>
-            <span>Virtual routing profile</span>
-            <select id="route-profile">
-              <option value="voicemeeter">VoiceMeeter Banana · VAIO/AUX</option>
-              <option value="vb-cable">VB-CABLE A+B</option>
-            </select>
-          </label>
-          <label>
-            <span>Physical microphone · TX source</span>
-            <select id="physical-mic" required></select>
-          </label>
-          <label>
-            <span>TX virtual output sink</span>
-            <select id="cable-a-sink" required></select>
-          </label>
-          <label>
-            <span>RX virtual input source</span>
-            <select id="cable-b-source" required></select>
-          </label>
-          <label>
-            <span>Physical headphones · RX output sink</span>
-            <select id="headphones" required></select>
-          </label>
-          <div class="endpoint-note">
-            VoiceMeeter: TX = AUX Input, RX = Out B1. VB-CABLE: TX = Cable-A
-            Input, RX = Cable-B Output.
-          </div>
-        </div>
-        <label class="checkbox-row">
-          <input id="headphones-confirmed" type="checkbox" />
-          <span
-            >I confirm this selected endpoint is headphones, not physical
-            speakers. Device names are not proof.</span
-          >
-        </label>
-        <div class="actions">
-          <button id="preflight" type="button">Route preflight</button>
-          <button id="test-headphones" type="button">Test headphones</button>
-          <button id="start" type="button" class="primary">
-            Start dual channel
+
+        <div class="mode-switcher" role="tablist" aria-label="翻譯模式">
+          <button class="mode-option is-active" data-mode-button="meeting" role="tab">
+            <strong>雙向會議</strong><span>Meeting · TX + RX</span>
           </button>
-          <button id="stop" type="button" class="danger" disabled>Stop</button>
+          <button class="mode-option" data-mode-button="media" role="tab">
+            <strong>媒體翻譯</strong><span>Media · RX only</span>
+          </button>
+          <button class="mode-option" data-mode-button="microphone" role="tab">
+            <strong>麥克風翻譯</strong><span>Microphone · TX only</span>
+          </button>
         </div>
-        <p id="route-result" class="muted" role="status">
-          Refresh devices, choose all four endpoints, then run preflight.
-        </p>
-        <p id="meeting-instructions" class="instruction">
-          Teams/Zoom: choose Voicemeeter Out B2 as microphone and Voicemeeter
-          Input as speaker. TransLive never changes these settings automatically.
-        </p>
-      </section>
 
-      <section class="channels" aria-label="Translation channels">
-        <article class="card channel" data-direction="tx">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">TX · me → meeting</p>
-              <h2>Traditional Chinese → English</h2>
+        <div class="configuration">
+          <section class="config-section">
+            <h2>語言與聲音</h2>
+            <div class="field-grid">
+              <label data-mode-show="meeting microphone">
+                <span>我說的語言</span>
+                <select id="tx-source-language"><option>繁體中文（台灣）</option></select>
+              </label>
+              <label data-mode-show="meeting microphone">
+                <span>對方聽到</span>
+                <select id="tx-target-language"><option>English</option></select>
+              </label>
+              <label data-mode-show="meeting media">
+                <span>我聽到</span>
+                <select id="rx-target-language"><option>繁體中文（台灣）</option></select>
+              </label>
+              <label>
+                <span>翻譯聲音</span>
+                <select id="voice"><option value="cove">Cove</option></select>
+              </label>
             </div>
-            <output id="tx-state" class="status connecting">Idle</output>
-          </div>
-          <p>Voice: <strong>Cove</strong> · output: selected TX virtual sink</p>
-          <label class="level-row"
-            >Mic level <meter id="tx-level" min="0" max="1" value="0"></meter
-          ></label>
-          <button id="tx-mute" type="button" disabled>Mute TX</button>
-          <p class="metric">
-            TTFA <output id="tx-ttfa">—</output> · RTT
-            <output id="tx-rtt">—</output>
-          </p>
-        </article>
-        <article class="card channel" data-direction="rx">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">RX · meeting → me</p>
-              <h2>English → Traditional Chinese</h2>
+          </section>
+
+          <section class="config-section">
+            <h2>音訊路由</h2>
+            <div class="field-grid device-grid">
+              <label data-mode-show="meeting">
+                <span>會議平台</span>
+                <select id="meeting-platform">
+                  <option value="teams">Microsoft Teams</option>
+                  <option value="zoom">Zoom</option>
+                  <option value="custom">其他應用程式</option>
+                </select>
+              </label>
+              <label>
+                <span>虛擬路由</span>
+                <select id="route-profile">
+                  <option value="voicemeeter">VoiceMeeter Banana</option>
+                  <option value="vb-cable">VB-CABLE A+B</option>
+                </select>
+              </label>
+              <label data-mode-show="meeting microphone">
+                <span>實體麥克風</span>
+                <select id="physical-mic"><option value="">選擇裝置</option></select>
+              </label>
+              <label data-mode-show="meeting microphone">
+                <span>虛擬麥克風輸出</span>
+                <select id="tx-sink"><option value="">選擇裝置</option></select>
+              </label>
+              <label data-mode-show="meeting media">
+                <span>音訊來源</span>
+                <select id="rx-source"><option value="">選擇裝置</option></select>
+              </label>
+              <label data-mode-show="meeting media">
+                <span>耳機輸出</span>
+                <select id="headphones"><option value="">選擇裝置</option></select>
+              </label>
             </div>
-            <output id="rx-state" class="status connecting">Idle</output>
-          </div>
-          <p>Voice: <strong>Cove</strong> · output: physical headphones</p>
-          <button id="rx-mute" type="button" disabled>Mute RX</button>
-          <p class="metric">
-            TTFA <output id="rx-ttfa">—</output> · RTT
-            <output id="rx-rtt">—</output>
-          </p>
-        </article>
-      </section>
+            <label class="checkbox-row" data-mode-show="meeting media">
+              <input id="headphones-confirmed" type="checkbox" />
+              <span>我確認選擇的是耳機，不是實體喇叭。</span>
+            </label>
+            <p class="mode-help" data-mode-show="media">在 Windows 音量混音程式中，將 YouTube／瀏覽器輸出設為 VoiceMeeter Input。</p>
+          </section>
 
-      <section class="card" aria-labelledby="transcript-heading">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Ephemeral diagnostics</p>
-            <h2 id="transcript-heading">Live transcripts</h2>
-          </div>
-          <button id="clear-transcript" type="button">Clear display</button>
-        </div>
-        <p class="muted">
-          Displayed only while this window is open. No transcript or audio is
-          written to disk.
-        </p>
-        <div id="transcripts" class="transcripts" aria-live="polite"></div>
-      </section>
-
-      <section class="card diagnostics" aria-labelledby="diagnostics-heading">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Redacted evidence</p>
-            <h2 id="diagnostics-heading">Timing and diagnostics</h2>
+          <div class="health-row" aria-label="系統健康狀態">
+            <span id="health-account"><i></i>ChatGPT</span>
+            <span id="health-runtime"><i></i>GPT‑Live</span>
+            <span id="health-devices"><i></i>音訊裝置</span>
           </div>
         </div>
-        <dl>
-          <div>
-            <dt>TX input / output</dt>
-            <dd id="tx-timing">—</dd>
-          </div>
-          <div>
-            <dt>RX input / output</dt>
-            <dd id="rx-timing">—</dd>
-          </div>
-          <div>
-            <dt>WebRTC</dt>
-            <dd id="webrtc-summary">—</dd>
-          </div>
-          <div>
-            <dt>Last event</dt>
-            <dd id="last-event">—</dd>
-          </div>
-        </dl>
+
+        <div class="primary-action-area">
+          <button class="start-button" id="start-button" type="button">開始翻譯<span>Start translating</span></button>
+          <p id="ready-message" class="action-note">選擇裝置後即可開始。</p>
+        </div>
+      </section>
+
+      <section class="screen connecting-screen" data-state-show="connecting">
+        <div class="connection-panel">
+          <p class="section-kicker">正在準備</p>
+          <h1>建立翻譯連線…</h1>
+          <ol class="progress-list">
+            <li id="connect-account-step">ChatGPT 登入</li>
+            <li id="connect-runtime-step">檢查 Codex runtime</li>
+            <li id="connect-session-step">建立 GPT‑Live session</li>
+            <li id="connect-route-step">套用音訊路由</li>
+          </ol>
+          <button class="secondary-button" id="cancel-connect-button" type="button">取消</button>
+        </div>
+      </section>
+
+      <section class="screen live-screen" data-state-show="live degraded" aria-live="polite">
+        <div class="live-bar">
+          <div class="live-identity"><span class="live-pulse"></span><strong id="live-status">翻譯中</strong><span>Live</span></div>
+          <span id="live-mode-label">雙向會議</span>
+          <span class="cloud-note">雲端傳輸中</span>
+          <button class="danger-button" id="stop-button" type="button">停止</button>
+        </div>
+
+        <div class="degraded-banner" id="degraded-banner" role="alert">
+          <div><strong id="degraded-title">通道已中斷</strong><p id="degraded-copy">請檢查音訊裝置或重新開始翻譯。</p></div>
+        </div>
+
+        <div class="caption-workspace meeting-captions" data-mode-show="meeting">
+          <article class="channel-column" data-direction="tx">
+            <header><div><span class="channel-label">我 → 對方</span><strong>TX</strong></div><div class="channel-state"><i></i><span id="tx-state">連線中</span><button class="mute-button" data-direction="tx">靜音</button></div></header>
+            <div class="caption-group source"><span>我說</span><p id="tx-source-caption">等待輸入音訊…</p></div>
+            <div class="caption-group target"><span>對方聽到</span><p id="tx-target-caption" aria-live="polite">—</p></div>
+          </article>
+          <article class="channel-column" data-direction="rx">
+            <header><div><span class="channel-label">對方 → 我</span><strong>RX</strong></div><div class="channel-state"><i></i><span id="rx-state">連線中</span><button class="mute-button" data-direction="rx">靜音</button></div></header>
+            <div class="caption-group source"><span>對方說</span><p id="rx-source-caption">等待輸入音訊…</p></div>
+            <div class="caption-group target"><span>我聽到</span><p id="rx-target-caption" aria-live="polite">—</p></div>
+          </article>
+        </div>
+
+        <div class="caption-workspace single-captions" data-mode-show="media microphone">
+          <header><div><span class="channel-label" id="single-channel-label">媒體 → 我</span><strong id="single-channel-id">RX</strong></div><div class="channel-state"><i></i><span id="single-channel-state">連線中</span><button class="mute-button" id="single-mute-button">靜音</button></div></header>
+          <div class="caption-group source"><span id="single-source-label">原文 Source</span><p id="single-source-caption">等待輸入音訊…</p></div>
+          <div class="caption-group target hero-caption"><span id="single-target-label">繁中 Translation</span><p id="single-target-caption" aria-live="polite">—</p></div>
+        </div>
+
+        <footer class="live-footer">
+          <span id="live-route-summary">VoiceMeeter · Cove</span>
+          <button class="text-button" id="mini-overlay-button" type="button">迷你字幕</button>
+          <button class="text-button" id="diagnostics-button-live" type="button">開啟診斷</button>
+        </footer>
+      </section>
+
+      <section class="screen stopped-screen" data-state-show="stopped">
+        <div class="stopped-panel"><span class="success-mark">✓</span><h1>翻譯已停止</h1><p>音訊連線已釋放。逐字稿與摘要將於下一階段提供。</p><button class="primary-button" id="restart-button">再次開始</button></div>
+      </section>
+
+      <section class="screen blocked-screen" data-state-show="blocked" role="alert">
+        <div class="blocked-panel"><p class="section-kicker danger-text">無法開始</p><h1 id="blocked-title">無法建立翻譯連線</h1><p id="blocked-copy">請檢查登入、音訊裝置和路由設定。</p><button class="primary-button" id="blocked-action">重新連接 ChatGPT</button><details><summary>技術資訊</summary><code id="blocked-detail">NO_DETAILS</code></details></div>
+      </section>
+
+      <section class="screen settings-screen" data-view-show="settings">
+        <div class="page-heading"><div><p class="section-kicker">偏好設定</p><h1>設定</h1><p>目前只提供帳戶、主題與 runtime 資訊。</p></div></div>
+        <div class="settings-list">
+          <button id="settings-account-button">帳戶與 ChatGPT OAuth<span id="settings-account-status">檢查中</span></button>
+          <button id="settings-logout-button">登出 ChatGPT<span>移除本機 Codex 登入</span></button>
+          <button id="theme-button">外觀主題<span id="theme-label">深色</span></button>
+          <button id="settings-runtime-button">Codex runtime<span id="settings-runtime-status">尚未檢查</span></button>
+        </div>
       </section>
     </main>
+
+    <aside class="diagnostics-drawer" id="diagnostics-drawer" aria-hidden="true">
+      <header><div><p class="section-kicker">健康狀態</p><h2>診斷 <span>Diagnostics</span></h2></div><button class="icon-button" id="close-diagnostics" aria-label="關閉診斷">×</button></header>
+      <dl class="health-list">
+        <div><dt>帳戶</dt><dd id="diag-account">檢查中</dd></div>
+        <div><dt>模式</dt><dd id="diag-mode">雙向會議</dd></div>
+        <div><dt>TX</dt><dd id="diag-tx">—</dd></div>
+        <div><dt>RX</dt><dd id="diag-rx">—</dd></div>
+        <div><dt>最後事件</dt><dd id="diag-last-event">—</dd></div>
+      </dl>
+      <details class="advanced-details"><summary>進階資訊</summary><div class="technical-grid"><span>Codex</span><code id="diag-codex">尚未檢查</code><span>Route</span><code id="diag-route">—</code><span>Event</span><code id="diag-event-detail">—</code></div></details>
+      <button class="secondary-button full-width" id="copy-diagnostics">複製診斷資訊</button>
+    </aside>
+    <div class="drawer-scrim" id="drawer-scrim"></div>
+
+    <section class="mini-overlay" id="mini-overlay" aria-hidden="true">
+      <header><div><span class="live-pulse"></span><strong id="mini-status">Live</strong></div><button id="close-mini">展開</button></header>
+      <p id="mini-primary">等待翻譯字幕…</p>
+      <p id="mini-secondary"></p>
+    </section>
+
     <script type="module" src="./renderer-entry.js"></script>
   </body>
 </html>

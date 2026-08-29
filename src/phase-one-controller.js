@@ -57,35 +57,49 @@ function requestIdFrom(error) {
   return typeof value === "string" ? value : undefined;
 }
 
+function startupCanceledError() {
+  const error = new Error("Translation startup canceled");
+  error.name = "AbortError";
+  return error;
+}
+
 function endpointRecords(config = {}) {
-  const tx = config.tx ?? {};
-  const rx = config.rx ?? {};
-  return [
-    {
-      role: "physicalMicSource",
-      id: tx.sourceEndpointId ?? "missing-tx-source",
-      name: tx.sourceEndpointName ?? "Unknown TX source",
-      kind: tx.sourceEndpointKind ?? "unknown",
-    },
-    {
-      role: "cableAPlaybackSink",
-      id: tx.sinkEndpointId ?? "missing-tx-sink",
-      name: tx.sinkEndpointName ?? "Unknown Cable-A sink",
-      kind: tx.sinkEndpointKind ?? "unknown",
-    },
-    {
-      role: "cableBRecordingSource",
-      id: rx.sourceEndpointId ?? "missing-rx-source",
-      name: rx.sourceEndpointName ?? "Unknown Cable-B source",
-      kind: rx.sourceEndpointKind ?? "unknown",
-    },
-    {
-      role: "headphonesSink",
-      id: rx.sinkEndpointId ?? "missing-rx-sink",
-      name: rx.sinkEndpointName ?? "Unknown headphone sink",
-      kind: rx.sinkEndpointKind ?? "unknown",
-    },
-  ];
+  const records = [];
+  if (directionsForMode(config.mode).includes("tx")) {
+    const tx = config.tx;
+    records.push(
+      {
+        role: "physicalMicSource",
+        id: tx.sourceEndpointId,
+        name: tx.sourceEndpointName,
+        kind: tx.sourceEndpointKind,
+      },
+      {
+        role: "cableAPlaybackSink",
+        id: tx.sinkEndpointId,
+        name: tx.sinkEndpointName,
+        kind: tx.sinkEndpointKind,
+      },
+    );
+  }
+  if (directionsForMode(config.mode).includes("rx")) {
+    const rx = config.rx;
+    records.push(
+      {
+        role: "cableBRecordingSource",
+        id: rx.sourceEndpointId,
+        name: rx.sourceEndpointName,
+        kind: rx.sourceEndpointKind,
+      },
+      {
+        role: "headphonesSink",
+        id: rx.sinkEndpointId,
+        name: rx.sinkEndpointName,
+        kind: rx.sinkEndpointKind,
+      },
+    );
+  }
+  return records;
 }
 
 function assertRouteConfig(config) {
@@ -132,7 +146,8 @@ function meetingInstructions(platform, routeProfile) {
 export class PhaseOneController {
   #active;
   #appVersion;
-  #codexArgs;
+  #cancelStartRequested = false;
+  #createClient;
   #codexExecutable;
   #codexVersion;
   #cwd;
@@ -140,6 +155,7 @@ export class PhaseOneController {
   #inspectRuntime;
   #publish;
   #starting = false;
+  #startingContext;
 
   constructor({
     appVersion,
@@ -150,15 +166,21 @@ export class PhaseOneController {
     evidenceDirectory = process.env.TRANSLIVE_EVIDENCE_DIR ||
       ".translive-evidence",
     inspectRuntime = inspectCodexRuntime,
+    createClient = () =>
+      new CodexAppServer({
+        executable: codexExecutable,
+        args: codexArgs,
+        cwd,
+      }),
     publish = () => {},
   }) {
     this.#appVersion = appVersion;
-    this.#codexArgs = codexArgs;
     this.#codexExecutable = codexExecutable;
     this.#codexVersion = codexVersion;
     this.#cwd = cwd;
     this.#evidenceDirectory = evidenceDirectory;
     this.#inspectRuntime = inspectRuntime;
+    this.#createClient = createClient;
     this.#publish = publish;
   }
 
@@ -188,24 +210,23 @@ export class PhaseOneController {
     if (this.#active || this.#starting)
       throw new Error("A Phase 1 run is already starting or active");
     this.#starting = true;
+    this.#cancelStartRequested = false;
     let context;
     let runtime;
     try {
       assertStartConfig(config);
       runtime = await this.#runtime(true);
+      this.#throwIfStartupCanceled();
       this.#assertRuntime(runtime);
       const evidence = this.#evidence(config, runtime);
-      const client = new CodexAppServer({
-        executable: this.#codexExecutable,
-        args: this.#codexArgs,
-        cwd: this.#cwd,
-      });
+      const client = this.#createClient();
       context = {
         client,
         evidence,
         run: undefined,
         threads: new Map(),
         buffered: [],
+        canceled: false,
         finalized: false,
         speechFallback: {
           buffer: "",
@@ -215,6 +236,7 @@ export class PhaseOneController {
           queue: Promise.resolve(),
         },
       };
+      this.#startingContext = context;
       client.on("notification", (notification) =>
         this.#receiveNotification(context, notification),
       );
@@ -233,12 +255,14 @@ export class PhaseOneController {
       });
 
       await client.start();
+      this.#throwIfStartupCanceled(context);
       const run = await startDualChannelRun(config, {
         evidence,
         onStateChange: (event) => this.#publish({ type: "state", ...event }),
         openChannel: async (channel) => this.#openChannel(context, channel),
       });
       context.run = run;
+      this.#throwIfStartupCanceled(context);
       // Install the active run before forwarding buffered SDP notifications to the renderer.
       this.#active = { context, run };
       for (const notification of context.buffered.splice(0)) {
@@ -269,6 +293,7 @@ export class PhaseOneController {
       });
       return { status: run.status(), aggregate, codexVersion: runtime.version };
     } catch (error) {
+      const canceled = error?.name === "AbortError" || context?.canceled;
       if (!context?.finalized) {
         if (context) {
           context.evidence.recordBlockedAttempt("controller-start", error);
@@ -276,10 +301,10 @@ export class PhaseOneController {
             requestId: requestIdFrom(error),
           });
           await this.#finalize(context, {
-            reason: safeMessage(error),
-            outcome: "blocked",
+            reason: canceled ? "Translation startup canceled" : safeMessage(error),
+            outcome: canceled ? "canceled" : "blocked",
           });
-        } else {
+        } else if (!canceled) {
           await this.#recordBlockedAttempt(
             config,
             "controller-start",
@@ -288,15 +313,36 @@ export class PhaseOneController {
           );
         }
       }
+      if (canceled) {
+        this.#publish({
+          type: "stopped",
+          status: { tx: "stopped", rx: "stopped" },
+        });
+        throw startupCanceledError();
+      }
       this.#publish({ type: "blocked", message: safeMessage(error) });
       throw new Error(safeMessage(error));
     } finally {
+      if (this.#startingContext === context) this.#startingContext = undefined;
+      this.#cancelStartRequested = false;
       this.#starting = false;
     }
   }
 
   status() {
     return this.#active?.run.status() ?? { tx: "stopped", rx: "stopped" };
+  }
+
+  async cancelStart() {
+    this.#cancelStartRequested = true;
+    const context = this.#startingContext;
+    if (!context) return { canceled: true };
+    context.canceled = true;
+    await this.#finalize(context, {
+      reason: "Translation startup canceled",
+      outcome: "canceled",
+    });
+    return { canceled: true };
   }
 
   async answerApplied(direction) {
@@ -307,6 +353,10 @@ export class PhaseOneController {
 
   async stop(reason = "user-stop") {
     const active = this.#active;
+    if (!active && this.#starting) {
+      await this.cancelStart();
+      return { status: { tx: "stopped", rx: "stopped" }, aggregate: "stopped" };
+    }
     if (!active)
       return { status: { tx: "stopped", rx: "stopped" }, aggregate: "stopped" };
     this.#active = undefined;
@@ -360,6 +410,12 @@ export class PhaseOneController {
 
   async dispose() {
     await this.stop("app-quit");
+  }
+
+  #throwIfStartupCanceled(context) {
+    if (this.#cancelStartRequested || context?.canceled) {
+      throw startupCanceledError();
+    }
   }
 
   async #runtime(includeChecksum) {

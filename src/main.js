@@ -1,12 +1,14 @@
-import { app, BrowserWindow, ipcMain, session } from "electron";
+import { app, BrowserWindow, ipcMain, session, shell } from "electron";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { AccountController } from "./account-controller.js";
 import { PhaseOneController } from "./phase-one-controller.js";
 import { allowsLocalAudioPermission } from "./permissions.js";
 
 const sourceDirectory = dirname(fileURLToPath(import.meta.url));
 let mainWindow;
+let accountController;
 let controller;
 let quitting = false;
 
@@ -57,6 +59,21 @@ function createWindow() {
 }
 
 function registerIpc() {
+  ipcMain.handle("translive:account-status", () => accountController.status());
+  ipcMain.handle("translive:account-login", async () => {
+    const login = await accountController.startLogin();
+    try {
+      await shell.openExternal(login.authUrl);
+      return { state: "waiting" };
+    } catch (error) {
+      await accountController.cancelLogin();
+      throw error;
+    }
+  });
+  ipcMain.handle("translive:account-logout", () => accountController.logout());
+  ipcMain.handle("translive:account-login-cancel", () =>
+    accountController.cancelLogin(),
+  );
   ipcMain.handle("translive:preflight", (_event, config) =>
     controller.preflight(config),
   );
@@ -67,6 +84,7 @@ function registerIpc() {
     controller.answerApplied(direction),
   );
   ipcMain.handle("translive:stop", async () => controller.stop());
+  ipcMain.handle("translive:cancel-start", async () => controller.cancelStart());
   ipcMain.handle("translive:set-muted", (_event, direction, muted) =>
     controller.setMuted(direction, Boolean(muted)),
   );
@@ -85,6 +103,10 @@ function registerIpc() {
 
 app.whenReady().then(() => {
   configurePermissions();
+  accountController = new AccountController({
+    cwd: app.getAppPath(),
+    publish,
+  });
   controller = new PhaseOneController({
     appVersion: app.getVersion(),
     cwd: app.getAppPath(),
@@ -106,5 +128,7 @@ app.on("before-quit", (event) => {
   if (quitting || !controller) return;
   quitting = true;
   event.preventDefault();
-  controller.dispose().finally(() => app.quit());
+  Promise.allSettled([controller.dispose(), accountController.dispose()]).finally(
+    () => app.quit(),
+  );
 });
