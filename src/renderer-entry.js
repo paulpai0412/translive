@@ -81,6 +81,7 @@ const elements = Object.fromEntries(
     "health-account",
     "health-devices",
     "health-runtime",
+    "global-audio-status",
     "live-mode-label",
     "live-route-summary",
     "live-save-status",
@@ -1019,6 +1020,37 @@ function updateDiagnostics(event) {
   }
 }
 
+function applyGlobalAudioStatus({ state } = {}) {
+  elements["global-audio-status"].textContent =
+    {
+      active:
+        "Windows 預設音訊已暫時導向 VoiceMeeter；完全結束 TransLive 後會還原。",
+      "target-unavailable":
+        "找不到 VoiceMeeter 虛擬裝置。Windows 音訊設定未變更；請啟動 VoiceMeeter Banana 後重新開啟 TransLive。",
+      "snapshot-failed":
+        "無法保存目前 Windows 音訊設定。Windows 音訊設定未變更；請稍後重新開啟 TransLive。",
+      "apply-failed":
+        "無法套用 VoiceMeeter 系統音訊設定。Windows 音訊設定已還原；請確認 VoiceMeeter 後重新開啟 TransLive。",
+      "restore-failed":
+        "前次 Windows 音訊設定無法還原。為避免覆蓋原設定，本次未變更裝置；請開啟 Windows 音效設定後重新啟動。",
+      "legacy-recovery-needed":
+        "前次 Teams／Zoom 通訊裝置尚未還原。為避免覆蓋原設定，本次未變更 Windows 預設音訊；請先在 Windows 音效設定確認裝置後重新啟動。",
+      "recovery-needed":
+        "偵測到 Windows 音訊設定已被變更。為避免覆蓋目前設定，本次未變更裝置；請確認 Windows 音效設定後重新啟動。",
+      "checkpoint-clear-failed":
+        "Windows 音訊已還原，但本機復原記錄尚未清除。為避免覆蓋後續設定，本次未變更裝置；請確認 Windows 音效設定後重新啟動。",
+      unsupported: "全域 Windows 音訊切換僅支援 Windows。",
+    }[state] ?? "Windows 系統音訊狀態尚未確認。";
+}
+
+async function initializeGlobalAudioDefaults() {
+  try {
+    applyGlobalAudioStatus(await window.translive.audioDefaultsStatus());
+  } catch {
+    applyGlobalAudioStatus({ state: "snapshot-failed" });
+  }
+}
+
 async function initializeTray() {
   try {
     const tray = await window.translive.trayStatus();
@@ -1816,6 +1848,10 @@ window.translive.onEvent(async (event) => {
     }
     return;
   }
+  if (event.type === "global-audio") {
+    applyGlobalAudioStatus(event);
+    return;
+  }
   if (event.type === "tray") {
     if (event.action === "diagnostics") setDrawer(true);
     if (event.action === "stopped") setAppState("stopped");
@@ -1886,4 +1922,5 @@ setView("translate");
 initializeTray();
 initializeConsent();
 initializeRetention();
+initializeGlobalAudioDefaults();
 initializeAccount();

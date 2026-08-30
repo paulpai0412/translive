@@ -31,9 +31,12 @@ import { SummaryController } from "./summary-controller.js";
 import { TranslationLifecycle } from "./translation-lifecycle.js";
 import { TrayController } from "./tray-controller.js";
 import { TrayPreferences } from "./tray-preferences.js";
+import { WindowsAudioDefaultsController } from "./windows-audio-defaults-controller.js";
+import { WindowsAudioDefaultsStore } from "./windows-audio-defaults-store.js";
 import { WindowsMeetingDeviceAdapter } from "./windows-meeting-device-adapter.js";
 
 const sourceDirectory = dirname(fileURLToPath(import.meta.url));
+const isPrimaryInstance = app.requestSingleInstanceLock();
 const windowIconPath = join(
   sourceDirectory,
   "../assets/translive-brand",
@@ -52,6 +55,10 @@ let recordsStore;
 let summaryController;
 let trayController;
 let trayState = "ready";
+let windowsAudioDefaultsController;
+let globalAudioRoutingStarted = false;
+let globalAudioStartupPromise;
+let globalAudioState = { state: "unknown" };
 let rendererControls;
 let translationLifecycle;
 
@@ -184,6 +191,7 @@ function registerIpc() {
   ipcMain.handle("translive:account-login-cancel", () =>
     accountController.cancelLogin(),
   );
+  ipcMain.handle("translive:audio-defaults-status", () => globalAudioState);
   ipcMain.handle("translive:preflight", (_event, config) =>
     controller.preflight(config),
   );
@@ -353,118 +361,157 @@ function registerIpc() {
   );
 }
 
-app.whenReady().then(async () => {
-  configurePermissions();
-  codexLaunch = await resolveCodexLaunch({
-    allowExternalPackaged:
-      process.env.TRANSLIVE_ALLOW_EXTERNAL_PACKAGED_CODEX === "1",
-    appPath: app.getAppPath(),
-    isPackaged: app.isPackaged,
+if (!isPrimaryInstance) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    if (trayController) trayController.showWindow();
+    else mainWindow.show();
+    mainWindow.focus();
   });
-  accountController = new AccountController({
-    codexExecutable: codexLaunch.executable,
-    cwd: app.getAppPath(),
-    publish,
-  });
-  recordsStore = new RecordsStore({
-    directory: recordsDirectory({
-      fallback: app.getPath("userData"),
-      platform: process.platform,
-    }),
-  });
-  summaryController = new SummaryController({
-    records: recordsStore,
-    summaryService: new CodexSummaryService({
+
+  app.whenReady().then(async () => {
+    configurePermissions();
+    codexLaunch = await resolveCodexLaunch({
+      allowExternalPackaged:
+        process.env.TRANSLIVE_ALLOW_EXTERNAL_PACKAGED_CODEX === "1",
+      appPath: app.getAppPath(),
+      isPackaged: app.isPackaged,
+    });
+    accountController = new AccountController({
       codexExecutable: codexLaunch.executable,
       cwd: app.getAppPath(),
-    }),
-    publish,
-  });
-  controller = new PhaseOneController({
-    appVersion: app.getVersion(),
-    codexExecutable: codexLaunch.executable,
-    codexVersion: codexLaunch.version ?? process.env.TRANSLIVE_CODEX_VERSION,
-    cwd: app.getAppPath(),
-    evidenceDirectory:
-      process.env.TRANSLIVE_EVIDENCE_DIR ||
-      join(app.getPath("userData"), ".translive-evidence"),
-    publish,
-    records: recordsStore,
-  });
-  meetingSetupController = new MeetingSetupController({
-    adapter: new WindowsMeetingDeviceAdapter({
+      publish,
+    });
+    recordsStore = new RecordsStore({
+      directory: recordsDirectory({
+        fallback: app.getPath("userData"),
+        platform: process.platform,
+      }),
+    });
+    summaryController = new SummaryController({
+      records: recordsStore,
+      summaryService: new CodexSummaryService({
+        codexExecutable: codexLaunch.executable,
+        cwd: app.getAppPath(),
+      }),
+      publish,
+    });
+    controller = new PhaseOneController({
+      appVersion: app.getVersion(),
+      codexExecutable: codexLaunch.executable,
+      codexVersion: codexLaunch.version ?? process.env.TRANSLIVE_CODEX_VERSION,
+      cwd: app.getAppPath(),
+      evidenceDirectory:
+        process.env.TRANSLIVE_EVIDENCE_DIR ||
+        join(app.getPath("userData"), ".translive-evidence"),
+      publish,
+      records: recordsStore,
+    });
+    const windowsAudioAdapter = new WindowsMeetingDeviceAdapter({
       openExternal: (url) => shell.openExternal(url),
       scriptPath: join(
         app.getAppPath(),
         "scripts",
         "windows-meeting-devices.ps1",
       ),
-    }),
-    store: new MeetingSetupStore({ directory: app.getPath("userData") }),
-  });
-  const startupRestore = await meetingSetupController.restorePending();
-  createWindow();
-  rendererControls = new RendererControlBridge({ send: sendRendererControl });
-  translationLifecycle = new TranslationLifecycle({
-    controller,
-    disposeSummaries: () => summaryController.dispose(),
-    rendererControls,
-    restoreMeetingDevices,
-    publish,
-  });
-  trayController = new TrayController({
-    app,
-    controller: {
-      status: () => controller.status(),
-      setMuted: (direction, muted) =>
-        translationLifecycle.setMuted(direction, muted),
-      stop: () => translationLifecycle.stop("tray-stop"),
-    },
-    iconPath: join(
-      sourceDirectory,
-      "../assets/translive-brand/translive-tray.png",
-    ),
-    Menu,
-    nativeImage,
-    preferences: new TrayPreferences({ directory: app.getPath("userData") }),
-    publish,
-    Tray,
-    window: mainWindow,
-  });
-  await trayController.initialize({
-    appState: trayState,
-    mode: activeMode,
-    status: controller.status(),
-  });
-  registerIpc();
-  if (startupRestore.reason) {
-    publish({
-      type: "meeting-setup",
-      state: startupRestore.reason,
-      message: "無法還原前次 Windows 通訊裝置，請在設定中手動確認。",
     });
-  }
+    meetingSetupController = new MeetingSetupController({
+      adapter: windowsAudioAdapter,
+      store: new MeetingSetupStore({ directory: app.getPath("userData") }),
+    });
+    // Restore a legacy quick-setup snapshot before the global snapshot takes over.
+    const startupRestore = await meetingSetupController.restorePending();
+    windowsAudioDefaultsController = new WindowsAudioDefaultsController({
+      adapter: windowsAudioAdapter,
+      store: new WindowsAudioDefaultsStore({
+        directory: app.getPath("userData"),
+      }),
+    });
+    globalAudioRoutingStarted = !startupRestore.reason;
+    globalAudioStartupPromise = globalAudioRoutingStarted
+      ? windowsAudioDefaultsController.start()
+      : Promise.resolve({ state: "legacy-recovery-needed" });
+    const globalAudioStartup = await globalAudioStartupPromise;
+    globalAudioState = globalAudioStartup;
+    createWindow();
+    rendererControls = new RendererControlBridge({ send: sendRendererControl });
+    translationLifecycle = new TranslationLifecycle({
+      controller,
+      disposeSummaries: () => summaryController.dispose(),
+      rendererControls,
+      restoreMeetingDevices,
+      publish,
+    });
+    trayController = new TrayController({
+      app,
+      controller: {
+        status: () => controller.status(),
+        setMuted: (direction, muted) =>
+          translationLifecycle.setMuted(direction, muted),
+        stop: () => translationLifecycle.stop("tray-stop"),
+      },
+      iconPath: join(
+        sourceDirectory,
+        "../assets/translive-brand/translive-tray.png",
+      ),
+      Menu,
+      nativeImage,
+      preferences: new TrayPreferences({ directory: app.getPath("userData") }),
+      publish,
+      Tray,
+      window: mainWindow,
+    });
+    await trayController.initialize({
+      appState: trayState,
+      mode: activeMode,
+      status: controller.status(),
+    });
+    registerIpc();
+    publish({ type: "global-audio", state: globalAudioStartup.state });
+    if (startupRestore.reason) {
+      publish({
+        type: "meeting-setup",
+        state: startupRestore.reason,
+        message: "無法還原前次 Windows 通訊裝置，請在設定中手動確認。",
+      });
+    }
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-    trayController?.showWindow();
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      trayController?.showWindow();
+    });
   });
-});
 
-app.on("window-all-closed", () => {
-  if (!trayController?.shouldHideOnClose()) app.quit();
-});
-app.on("before-quit", (event) => {
-  if (quitting || !controller) return;
-  quitting = true;
-  event.preventDefault();
-  Promise.allSettled([
-    translationLifecycle?.stop("app-quit", { rendererControl: false }),
-    accountController.dispose(),
-    summaryController.dispose(),
-    trayController.dispose(),
-  ]).finally(() => {
-    rendererControls?.dispose();
-    app.quit();
+  app.on("window-all-closed", () => {
+    if (!trayController?.shouldHideOnClose()) app.quit();
   });
-});
+  app.on("before-quit", (event) => {
+    if (quitting || !controller) return;
+    quitting = true;
+    event.preventDefault();
+    Promise.allSettled([
+      translationLifecycle?.stop("app-quit", { rendererControl: false }),
+      accountController?.dispose(),
+      summaryController?.dispose(),
+      trayController?.dispose(),
+    ])
+      .then(async () => {
+        await globalAudioStartupPromise?.catch(() => {});
+        if (!globalAudioRoutingStarted) return undefined;
+        return windowsAudioDefaultsController?.restore();
+      })
+      .then((result) => {
+        if (result?.reason) {
+          globalAudioState = { state: result.reason };
+          publish({ type: "global-audio", state: result.reason });
+        }
+      })
+      .finally(() => {
+        rendererControls?.dispose();
+        app.quit();
+      });
+  });
+}

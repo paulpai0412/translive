@@ -17,6 +17,29 @@ function endpointName(value, field) {
   return value.trim();
 }
 
+function roleSnapshot(value) {
+  const capture = value?.capture;
+  const render = value?.render;
+  return {
+    capture: {
+      consoleId: endpointId(capture?.consoleId, "capture.consoleId"),
+      multimediaId: endpointId(capture?.multimediaId, "capture.multimediaId"),
+      communicationsId: endpointId(
+        capture?.communicationsId,
+        "capture.communicationsId",
+      ),
+    },
+    render: {
+      consoleId: endpointId(render?.consoleId, "render.consoleId"),
+      multimediaId: endpointId(render?.multimediaId, "render.multimediaId"),
+      communicationsId: endpointId(
+        render?.communicationsId,
+        "render.communicationsId",
+      ),
+    },
+  };
+}
+
 export class WindowsMeetingDeviceAdapter {
   #openExternal;
   #platform;
@@ -75,6 +98,50 @@ export class WindowsMeetingDeviceAdapter {
 
   async current() {
     return this.snapshot();
+  }
+
+  async snapshotAllRoles() {
+    this.#requireWindows();
+    return roleSnapshot(await this.#invoke([], "snapshot-all-roles"));
+  }
+
+  async currentAllRoles() {
+    return this.snapshotAllRoles();
+  }
+
+  async applyAllRoles({ captureId, renderId }) {
+    this.#requireWindows();
+    await this.#invoke(
+      [
+        "-CaptureId",
+        endpointId(captureId, "captureId"),
+        "-RenderId",
+        endpointId(renderId, "renderId"),
+      ],
+      "apply-all-roles",
+    );
+  }
+
+  async restoreAllRoles(snapshot) {
+    this.#requireWindows();
+    const roles = roleSnapshot(snapshot);
+    await this.#invoke(
+      [
+        "-CaptureConsoleId",
+        roles.capture.consoleId,
+        "-CaptureMultimediaId",
+        roles.capture.multimediaId,
+        "-CaptureCommunicationsId",
+        roles.capture.communicationsId,
+        "-RenderConsoleId",
+        roles.render.consoleId,
+        "-RenderMultimediaId",
+        roles.render.multimediaId,
+        "-RenderCommunicationsId",
+        roles.render.communicationsId,
+      ],
+      "restore-all-roles",
+    );
   }
 
   async apply({ captureId, renderId }) {

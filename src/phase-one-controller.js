@@ -139,7 +139,7 @@ function meetingInstructions(platform, routeProfile) {
     speaker: voicemeeter
       ? "Select Voicemeeter Input as the speaker."
       : "Select Cable-B Input as the speaker.",
-    note: "TransLive does not change meeting-app or Windows defaults.",
+    note: "TransLive 暫時切換 Windows 預設音訊；完全結束後會還原。仍請在會議 App 確認裝置。",
   };
 }
 

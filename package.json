@@ -22,6 +22,7 @@
   },
   "knip": {
     "entry": [
+      "src/main.js",
       "src/account-controller.js",
       "src/preload.cjs",
       "src/renderer-entry.js",

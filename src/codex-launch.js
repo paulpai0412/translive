@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
-import { access as defaultAccess, readFile as defaultReadFile } from "node:fs/promises";
+import {
+  access as defaultAccess,
+  readFile as defaultReadFile,
+} from "node:fs/promises";
 import { posix, win32 } from "node:path";
 
 const BUNDLE_ROOT = "assets/codex";
@@ -13,11 +16,15 @@ function externalLaunch(env, source) {
 }
 
 function pathApi(appPath) {
-  return /^[a-z]:[\\/]/i.test(appPath) || appPath.includes("\\") ? win32 : posix;
+  return /^[a-z]:[\\/]/i.test(appPath) || appPath.includes("\\")
+    ? win32
+    : posix;
 }
 
 function safeBundlePath(appPath, platform, relativePath) {
-  const normalized = posix.normalize(String(relativePath ?? "").replaceAll("\\", "/"));
+  const normalized = posix.normalize(
+    String(relativePath ?? "").replaceAll("\\", "/"),
+  );
   const requiredPrefix = `${BUNDLE_ROOT}/${platform}/`;
   if (!normalized.startsWith(requiredPrefix) || normalized.includes("..")) {
     throw new Error("Bundled Codex manifest has an unsafe asset path");
@@ -50,7 +57,11 @@ export async function resolveCodexLaunch({
     return externalLaunch(env, "external-packaged-test");
   }
 
-  const manifestPath = pathApi(appPath).join(appPath, BUNDLE_ROOT, "manifest.json");
+  const manifestPath = pathApi(appPath).join(
+    appPath,
+    BUNDLE_ROOT,
+    "manifest.json",
+  );
   let manifest;
   try {
     manifest = JSON.parse(await readFile(manifestPath, "utf8"));

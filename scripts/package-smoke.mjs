@@ -44,7 +44,8 @@ export async function smokePackage({ appDirectory, platform }) {
     });
   }
 
-  const unapproved = (await filesUnder(appDirectory))
+  const packageFiles = await filesUnder(appDirectory);
+  const unapproved = packageFiles
     .map((path) => path.slice(appDirectory.length + 1).replaceAll("\\", "/"))
     .filter((path) => !packagedPathIsAllowed(path));
   if (unapproved.length > 0) {

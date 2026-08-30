@@ -30,7 +30,9 @@ if (
   packageMetadata.translive?.appId !== "com.paulpai.translive" ||
   packageMetadata.version !== "0.1.0-beta.1"
 ) {
-  throw new Error("package.json must contain branded TransLive release metadata");
+  throw new Error(
+    "package.json must contain branded TransLive release metadata",
+  );
 }
 for (const script of [
   "codex:bundle",
@@ -43,7 +45,9 @@ for (const script of [
   }
 }
 if (packageMetadata.devDependencies?.["@electron/packager"] !== "20.3.0") {
-  throw new Error("package.json must pin @electron/packager for reproducible packaging");
+  throw new Error(
+    "package.json must pin @electron/packager for reproducible packaging",
+  );
 }
 const jsConfig = await readFile("jsconfig.json", "utf8");
 try {
@@ -76,11 +80,14 @@ for (const required of [
   'ipcMain.handle("translive:account-login-cancel"',
   'ipcMain.handle("translive:cancel-start"',
   'ipcMain.handle("translive:meeting-setup-apply"',
+  '"translive:audio-defaults-status"',
   'ipcMain.handle("translive:diagnostics-export"',
   'ipcMain.handle("translive:records-list"',
   'ipcMain.handle("translive:summary-session-start"',
   "new RecordsStore",
   "new SummaryController",
+  "new WindowsAudioDefaultsController",
+  "new WindowsAudioDefaultsStore",
   "sanitizeMeetingSetupRequest(setup)",
   'ipcMain.handle("translive:tray-status"',
   "shell.openExternal(login.authUrl)",
@@ -96,8 +103,10 @@ for (const required of [
   }
 }
 for (const required of [
-  'ValidateSet("detect", "resolve", "snapshot", "apply", "restore")',
+  'ValidateSet("detect", "resolve", "snapshot", "apply", "restore", "snapshot-all-roles", "apply-all-roles", "restore-all-roles")',
   "ResolveActiveEndpointId",
+  "GetDefaultEndpointId",
+  "SetDefaultEndpointId",
   "$CaptureName",
   "$RenderName",
 ]) {
@@ -128,6 +137,7 @@ for (const required of [
   'id="records-list"',
   'id="summary-confirm-modal"',
   'id="settings-retention-status"',
+  'id="global-audio-status"',
   'aria-live="polite"',
   'role="alert"',
 ]) {
@@ -153,6 +163,7 @@ for (const required of [
   "summarySessionStart",
   "summaryAggregateStart",
   "summaryCancel",
+  "audioDefaultsStatus",
   "rendererControlAck",
 ]) {
   if (!preload.includes(required)) {
@@ -172,8 +183,15 @@ if (!renderer.includes("exportAggregate")) {
 if (!renderer.includes("diagnosticsExport")) {
   throw new Error("renderer-entry.js must expose redacted diagnostic export");
 }
+if (!renderer.includes("applyGlobalAudioStatus")) {
+  throw new Error(
+    "renderer-entry.js must expose safe global Windows audio status",
+  );
+}
 if (!renderer.includes('event.type === "renderer-control"')) {
-  throw new Error("renderer-entry.js must acknowledge main-to-renderer controls");
+  throw new Error(
+    "renderer-entry.js must acknowledge main-to-renderer controls",
+  );
 }
 const releaseConfig = await readFile("src/release-config.js", "utf8");
 if (releaseConfig.includes('value.startsWith("node_modules/")')) {

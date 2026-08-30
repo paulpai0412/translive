@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld("translive", {
   accountLogout: () => ipcRenderer.invoke("translive:account-logout"),
   accountLoginCancel: () =>
     ipcRenderer.invoke("translive:account-login-cancel"),
+  audioDefaultsStatus: () =>
+    ipcRenderer.invoke("translive:audio-defaults-status"),
   preflight: (config) => ipcRenderer.invoke("translive:preflight", config),
   start: (config) => ipcRenderer.invoke("translive:start", config),
   answerApplied: (direction) =>
@@ -20,8 +22,7 @@ contextBridge.exposeInMainWorld("translive", {
     ipcRenderer.invoke("translive:meeting-setup-restore"),
   meetingSetupOpenSettings: (appName) =>
     ipcRenderer.invoke("translive:meeting-setup-open-settings", appName),
-  diagnosticsExport: () =>
-    ipcRenderer.invoke("translive:diagnostics-export"),
+  diagnosticsExport: () => ipcRenderer.invoke("translive:diagnostics-export"),
   recordsConsentStatus: () =>
     ipcRenderer.invoke("translive:records-consent-status"),
   recordsRetentionStatus: () =>

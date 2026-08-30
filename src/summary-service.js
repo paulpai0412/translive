@@ -51,7 +51,8 @@ function normalizeSourceSessions(sourceSessions) {
     }
     normalized.set(id, new Set(timestamps));
   }
-  if (normalized.size === 0) throw new Error("Summary requires source sessions");
+  if (normalized.size === 0)
+    throw new Error("Summary requires source sessions");
   return normalized;
 }
 
@@ -91,13 +92,19 @@ function normalizeItem(item, section, sources) {
   }
   const normalized = { text, citations };
   if (section === "待辦" || section === "未完成待辦") {
-    normalized.owner = sanitizeText(item?.owner, { maxLength: 256 }).trim() || "未指定";
-    normalized.date = sanitizeText(item?.date, { maxLength: 256 }).trim() || "未指定";
+    normalized.owner =
+      sanitizeText(item?.owner, { maxLength: 256 }).trim() || "未指定";
+    normalized.date =
+      sanitizeText(item?.date, { maxLength: 256 }).trim() || "未指定";
   }
   return normalized;
 }
 
-export function validateSummaryStructured({ kind, modelOutput, sourceSessions }) {
+export function validateSummaryStructured({
+  kind,
+  modelOutput,
+  sourceSessions,
+}) {
   const sections = SECTION_NAMES[kind];
   if (!sections) throw new Error("Unsupported summary kind");
   const structured = extractJson(modelOutput);
@@ -121,7 +128,8 @@ export function validateSummaryStructured({ kind, modelOutput, sourceSessions })
 function citationsMarkdown(citations) {
   return citations
     .map(
-      (citation) => `【${citation.sessionId} @ ${formatOffset(citation.offsetMs)}】`,
+      (citation) =>
+        `【${citation.sessionId} @ ${formatOffset(citation.offsetMs)}】`,
     )
     .join("");
 }
@@ -158,7 +166,9 @@ export function formatSummaryMarkdown({ kind, modelOutput, sourceSessions }) {
         item.owner === undefined
           ? ""
           : `；負責人：${item.owner}；日期：${item.date}`;
-      output.push(`- ${item.text}${taskDetails}${citationsMarkdown(item.citations)}`);
+      output.push(
+        `- ${item.text}${taskDetails}${citationsMarkdown(item.citations)}`,
+      );
     }
     output.push("");
   }
@@ -215,7 +225,9 @@ export function prepareSummarySessions(sessions) {
     throw new Error(`摘要最多可處理 ${SUMMARY_LIMITS.maxEntries} 段逐字稿`);
   }
   if (textCharacters > SUMMARY_LIMITS.maxTextCharacters) {
-    throw new Error(`摘要逐字稿內容不可超過 ${SUMMARY_LIMITS.maxTextCharacters} 個字元`);
+    throw new Error(
+      `摘要逐字稿內容不可超過 ${SUMMARY_LIMITS.maxTextCharacters} 個字元`,
+    );
   }
   return prepared;
 }
@@ -351,7 +363,8 @@ export class CodexSummaryService {
             if (!turnId || params.turn?.id !== turnId) return;
             if (params.turn?.status !== "completed") {
               reject(
-                params.turn?.status === "interrupted" && (aborted || signal?.aborted)
+                params.turn?.status === "interrupted" &&
+                  (aborted || signal?.aborted)
                   ? abortError()
                   : new Error("Codex summary turn did not complete"),
               );

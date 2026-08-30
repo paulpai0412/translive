@@ -127,7 +127,8 @@ test("sorts and bounds summary input before it reaches Codex", () => {
     ["early", "late"],
   );
   assert.throws(
-    () => prepareSummarySessions(Array.from({ length: 21 }, () => sessions()[0])),
+    () =>
+      prepareSummarySessions(Array.from({ length: 21 }, () => sessions()[0])),
     /最多可匯整/i,
   );
 });

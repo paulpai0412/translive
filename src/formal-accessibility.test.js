@@ -33,7 +33,10 @@ test("formal UI exposes every app state and destructive action through accessibl
     assert.match(html, pattern, modal);
   }
   assert.match(html, /id="diagnostics-drawer"[\s\S]{0,120}role="dialog"/);
-  assert.match(html, /id="assertive-error" role="alert" aria-live="assertive"/);
+  assert.match(
+    html,
+    /id="assertive-error"[\s\S]{0,100}role="alert"[\s\S]{0,100}aria-live="assertive"/,
+  );
   assert.match(html, /id="records-status" role="status"/);
   assert.match(html, /id="copy-diagnostics"[\s\S]{0,80}>\s*匯出遮罩診斷包/);
   assert.match(renderer, /event\.key === "Tab" && openModal/);
@@ -70,6 +73,30 @@ test("formal UI provides Traditional-Chinese actionable persistence and summary 
     renderer,
     /if \(canceled\) \{\s+await releaseRendererResources\(\);/,
   );
+});
+
+test("shows a safe global Windows audio-routing status", async () => {
+  const [html, preload, renderer] = await Promise.all([
+    readFile(new URL("./index.html", import.meta.url), "utf8"),
+    readFile(new URL("./preload.cjs", import.meta.url), "utf8"),
+    readFile(new URL("./renderer-entry.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(html, /id="global-audio-status"[^>]*role="status"/);
+  assert.match(
+    html,
+    /TransLive 開啟時會將 Windows 預設輸入與輸出暫時導向 VoiceMeeter/,
+  );
+  assert.match(preload, /audioDefaultsStatus/);
+  assert.match(renderer, /audioDefaultsStatus\(\)/);
+  assert.match(renderer, /event\.type === "global-audio"/);
+  assert.match(renderer, /Windows 預設音訊已暫時導向 VoiceMeeter/);
+  assert.match(renderer, /Windows 音訊設定未變更/);
+  assert.match(renderer, /legacy-recovery-needed/);
+  assert.match(renderer, /recovery-needed/);
+  assert.match(renderer, /checkpoint-clear-failed/);
+  assert.doesNotMatch(renderer, /global-audio.*captureId/);
+  assert.doesNotMatch(renderer, /global-audio.*renderId/);
 });
 
 test("enumerates audio devices as soon as ChatGPT is connected", async () => {

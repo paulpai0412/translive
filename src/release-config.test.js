@@ -23,7 +23,10 @@ test("defines branded Windows release metadata", () => {
 test("packages only production runtime files and excludes secrets, evidence, and tests", () => {
   for (const path of [
     "package.json",
+    "src/json-file-store.js",
     "src/main.js",
+    "src/windows-audio-defaults-controller.js",
+    "src/windows-audio-defaults-store.js",
     "src/windows-meeting-device-adapter.js",
     "assets/translive-brand/translive.ico",
     "assets/codex/manifest.json",

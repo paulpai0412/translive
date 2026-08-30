@@ -150,6 +150,86 @@ test("applies and reads communication endpoint IDs without shell interpolation",
   ]);
 });
 
+test("snapshots, applies, and restores every Windows default-audio role", async () => {
+  const calls = [];
+  const snapshot = {
+    capture: {
+      consoleId: "physical-mic-console",
+      multimediaId: "physical-mic-media",
+      communicationsId: "physical-mic-comms",
+    },
+    render: {
+      consoleId: "physical-speaker-console",
+      multimediaId: "physical-speaker-media",
+      communicationsId: "physical-speaker-comms",
+    },
+  };
+  const adapter = new WindowsMeetingDeviceAdapter({
+    platform: "win32",
+    run: async (_command, args) => {
+      calls.push(args);
+      return { stdout: JSON.stringify({ ok: true, ...snapshot }) };
+    },
+    scriptPath: "devices.ps1",
+  });
+
+  assert.deepEqual(await adapter.snapshotAllRoles(), snapshot);
+  await adapter.applyAllRoles({
+    captureId: "voicemeeter-b2",
+    renderId: "voicemeeter-input",
+  });
+  await adapter.restoreAllRoles(snapshot);
+
+  assert.deepEqual(calls, [
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "devices.ps1",
+      "-Action",
+      "snapshot-all-roles",
+    ],
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "devices.ps1",
+      "-Action",
+      "apply-all-roles",
+      "-CaptureId",
+      "voicemeeter-b2",
+      "-RenderId",
+      "voicemeeter-input",
+    ],
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "devices.ps1",
+      "-Action",
+      "restore-all-roles",
+      "-CaptureConsoleId",
+      "physical-mic-console",
+      "-CaptureMultimediaId",
+      "physical-mic-media",
+      "-CaptureCommunicationsId",
+      "physical-mic-comms",
+      "-RenderConsoleId",
+      "physical-speaker-console",
+      "-RenderMultimediaId",
+      "physical-speaker-media",
+      "-RenderCommunicationsId",
+      "physical-speaker-comms",
+    ],
+  ]);
+});
+
 test("opens Windows sound settings and never runs device commands off Windows", async () => {
   let calls = 0;
   const opened = [];

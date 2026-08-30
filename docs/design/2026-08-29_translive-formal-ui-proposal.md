@@ -617,3 +617,83 @@ Tray tooltip 必須顯示目前模式與通道狀態；斷線時送出 Windows n
 主要自動測試 seam 沿用 Phase 1 的 translation orchestration contract：給定模式、路由與外部 adapter，從公開 Start／Mute／Stop／State 觀察行為，不測 private helper。Electron、Windows 裝置與會議 App 行為在 adapter 邊界做少量整合測試，最後以 Windows 真機驗證。
 
 第一個 tracer bullet 是 Mode runtime；它必須在不要求多餘裝置的情況下，只建立目前模式需要的 GPT‑Live session。
+
+## 20. 2026-08-30 修訂：Windows 全域音訊生命週期
+
+使用者確認不做瀏覽器座標自動化或未文件化的 per-app 路由。TransLive 採用較可預測的 Windows 全域預設裝置切換：
+
+- 主實例啟動時，保存 Console、Multimedia、Communications 三種角色的 capture／render 原始端點；
+- 預設輸出切到 `Voicemeeter Input (VB-Audio Voicemeeter VAIO)`；
+- 預設輸入切到 `Voicemeeter Out B2 (VB-Audio Voicemeeter VAIO)`；
+- 停止單次翻譯不還原；完全退出 TransLive 才還原全部原始角色；
+- 第二個 Electron 實例不得碰觸共用還原 checkpoint；
+- checkpoint 保存原始角色、虛擬目標與 applying／active phase；異常退出後只在目前端點仍等於虛擬目標時自動還原；若使用者已變更裝置則停止自動操作並提示人工確認；
+- 任一目標缺失、snapshot／apply／verify／restore 失敗時，不得覆蓋原始 checkpoint，也不得向 renderer 傳送原始 endpoint ID。
+
+公開 TDD seam 為 `WindowsAudioDefaultsController.start()/restore()/status()`、Windows adapter 的 all-role snapshot/apply/restore，以及 Electron 單一實例／退出 orchestration。Teams／Zoom Quick Setup 只暫時改 Communications；停止翻譯回到 TransLive 開啟期間的全域虛擬值，完整退出才回到實體原值。
+
+## 21. 2026-08-30 修訂：自適應同步翻譯節奏
+
+### 21.1 問題與不可兼得條件
+
+固定語速、逐字完整、永遠零積壓無法同時保證。正式預設優先順序為：
+
+1. 自然且穩定的一般人語速；
+2. 將聲音與目標字幕維持在有界延遲內；
+3. 保留意思、名稱、數字與技術詞；
+4. 積壓時先壓縮贅詞與合併未送出的短句，不以突然高速朗讀追趕，也不靜默丟棄已承諾內容。
+
+GPT-Live 目前沒有公開的每句 TTS rate 參數；因此第一階段不宣稱能鎖定絕對語速。採用同步翻譯常見的 adaptive segmentation／wait policy，加上 bounded jitter buffer 與回授式 backlog control。WSOLA／AudioWorklet time-scale modification 保留為實測仍不足時的第二階段，不先加入 PCM 重取樣複雜度。
+
+### 21.2 `PacingPolicy`
+
+所有參數集中在可驗證、可版本化的 policy，不散落 magic numbers：
+
+- 目標延遲區間與最大 backlog；
+- 來源／目標語言的初始預估語速；
+- 第一段與穩態段的目標朗讀時間；
+- 最短可播能力（由 GPT-Live capability／實測提供，不等同全程固定切段）；
+- backlog hysteresis；
+- 語意壓縮是否允許及最大程度；
+- 未來可選的 time-scale 修正上下限。
+
+預設 preset 為「自然同步」；後續可提供「最低延遲」與「字義完整」，三者都映射到同一 policy schema。
+
+### 21.3 `AdaptivePacingController`
+
+控制器是純邏輯公開 seam，輸入：
+
+- source／target transcript delta 與時間戳；
+- 已送出、待送出與播放開始／完成事件；
+- 目前 policy；
+- 由實際輸出逐步校正的語速估計。
+
+輸出是可觀察決策：wait、flush、coalesce、request-concise、正常播放或 lag warning。切段以語意／標點邊界及預估朗讀時間為主，不以固定字數為唯一規則。第一個達到可播能力的完整子句立即送出；穩態段較完整，以降低短片段造成的 cadence variance。
+
+backlog 以預估毫秒計算：
+
+```text
+backlogMs = queuedEstimatedSpeechMs - elapsedPlayoutMs
+errorMs   = backlogMs - targetBacklogMs
+```
+
+第一階段採有 hysteresis 的比例回授，不直接使用會放大語音抖動的高增益 PID。控制動作只影響尚未送出的分段／精簡提示；已開始播放的語音不突然變速。
+
+### 21.4 字幕同步
+
+- 原文字幕可即時顯示；
+- 目標字幕以對應 speech segment 的 dispatch／output-start 為準，不在尚未朗讀時提前顯示；
+- 診斷僅保存聚合 pacing 指標，不保存 transcript：首次語音延遲、backlog p50／p95／max、segment 預估／實際時間、cadence variance 與 lag-warning 次數。
+
+### 21.5 TDD 垂直切片與驗收
+
+| Slice | 公開 seam | Red → Green 行為 |
+| --- | --- | --- |
+| P1 Policy／估算 | `AdaptivePacingController` | 相同輸入在不同語速估計下產生時間型切段，而非固定字數 |
+| P2 Fast start | `AdaptivePacingController` | 第一個完整可播子句先送出，後續回到穩態段 |
+| P3 Bounded backlog | `AdaptivePacingController` | 積壓跨過 hysteresis 才合併／要求精簡，不突然高速或丟內容 |
+| P4 GPT-Live integration | `PhaseOneController` 公開事件與 fake app-server | RX appendSpeech 順序、取消、Stop drain 與 100-chunk circuit breaker 不回歸 |
+| P5 Caption timing | renderer 公開 event contract | 目標字幕跟隨 speech segment dispatch／output，而非僅跟 transcript delta |
+| P6 Windows 實測 | redacted evidence＋耳機觀察 | YouTube 長段落不再明顯忽快忽慢，初始與穩態延遲落在門檻內 |
+
+初始驗收目標沿用 Phase 1：first translated audio P50 ≤ 1.5 秒、P95 ≤ 2.5 秒；穩態 backlog 以 1–3 秒為目標、正常情況不超過 4 秒。語速穩定度以 segment 實際毫秒／字（或詞）分布衡量，不能只靠主觀感受；Windows 真機結果可校正 policy 預設值，但演算法與測試不得綁死單一影片或單一說話者。

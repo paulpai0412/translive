@@ -184,8 +184,8 @@
               <span>我確認選擇的是耳機，不是實體喇叭。</span>
             </label>
             <p class="mode-help" data-mode-show="media">
-              在 Windows 音量混音程式中，將 YouTube／瀏覽器輸出設為 VoiceMeeter
-              Input。
+              TransLive 開啟時會將 Windows 預設輸入與輸出暫時導向 VoiceMeeter；
+              完全結束後會自動還原。
             </p>
             <div class="quick-setup-row" data-mode-show="meeting">
               <button
@@ -204,6 +204,9 @@
             <span id="health-runtime"><i></i>GPT‑Live</span>
             <span id="health-devices"><i></i>音訊裝置</span>
           </div>
+          <p id="global-audio-status" class="mode-help" role="status">
+            正在檢查 Windows 系統音訊設定…
+          </p>
         </div>
 
         <div class="primary-action-area">
@@ -387,7 +390,9 @@
             <p>逐字稿、單場摘要與跨場摘要匯整。</p>
           </div>
           <div class="page-actions">
-            <button class="text-button danger-text" id="records-delete-all">刪除全部</button>
+            <button class="text-button danger-text" id="records-delete-all">
+              刪除全部
+            </button>
             <button class="text-button" id="records-refresh">重新整理</button>
           </div>
         </div>
@@ -568,11 +573,21 @@
     >
       <p class="section-kicker">隱私與儲存</p>
       <h2 id="consent-title">是否保存明文逐字稿？</h2>
-      <p>逐字稿會以明文保存在這台電腦的 <code>TransLive\meetings</code>。不保存任何音訊。你可稍後在紀錄頁刪除。</p>
-      <label class="consent-option"><input id="consent-checkbox" type="checkbox" />我了解逐字稿將以明文保存於本機。</label>
+      <p>
+        逐字稿會以明文保存在這台電腦的
+        <code>TransLive\meetings</code>。不保存任何音訊。你可稍後在紀錄頁刪除。
+      </p>
+      <label class="consent-option"
+        ><input
+          id="consent-checkbox"
+          type="checkbox"
+        />我了解逐字稿將以明文保存於本機。</label
+      >
       <footer>
         <button class="text-button" id="consent-decline">這次不保存</button>
-        <button class="primary-button" id="consent-confirm" disabled>同意並開始</button>
+        <button class="primary-button" id="consent-confirm" disabled>
+          同意並開始
+        </button>
       </footer>
     </section>
 
@@ -586,11 +601,18 @@
     >
       <p class="section-kicker danger-text">不可復原</p>
       <h2 id="delete-confirm-title">刪除全部紀錄</h2>
-      <p>這會刪除所有本機逐字稿、單場摘要與跨場摘要。請輸入 <code>DELETE</code> 確認。</p>
-      <label>確認文字<input id="delete-confirm-input" autocomplete="off" /></label>
+      <p>
+        這會刪除所有本機逐字稿、單場摘要與跨場摘要。請輸入
+        <code>DELETE</code> 確認。
+      </p>
+      <label
+        >確認文字<input id="delete-confirm-input" autocomplete="off"
+      /></label>
       <footer>
         <button class="text-button" id="delete-confirm-cancel">取消</button>
-        <button class="danger-button" id="delete-confirm-action" disabled>刪除全部</button>
+        <button class="danger-button" id="delete-confirm-action" disabled>
+          刪除全部
+        </button>
       </footer>
     </section>
 
@@ -619,7 +641,13 @@
       </footer>
     </section>
 
-    <div class="assertive-error" id="assertive-error" role="alert" aria-live="assertive" hidden></div>
+    <div
+      class="assertive-error"
+      id="assertive-error"
+      role="alert"
+      aria-live="assertive"
+      hidden
+    ></div>
 
     <section class="mini-overlay" id="mini-overlay" aria-hidden="true">
       <header>

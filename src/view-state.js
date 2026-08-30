@@ -23,6 +23,7 @@ export function diagnosticEventLabel(type) {
     {
       account: "帳戶狀態更新",
       blocked: "連線受阻",
+      "global-audio": "Windows 系統音訊設定",
       "meeting-setup": "會議裝置設定",
       record: "紀錄已保存",
       summary: "摘要狀態更新",

@@ -112,6 +112,7 @@ test("returns VoiceMeeter meeting endpoint instructions for the free route profi
   assert.equal(result.ok, true);
   assert.match(result.instructions.microphone, /Voicemeeter Out B2/i);
   assert.match(result.instructions.speaker, /Voicemeeter Input/i);
+  assert.match(result.instructions.note, /完全結束.*還原/i);
 });
 
 test("media mode creates only the RX realtime session", async () => {

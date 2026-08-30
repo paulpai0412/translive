@@ -1,13 +1,19 @@
 param(
   [Parameter(Mandatory = $true)]
-  [ValidateSet("detect", "resolve", "snapshot", "apply", "restore")]
+  [ValidateSet("detect", "resolve", "snapshot", "apply", "restore", "snapshot-all-roles", "apply-all-roles", "restore-all-roles")]
   [string]$Action,
   [ValidateSet("teams", "zoom")]
   [string]$App,
   [string]$CaptureName,
   [string]$RenderName,
   [string]$CaptureId,
-  [string]$RenderId
+  [string]$RenderId,
+  [string]$CaptureConsoleId,
+  [string]$CaptureMultimediaId,
+  [string]$CaptureCommunicationsId,
+  [string]$RenderConsoleId,
+  [string]$RenderMultimediaId,
+  [string]$RenderCommunicationsId
 )
 
 $ErrorActionPreference = "Stop"
@@ -69,8 +75,8 @@ namespace TransLive.Audio {
   internal class MMDeviceEnumeratorComObject { }
 
   // Windows exposes no supported public API for changing default endpoints.
-  // This isolated PolicyConfig call is limited to ERole.eCommunications. Callers
-  // snapshot, verify, and restore instead of relying on an unverified change.
+  // Callers snapshot, verify, and restore every requested role instead of
+  // relying on an unverified change.
   [ComImport, Guid("F8679F50-850A-41CF-9C72-430F290290C8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
   internal interface IPolicyConfig {
     int GetMixFormat(string deviceId, IntPtr format);
@@ -153,12 +159,12 @@ namespace TransLive.Audio {
       }
     }
 
-    public static string GetDefaultCommunicationsId(bool capture) {
+    public static string GetDefaultEndpointId(bool capture, ERole role) {
       var enumerator = (IMMDeviceEnumerator)new MMDeviceEnumeratorComObject();
       IMMDevice device;
       Check(enumerator.GetDefaultAudioEndpoint(
         capture ? EDataFlow.eCapture : EDataFlow.eRender,
-        ERole.eCommunications,
+        role,
         out device
       ));
       string id;
@@ -166,10 +172,18 @@ namespace TransLive.Audio {
       return id;
     }
 
-    public static void SetDefaultCommunicationsId(string deviceId) {
+    public static string GetDefaultCommunicationsId(bool capture) {
+      return GetDefaultEndpointId(capture, ERole.eCommunications);
+    }
+
+    public static void SetDefaultEndpointId(string deviceId, ERole role) {
       if (String.IsNullOrWhiteSpace(deviceId)) throw new ArgumentException("Device ID is required");
       var policy = (IPolicyConfig)new PolicyConfigClient();
-      Check(policy.SetDefaultEndpoint(deviceId, ERole.eCommunications));
+      Check(policy.SetDefaultEndpoint(deviceId, role));
+    }
+
+    public static void SetDefaultCommunicationsId(string deviceId) {
+      SetDefaultEndpointId(deviceId, ERole.eCommunications);
     }
   }
 }
@@ -177,6 +191,32 @@ namespace TransLive.Audio {
 
 function Emit-Result($value) {
   $value | ConvertTo-Json -Compress
+}
+
+function All-Roles-Snapshot {
+  return @{
+    capture = @{
+      consoleId = [TransLive.Audio.DevicePolicy]::GetDefaultEndpointId($true, [TransLive.Audio.ERole]::eConsole)
+      multimediaId = [TransLive.Audio.DevicePolicy]::GetDefaultEndpointId($true, [TransLive.Audio.ERole]::eMultimedia)
+      communicationsId = [TransLive.Audio.DevicePolicy]::GetDefaultEndpointId($true, [TransLive.Audio.ERole]::eCommunications)
+    }
+    render = @{
+      consoleId = [TransLive.Audio.DevicePolicy]::GetDefaultEndpointId($false, [TransLive.Audio.ERole]::eConsole)
+      multimediaId = [TransLive.Audio.DevicePolicy]::GetDefaultEndpointId($false, [TransLive.Audio.ERole]::eMultimedia)
+      communicationsId = [TransLive.Audio.DevicePolicy]::GetDefaultEndpointId($false, [TransLive.Audio.ERole]::eCommunications)
+    }
+  }
+}
+
+function Set-All-Roles([string]$CaptureEndpointId, [string]$RenderEndpointId) {
+  foreach ($role in @(
+    [TransLive.Audio.ERole]::eConsole,
+    [TransLive.Audio.ERole]::eMultimedia,
+    [TransLive.Audio.ERole]::eCommunications
+  )) {
+    [TransLive.Audio.DevicePolicy]::SetDefaultEndpointId($CaptureEndpointId, $role)
+    [TransLive.Audio.DevicePolicy]::SetDefaultEndpointId($RenderEndpointId, $role)
+  }
 }
 
 function Detect-App([string]$Target) {
@@ -223,6 +263,30 @@ try {
       captureId = [TransLive.Audio.DevicePolicy]::GetDefaultCommunicationsId($true)
       renderId = [TransLive.Audio.DevicePolicy]::GetDefaultCommunicationsId($false)
     }
+    exit 0
+  }
+
+  if ($Action -eq "snapshot-all-roles") {
+    $snapshot = All-Roles-Snapshot
+    $snapshot.ok = $true
+    Emit-Result $snapshot
+    exit 0
+  }
+
+  if ($Action -eq "apply-all-roles") {
+    Set-All-Roles $CaptureId $RenderId
+    Emit-Result @{ ok = $true }
+    exit 0
+  }
+
+  if ($Action -eq "restore-all-roles") {
+    [TransLive.Audio.DevicePolicy]::SetDefaultEndpointId($CaptureConsoleId, [TransLive.Audio.ERole]::eConsole)
+    [TransLive.Audio.DevicePolicy]::SetDefaultEndpointId($CaptureMultimediaId, [TransLive.Audio.ERole]::eMultimedia)
+    [TransLive.Audio.DevicePolicy]::SetDefaultEndpointId($CaptureCommunicationsId, [TransLive.Audio.ERole]::eCommunications)
+    [TransLive.Audio.DevicePolicy]::SetDefaultEndpointId($RenderConsoleId, [TransLive.Audio.ERole]::eConsole)
+    [TransLive.Audio.DevicePolicy]::SetDefaultEndpointId($RenderMultimediaId, [TransLive.Audio.ERole]::eMultimedia)
+    [TransLive.Audio.DevicePolicy]::SetDefaultEndpointId($RenderCommunicationsId, [TransLive.Audio.ERole]::eCommunications)
+    Emit-Result @{ ok = $true }
     exit 0
   }
 
