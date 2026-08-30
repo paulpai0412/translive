@@ -71,3 +71,19 @@ test("formal UI provides Traditional-Chinese actionable persistence and summary 
     /if \(canceled\) \{\s+await releaseRendererResources\(\);/,
   );
 });
+
+test("enumerates audio devices as soon as ChatGPT is connected", async () => {
+  const renderer = await readFile(
+    new URL("./renderer-entry.js", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    renderer,
+    /setAppState\(result\.state === "connected" \? "ready" : "logged-out"\);\s+if \(result\.state === "connected"\) await refreshDevices\(\);/,
+  );
+  assert.match(
+    renderer,
+    /if \(event\.state === "connected"\) \{\s+setAppState\("ready"\);\s+await refreshDevices\(\);/,
+  );
+});

@@ -1058,6 +1058,7 @@ async function initializeAccount() {
     const result = await window.translive.accountStatus();
     setAccountState(result.state);
     setAppState(result.state === "connected" ? "ready" : "logged-out");
+    if (result.state === "connected") await refreshDevices();
   } catch {
     setAccountState("failed");
     setAppState("logged-out");
@@ -1822,8 +1823,10 @@ window.translive.onEvent(async (event) => {
   }
   if (event.type === "account") {
     setAccountState(event.state);
-    if (event.state === "connected") setAppState("ready");
-    else if (event.state === "waiting") setAppState("auth-waiting");
+    if (event.state === "connected") {
+      setAppState("ready");
+      await refreshDevices();
+    } else if (event.state === "waiting") setAppState("auth-waiting");
     else if (["failed", "logged-out"].includes(event.state)) {
       setAppState("logged-out");
     }
