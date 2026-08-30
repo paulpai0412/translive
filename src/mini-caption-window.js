@@ -96,7 +96,11 @@ export class MiniCaptionWindowController {
     this.#ready = false;
     this.#showRequested = false;
     this.#window = undefined;
-    if (window && !window.isDestroyed()) window.destroy?.();
+    if (window && !window.isDestroyed()) {
+      window.removeAllListeners?.("close");
+      window.destroy?.();
+      return;
+    }
     this.#disposing = false;
   }
 
@@ -145,6 +149,7 @@ export class MiniCaptionWindowController {
       this.hideAndFocusMain();
     });
     window.on("closed", () => {
+      this.#disposing = false;
       if (this.#window === window) {
         this.#ready = false;
         this.#window = undefined;

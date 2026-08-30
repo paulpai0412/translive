@@ -15,6 +15,7 @@ class FakeWindow extends EventEmitter {
   shown = 0;
   focused = 0;
   loaded = [];
+  destroyRequested = false;
   sent = [];
   webContents = {
     send: (channel, payload) => this.sent.push({ channel, payload }),
@@ -44,6 +45,17 @@ class FakeWindow extends EventEmitter {
 
   isDestroyed() {
     return this.destroyed;
+  }
+
+  destroy() {
+    this.destroyRequested = true;
+    queueMicrotask(() => {
+      let prevented = false;
+      this.emit("close", { preventDefault: () => (prevented = true) });
+      if (prevented) return;
+      this.destroyed = true;
+      this.emit("closed");
+    });
   }
 }
 
@@ -136,6 +148,19 @@ test("hides only mini captions and returns focus to the main window on close or 
   controller.hideAndFocusMain();
   assert.equal(child.hidden, true);
   assert.equal(main.focused, 2);
+});
+
+test("dispose destroys a hidden mini window even when close events are asynchronous", async () => {
+  const { controller, created } = fixture();
+  controller.show({ primary: "字幕" });
+  const child = created[0].child;
+  child.emit("ready-to-show");
+
+  controller.dispose();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(child.destroyRequested, true);
+  assert.equal(child.destroyed, true);
 });
 
 test("mini caption assets keep an isolated CSP and only expose return/caption IPC", async () => {
