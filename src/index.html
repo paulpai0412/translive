@@ -422,7 +422,7 @@
           <div>
             <p class="section-kicker">偏好設定</p>
             <h1>設定</h1>
-            <p>目前只提供帳戶、主題與 runtime 資訊。</p>
+            <p>帳戶、音訊、runtime 與本機處理偏好。</p>
           </div>
         </div>
         <div class="settings-list">
@@ -449,6 +449,94 @@
             本機保存上限<span id="settings-retention-status">正在檢查</span>
           </button>
         </div>
+
+        <section
+          class="voice-conversion-settings"
+          aria-labelledby="voice-conversion-title"
+        >
+          <div class="voice-conversion-heading">
+            <div>
+              <p class="section-kicker">本機處理</p>
+              <h2 id="voice-conversion-title">本機自訂音色 RVC</h2>
+              <p>
+                僅在本機處理 GPT‑Live 的輸出；未通過本機 runtime 與模型驗證時，
+                一律播放原 GPT 音色。
+              </p>
+            </div>
+            <label
+              class="voice-conversion-switch"
+              for="voice-conversion-toggle"
+            >
+              <span>啟用自訂音色</span>
+              <input
+                id="voice-conversion-toggle"
+                type="checkbox"
+                role="switch"
+                aria-checked="false"
+                aria-describedby="voice-conversion-status"
+              />
+            </label>
+          </div>
+          <div class="voice-conversion-controls">
+            <label>
+              <span>本人音色設定檔</span>
+              <select
+                id="voice-profile-select"
+                aria-describedby="voice-conversion-status"
+              >
+                <option value="">尚未選擇本人音色</option>
+              </select>
+            </label>
+            <p id="voice-conversion-status" class="mode-help" role="status">
+              正在檢查本機 RVC 能力…
+            </p>
+          </div>
+          <div class="voice-profile-import">
+            <div>
+              <h3>建立／匯入本人音色</h3>
+              <p>
+                僅可使用本人或已明確授權的聲音。模型、索引與聲音材料只保存在本機，
+                不會送往 ChatGPT、診斷包或逐字稿。
+              </p>
+            </div>
+            <label>
+              <span>設定檔名稱</span>
+              <input
+                id="voice-profile-name"
+                type="text"
+                maxlength="80"
+                autocomplete="off"
+                placeholder="例如：我的正式音色"
+              />
+            </label>
+            <label class="checkbox-row">
+              <input id="voice-profile-consent" type="checkbox" />
+              <span>我確認我擁有或已獲明確授權使用此聲音。</span>
+            </label>
+            <button
+              class="secondary-button"
+              id="voice-profile-import"
+              type="button"
+              disabled
+            >
+              選擇本人已訓練的 RVC 模型
+            </button>
+            <div class="voice-profile-delete">
+              <label class="checkbox-row">
+                <input id="voice-profile-delete-confirm" type="checkbox" />
+                <span>我確認永久刪除所選音色、模型、索引與本機快取。</span>
+              </label>
+              <button
+                class="danger-button"
+                id="voice-profile-delete"
+                type="button"
+                disabled
+              >
+                刪除所選本人音色
+              </button>
+            </div>
+          </div>
+        </section>
       </section>
     </main>
 

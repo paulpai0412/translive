@@ -122,6 +122,14 @@ const elements = Object.fromEntries(
     "settings-runtime-status",
     "settings-retention-button",
     "settings-retention-status",
+    "voice-conversion-toggle",
+    "voice-conversion-status",
+    "voice-profile-consent",
+    "voice-profile-import",
+    "voice-profile-name",
+    "voice-profile-select",
+    "voice-profile-delete-confirm",
+    "voice-profile-delete",
     "rx-source",
     "rx-source-caption",
     "rx-target-language",
@@ -181,6 +189,12 @@ const ui = {
   devicePreferences: emptyDevicePreferences(),
   missingRecommendedDevices: [],
   selectedHeadphonesId: "",
+  voiceConversion: {
+    enabled: false,
+    profiles: [],
+    provider: "unavailable",
+    state: "checking",
+  },
   runtime: "尚未檢查",
 };
 const focusOrigins = new WeakMap();
@@ -1200,6 +1214,95 @@ async function initializeGlobalAudioDefaults() {
   }
 }
 
+function voiceConversionPresentation(status = {}) {
+  const state = status.state ?? "unavailable";
+  const detail =
+    {
+      checking: "正在檢查本機 RVC 與硬體能力…",
+      off: "已關閉，正在播放原 GPT 音色。",
+      ready: "本機自訂音色已就緒；尚未改變目前 GPT‑Live 音訊路徑。",
+      converting: "正在使用本機自訂音色。",
+      "raw-fallback": "自訂音色暫停，正在播放原 GPT 音色。",
+      unavailable:
+        "需要已驗證的本機 RVC runtime 與本人已授權模型；目前使用原 GPT 音色。",
+    }[state] ?? "本機自訂音色狀態尚未確認。";
+  return { detail, state };
+}
+
+function updateVoiceProfileImportButton() {
+  elements["voice-profile-import"].disabled = !(
+    elements["voice-profile-consent"].checked &&
+    elements["voice-profile-name"].value.trim()
+  );
+}
+
+function updateVoiceProfileDeleteButton() {
+  elements["voice-profile-delete"].disabled = !(
+    elements["voice-profile-delete-confirm"].checked &&
+    elements["voice-profile-select"].value
+  );
+}
+
+function renderVoiceConversion(status = {}) {
+  const profiles = Array.isArray(status.profiles) ? status.profiles : [];
+  const select = elements["voice-profile-select"];
+  const selected = status.profile?.id ?? select.value;
+  select.replaceChildren();
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "尚未選擇本人音色";
+  select.append(placeholder);
+  for (const profile of profiles) {
+    const option = document.createElement("option");
+    option.value = profile.id;
+    option.textContent = profile.displayName;
+    select.append(option);
+  }
+  if ([...select.options].some((option) => option.value === selected)) {
+    select.value = selected;
+  }
+  ui.voiceConversion = {
+    enabled: status.enabled === true,
+    profiles,
+    provider: status.provider ?? "unavailable",
+    state: status.state ?? "unavailable",
+  };
+  elements["voice-conversion-toggle"].checked = ui.voiceConversion.enabled;
+  elements["voice-conversion-toggle"].setAttribute(
+    "aria-checked",
+    String(ui.voiceConversion.enabled),
+  );
+  const presentation = voiceConversionPresentation(status);
+  elements["voice-conversion-status"].textContent = presentation.detail;
+  elements["voice-conversion-status"].dataset.state = presentation.state;
+  updateVoiceProfileImportButton();
+  updateVoiceProfileDeleteButton();
+}
+
+async function initializeVoiceConversion() {
+  try {
+    renderVoiceConversion(await window.translive.voiceConversionStatus());
+  } catch {
+    renderVoiceConversion({ state: "unavailable" });
+  }
+}
+
+function voiceConversionFailureMessage(reason) {
+  return (
+    {
+      "profile-required": "請先選擇本人已授權的音色設定檔。",
+      "capability-unavailable":
+        "需要已驗證的本機 RVC runtime，已維持原 GPT 音色。",
+      "runtime-unavailable":
+        "需要已驗證的本機 RVC runtime，已維持原 GPT 音色。",
+      "profile-unavailable":
+        "選取的本人音色設定檔無法使用，已維持原 GPT 音色。",
+      "profile-unverified": "匯入的模型尚待本機安全驗證，已維持原 GPT 音色。",
+      "unsafe-model": "模型尚未通過安全載入驗證，已維持原 GPT 音色。",
+    }[reason] ?? "無法啟用本機自訂音色，已維持原 GPT 音色。"
+  );
+}
+
 async function initializeTray() {
   try {
     const tray = await window.translive.trayStatus();
@@ -1899,6 +2002,80 @@ elements["settings-runtime-button"].addEventListener("click", () =>
 elements["settings-retention-button"].addEventListener("click", () =>
   setView("history"),
 );
+elements["voice-conversion-toggle"].addEventListener(
+  "change",
+  async (event) => {
+    const enabled = event.target.checked;
+    try {
+      const status = await window.translive.voiceConversionSetEnabled({
+        enabled,
+        profileId: elements["voice-profile-select"].value || undefined,
+      });
+      renderVoiceConversion(status);
+      if (enabled && status.enabled !== true) {
+        showAssertiveError(voiceConversionFailureMessage(status.reason));
+      }
+    } catch {
+      event.target.checked = false;
+      showAssertiveError("無法啟用本機自訂音色，已維持原 GPT 音色。");
+    }
+  },
+);
+elements["voice-profile-select"].addEventListener("change", async () => {
+  updateVoiceProfileDeleteButton();
+  if (!ui.voiceConversion.enabled) return;
+  try {
+    renderVoiceConversion(
+      await window.translive.voiceConversionSetEnabled({ enabled: false }),
+    );
+  } catch {
+    showAssertiveError("無法切換本人音色，已維持原 GPT 音色。");
+  }
+});
+elements["voice-profile-consent"].addEventListener(
+  "change",
+  updateVoiceProfileImportButton,
+);
+elements["voice-profile-delete-confirm"].addEventListener(
+  "change",
+  updateVoiceProfileDeleteButton,
+);
+elements["voice-profile-name"].addEventListener(
+  "input",
+  updateVoiceProfileImportButton,
+);
+elements["voice-profile-import"].addEventListener("click", async () => {
+  try {
+    const result = await window.translive.voiceProfileImport({
+      confirmedOwnAuthorizedVoice:
+        elements["voice-profile-consent"].checked === true,
+      displayName: elements["voice-profile-name"].value,
+    });
+    renderVoiceConversion(result.status);
+    if (result.imported) {
+      elements["voice-profile-name"].value = "";
+      elements["voice-profile-consent"].checked = false;
+      updateVoiceProfileImportButton();
+    }
+  } catch {
+    showAssertiveError(
+      "無法匯入本人音色。請確認同意、模型檔案與本機 RVC 設定。",
+    );
+  }
+});
+elements["voice-profile-delete"].addEventListener("click", async () => {
+  try {
+    const status = await window.translive.voiceProfileDelete({
+      confirmedDeleteProfile:
+        elements["voice-profile-delete-confirm"].checked === true,
+      id: elements["voice-profile-select"].value,
+    });
+    elements["voice-profile-delete-confirm"].checked = false;
+    renderVoiceConversion(status);
+  } catch {
+    showAssertiveError("無法刪除本人音色。請確認刪除確認並稍後再試。");
+  }
+});
 elements["tray-close-behavior"].addEventListener("change", async (event) => {
   const result = await window.translive.traySetCloseBehavior(
     event.target.value,
@@ -2010,6 +2187,10 @@ window.translive.onEvent(async (event) => {
     applyGlobalAudioStatus(event);
     return;
   }
+  if (event.type === "voice-conversion") {
+    renderVoiceConversion(event.status);
+    return;
+  }
   if (event.type === "tray") {
     if (event.action === "diagnostics") setDrawer(true);
     if (event.action === "stopped") setAppState("stopped");
@@ -2085,4 +2266,5 @@ initializeTray();
 initializeConsent();
 initializeRetention();
 initializeGlobalAudioDefaults();
+initializeVoiceConversion();
 initializeAccount();

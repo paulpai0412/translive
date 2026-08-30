@@ -983,6 +983,99 @@ body[data-mode="microphone"] #single-target-label::before {
 .settings-toggle > span {
   color: var(--text);
 }
+.voice-conversion-settings {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-top: 18px;
+  max-width: 760px;
+  padding: 22px;
+}
+.voice-conversion-heading {
+  align-items: start;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+}
+.voice-conversion-heading h2,
+.voice-profile-import h3 {
+  font-size: 18px;
+  margin: 0;
+}
+.voice-conversion-heading p,
+.voice-profile-import p {
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 8px 0 0;
+  max-width: 530px;
+}
+.voice-conversion-switch {
+  align-items: center;
+  display: flex;
+  flex: none;
+  gap: 10px;
+  white-space: nowrap;
+}
+.voice-conversion-switch input {
+  accent-color: var(--primary-solid);
+  block-size: 20px;
+  inline-size: 36px;
+}
+.voice-conversion-controls {
+  align-items: end;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 1fr);
+  margin-top: 20px;
+}
+.voice-conversion-controls label,
+.voice-profile-import > label:not(.checkbox-row) {
+  display: grid;
+  gap: 7px;
+}
+.voice-conversion-controls label > span,
+.voice-profile-import > label > span {
+  color: var(--muted);
+  font-size: 13px;
+}
+.voice-conversion-controls select,
+.voice-profile-import input[type="text"] {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  min-height: 42px;
+  padding: 0 11px;
+}
+#voice-conversion-status {
+  margin: 0;
+}
+#voice-conversion-status[data-state="raw-fallback"],
+#voice-conversion-status[data-state="unavailable"] {
+  color: var(--warning);
+}
+.voice-profile-import {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+  padding-top: 20px;
+}
+.voice-profile-import .checkbox-row {
+  margin: 0;
+}
+.voice-profile-import .secondary-button {
+  justify-self: start;
+}
+.voice-profile-delete {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.voice-profile-delete .checkbox-row {
+  flex: 1 1 300px;
+}
 
 .quick-setup-modal.is-open {
   display: block;
@@ -1177,6 +1270,13 @@ body[data-mode="microphone"] #single-target-label::before {
     grid-template-columns: 1fr;
   }
   .records-layout {
+    grid-template-columns: 1fr;
+  }
+  .voice-conversion-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .voice-conversion-controls {
     grid-template-columns: 1fr;
   }
   .cloud-note {

@@ -149,6 +149,47 @@ test("keeps saved-record paths concise, diagnostics current, and captions outsid
   assert.doesNotMatch(css, /\.mini-overlay/);
 });
 
+test("RVC settings require opt-in consent and expose only safe status/profile fields", async () => {
+  const [html, main, preload, renderer] = await Promise.all([
+    readFile(new URL("./index.html", import.meta.url), "utf8"),
+    readFile(new URL("./main.js", import.meta.url), "utf8"),
+    readFile(new URL("./preload.cjs", import.meta.url), "utf8"),
+    readFile(new URL("./renderer-entry.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(html, /本機自訂音色 RVC/);
+  assert.match(html, /id="voice-conversion-toggle"[^>]*role="switch"/);
+  assert.match(html, /id="voice-profile-select"/);
+  assert.match(html, /id="voice-profile-consent"/);
+  assert.match(html, /id="voice-profile-import"/);
+  assert.match(html, /id="voice-profile-delete-confirm"/);
+  assert.match(html, /id="voice-profile-delete"/);
+  assert.match(html, /僅可使用本人或已明確授權的聲音/);
+  assert.match(html, /id="voice-conversion-status"[^>]*role="status"/);
+  for (const method of [
+    "voiceConversionStatus",
+    "voiceConversionSetEnabled",
+    "voiceProfileImport",
+    "voiceProfileDelete",
+  ]) {
+    assert.match(preload, new RegExp(method));
+  }
+  assert.match(main, /"translive:voice-conversion-status"/);
+  assert.match(main, /"translive:voice-conversion-set-enabled"/);
+  assert.match(main, /"translive:voice-profile-import"/);
+  assert.match(main, /"translive:voice-profile-delete"/);
+  assert.match(renderer, /自訂音色暫停，正在播放原 GPT 音色/);
+  assert.match(renderer, /需要已驗證的本機 RVC runtime/);
+  assert.match(renderer, /voiceProfileDelete/);
+  assert.match(renderer, /confirmedDeleteProfile/);
+  assert.doesNotMatch(renderer, /modelPath|indexPath|embeddingPath|samplePath/);
+  assert.doesNotMatch(
+    renderer,
+    /VoiceConversionDeadline|createVoiceConversionFrame/,
+  );
+  assert.doesNotMatch(main, /FakeVoiceConversionSidecar/);
+});
+
 test("applies route-valid device recommendations while preserving manual physical choices", async () => {
   const renderer = await readFile(
     new URL("./renderer-entry.js", import.meta.url),

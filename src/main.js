@@ -33,6 +33,9 @@ import { SummaryController } from "./summary-controller.js";
 import { TranslationLifecycle } from "./translation-lifecycle.js";
 import { TrayController } from "./tray-controller.js";
 import { TrayPreferences } from "./tray-preferences.js";
+import { VoiceConversionCapabilityProbe } from "./voice-conversion-capability.js";
+import { VoiceConversionController } from "./voice-conversion-controller.js";
+import { VoiceProfileStore } from "./voice-profile-store.js";
 import { WindowsAudioDefaultsController } from "./windows-audio-defaults-controller.js";
 import { WindowsAudioDefaultsStore } from "./windows-audio-defaults-store.js";
 import { WindowsMeetingDeviceAdapter } from "./windows-meeting-device-adapter.js";
@@ -62,6 +65,7 @@ let windowsAudioDefaultsController;
 let globalAudioRoutingStarted = false;
 let globalAudioStartupPromise;
 let globalAudioState = { state: "unknown" };
+let voiceConversionController;
 let rendererControls;
 let translationLifecycle;
 
@@ -112,6 +116,12 @@ function sendRendererControl(event) {
     throw new Error("Renderer window is unavailable");
   }
   mainWindow.webContents.send("translive:event", event);
+}
+
+function requireMainRenderer(event) {
+  if (event?.sender !== mainWindow?.webContents) {
+    throw new Error("TRANSLIVE_UNAUTHORIZED_RENDERER");
+  }
 }
 
 function publish(event) {
@@ -201,6 +211,56 @@ function registerIpc() {
     accountController.cancelLogin(),
   );
   ipcMain.handle("translive:audio-defaults-status", () => globalAudioState);
+  ipcMain.handle("translive:voice-conversion-status", (event) => {
+    requireMainRenderer(event);
+    return voiceConversionController.status();
+  });
+  ipcMain.handle(
+    "translive:voice-conversion-set-enabled",
+    async (event, request) => {
+      requireMainRenderer(event);
+      const status = await voiceConversionController.setEnabled({
+        enabled: request?.enabled === true,
+        profileId:
+          typeof request?.profileId === "string"
+            ? request.profileId
+            : undefined,
+      });
+      publish({ type: "voice-conversion", status });
+      return status;
+    },
+  );
+  ipcMain.handle("translive:voice-profile-import", async (event, request) => {
+    requireMainRenderer(event);
+    if (request?.confirmedOwnAuthorizedVoice !== true) {
+      throw new Error("VOICE_PROFILE_CONSENT_REQUIRED");
+    }
+    const selected = await dialog.showOpenDialog(mainWindow, {
+      filters: [{ name: "RVC model", extensions: ["pth"] }],
+      properties: ["openFile"],
+      title: "選擇本人已訓練的 RVC 模型",
+    });
+    if (selected.canceled || !selected.filePaths[0]) {
+      return { imported: false, status: voiceConversionController.status() };
+    }
+    const profile = await voiceConversionController.importProfile({
+      confirmedOwnAuthorizedVoice: true,
+      displayName: request?.displayName,
+      modelSourcePath: selected.filePaths[0],
+    });
+    const status = voiceConversionController.status();
+    publish({ type: "voice-conversion", status });
+    return { imported: true, profile, status };
+  });
+  ipcMain.handle("translive:voice-profile-delete", async (event, request) => {
+    requireMainRenderer(event);
+    if (request?.confirmedDeleteProfile !== true) {
+      throw new Error("VOICE_PROFILE_DELETE_CONFIRMATION_REQUIRED");
+    }
+    const status = await voiceConversionController.deleteProfile(request.id);
+    publish({ type: "voice-conversion", status });
+    return status;
+  });
   ipcMain.handle("translive:mini-caption-show", (event, snapshot) => {
     if (event.sender !== mainWindow?.webContents) return { shown: false };
     return miniCaptionWindowController?.show(snapshot) ?? { shown: false };
@@ -456,6 +516,19 @@ if (!isPrimaryInstance) {
       : Promise.resolve({ state: "legacy-recovery-needed" });
     const globalAudioStartup = await globalAudioStartupPromise;
     globalAudioState = globalAudioStartup;
+    voiceConversionController = new VoiceConversionController({
+      capabilityProbe: new VoiceConversionCapabilityProbe({
+        platform: process.platform,
+        scriptPath: join(
+          app.getAppPath(),
+          "scripts",
+          "probe-rvc-capability.ps1",
+        ),
+      }),
+      profiles: new VoiceProfileStore({
+        directory: join(app.getPath("userData"), "voice-profiles"),
+      }),
+    });
     miniCaptionWindowController = new MiniCaptionWindowController({
       createWindow: (options) =>
         new BrowserWindow({
@@ -507,6 +580,22 @@ if (!isPrimaryInstance) {
     });
     registerIpc();
     publish({ type: "global-audio", state: globalAudioStartup.state });
+    // Optional RVC discovery must never delay the raw GPT-audio application.
+    void voiceConversionController
+      .initialize()
+      .then((status) => publish({ type: "voice-conversion", status }))
+      .catch(() =>
+        publish({
+          type: "voice-conversion",
+          status: {
+            enabled: false,
+            profiles: [],
+            provider: "unavailable",
+            reason: "initialization-failed",
+            state: "unavailable",
+          },
+        }),
+      );
     if (startupRestore.reason) {
       publish({
         type: "meeting-setup",
@@ -533,6 +622,7 @@ if (!isPrimaryInstance) {
       accountController?.dispose(),
       summaryController?.dispose(),
       trayController?.dispose(),
+      voiceConversionController?.dispose(),
     ])
       .then(async () => {
         await globalAudioStartupPromise?.catch(() => {});

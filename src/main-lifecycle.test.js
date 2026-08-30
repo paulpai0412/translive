@@ -23,6 +23,46 @@ test("only the primary Electron instance can initialize shared Windows audio rou
   );
 });
 
+test("opens the raw-audio app before optional RVC initialization settles", async () => {
+  const source = await mainSource();
+  const createWindowAt = source.indexOf("createWindow();");
+  const initializeAt = source.search(
+    /voiceConversionController\s*\.\s*initialize\(\)/,
+  );
+
+  assert.ok(createWindowAt >= 0);
+  assert.ok(initializeAt > createWindowAt);
+  assert.doesNotMatch(
+    source,
+    /const voiceConversionStartup = await voiceConversionController\.initialize\(\)/,
+  );
+  assert.match(
+    source,
+    /void voiceConversionController\s*\.\s*initialize\(\)/,
+  );
+});
+
+test("limits every RVC IPC to the main renderer and requires explicit profile deletion confirmation", async () => {
+  const source = await mainSource();
+
+  for (const channel of [
+    "voice-conversion-status",
+    "voice-conversion-set-enabled",
+    "voice-profile-import",
+    "voice-profile-delete",
+  ]) {
+    const pattern = new RegExp(
+      `translive:${channel}"[\\s\\S]{0,180}requireMainRenderer\\(event\\)`,
+    );
+    assert.match(source, pattern, channel);
+  }
+  assert.match(source, /confirmedDeleteProfile !== true/);
+  assert.match(
+    source,
+    /voiceConversionController\.deleteProfile\(request\.id\)/,
+  );
+});
+
 test("owns mini captions in a separate non-modal window with a bounded renderer IPC seam", async () => {
   const source = await mainSource();
 
@@ -44,6 +84,16 @@ test("exit close disposes a hidden mini window before quitting the app", async (
   assert.match(
     source,
     /if \(!trayController\?\.shouldHideOnClose\(\)\) \{\s+event\.preventDefault\(\);\s+miniCaptionWindowController\?\.dispose\(\);\s+app\.quit\(\);\s+return;/,
+  );
+});
+
+test("app quit disposes local voice conversion sidecars before process exit", async () => {
+  const source = await mainSource();
+
+  assert.match(source, /voiceConversionController\?\.dispose\(\)/);
+  assert.match(
+    source,
+    /Promise\.allSettled\(\[[\s\S]{0,420}voiceConversionController\?\.dispose\(\)/,
   );
 });
 

@@ -32,6 +32,9 @@ test("packages only production runtime files and excludes secrets, evidence, and
     "src/mini-caption-preload.cjs",
     "src/mini-caption-renderer.js",
     "src/main.js",
+    "src/voice-conversion-capability.js",
+    "src/voice-conversion-controller.js",
+    "src/voice-profile-store.js",
     "src/windows-audio-defaults-controller.js",
     "src/windows-audio-defaults-store.js",
     "src/windows-meeting-device-adapter.js",
@@ -40,6 +43,7 @@ test("packages only production runtime files and excludes secrets, evidence, and
     "assets/codex/win32/codex.exe",
     "assets/codex/win32/codex.exe.sig",
     "scripts/windows-meeting-devices.ps1",
+    "scripts/probe-rvc-capability.ps1",
   ]) {
     assert.equal(packagedPathIsAllowed(path), true, path);
   }

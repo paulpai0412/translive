@@ -8,6 +8,14 @@ contextBridge.exposeInMainWorld("translive", {
     ipcRenderer.invoke("translive:account-login-cancel"),
   audioDefaultsStatus: () =>
     ipcRenderer.invoke("translive:audio-defaults-status"),
+  voiceConversionStatus: () =>
+    ipcRenderer.invoke("translive:voice-conversion-status"),
+  voiceConversionSetEnabled: (request) =>
+    ipcRenderer.invoke("translive:voice-conversion-set-enabled", request),
+  voiceProfileImport: (request) =>
+    ipcRenderer.invoke("translive:voice-profile-import", request),
+  voiceProfileDelete: (request) =>
+    ipcRenderer.invoke("translive:voice-profile-delete", request),
   miniCaptionShow: (snapshot) =>
     ipcRenderer.invoke("translive:mini-caption-show", snapshot),
   miniCaptionUpdate: (snapshot) =>

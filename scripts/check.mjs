@@ -68,6 +68,10 @@ const windowsMeetingScript = await readFile(
   "scripts/windows-meeting-devices.ps1",
   "utf8",
 );
+const voiceConversionProbeScript = await readFile(
+  "scripts/probe-rvc-capability.ps1",
+  "utf8",
+);
 if (!main.includes('preload: join(sourceDirectory, "preload.cjs")')) {
   throw new Error("main.js must load the restricted preload bridge");
 }
@@ -88,6 +92,9 @@ for (const required of [
   "new SummaryController",
   "new WindowsAudioDefaultsController",
   "new WindowsAudioDefaultsStore",
+  "new VoiceConversionCapabilityProbe",
+  "new VoiceConversionController",
+  "new VoiceProfileStore",
   "sanitizeMeetingSetupRequest(setup)",
   'ipcMain.handle("translive:tray-status"',
   "shell.openExternal(login.authUrl)",
@@ -101,6 +108,17 @@ for (const required of [
   if (!main.includes(required)) {
     throw new Error(`main.js is missing account integration: ${required}`);
   }
+}
+if (
+  !voiceConversionProbeScript.includes("Get-CimInstance Win32_Processor") ||
+  !voiceConversionProbeScript.includes("ConvertTo-Json -Compress") ||
+  /Invoke-WebRequest|pip install|winget install|Copy-Item|Remove-Item/i.test(
+    voiceConversionProbeScript,
+  )
+) {
+  throw new Error(
+    "probe-rvc-capability.ps1 must remain a read-only capability probe",
+  );
 }
 for (const required of [
   'ValidateSet("detect", "resolve", "snapshot", "apply", "restore", "snapshot-all-roles", "apply-all-roles", "restore-all-roles")',
@@ -138,6 +156,9 @@ for (const required of [
   'id="summary-confirm-modal"',
   'id="settings-retention-status"',
   'id="global-audio-status"',
+  'id="voice-conversion-toggle"',
+  'id="voice-profile-select"',
+  'id="voice-profile-consent"',
   'aria-live="polite"',
   'role="alert"',
 ]) {
@@ -166,6 +187,9 @@ for (const required of [
   "audioDefaultsStatus",
   "miniCaptionShow",
   "miniCaptionUpdate",
+  "voiceConversionStatus",
+  "voiceConversionSetEnabled",
+  "voiceProfileImport",
   "rendererControlAck",
 ]) {
   if (!preload.includes(required)) {
@@ -184,6 +208,11 @@ if (!renderer.includes("exportAggregate")) {
 }
 if (!renderer.includes("diagnosticsExport")) {
   throw new Error("renderer-entry.js must expose redacted diagnostic export");
+}
+if (!renderer.includes("initializeVoiceConversion")) {
+  throw new Error(
+    "renderer-entry.js must expose safe local voice conversion status",
+  );
 }
 if (!renderer.includes("applyGlobalAudioStatus")) {
   throw new Error(
