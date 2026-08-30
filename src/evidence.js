@@ -2,6 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { sanitizeText } from "./text-sanitizer.js";
+
 const MAX_ERROR_LENGTH = 500;
 const GATES = Object.freeze({
   ttfaP50Ms: 1_500,
@@ -18,35 +20,9 @@ function hashEndpointId(id) {
 }
 
 function redactMessage(value) {
-  const message = String(value ?? "Unknown error")
-    .replace(
-      /["']?(?:authorization|access_token|refresh_token|id_token|api[_-]?key|session[_-]?token|client_secret|sdp)["']?\s*[:=]\s*["']?(?:bearer\s+)?[^\s,;"']+/gi,
-      (match) => {
-        const key =
-          match.match(
-            /authorization|access_token|refresh_token|id_token|api[_-]?key|session[_-]?token|client_secret|sdp/i,
-          )?.[0] ?? "credential";
-        return `${key}: [redacted]`;
-      },
-    )
-    .replace(/bearer\s+[^\s,;]+/gi, "Bearer [redacted]")
-    .replace(
-      /\b(?:sk(?:-proj)?-[A-Za-z0-9_-]+|(?:gho|ghp|ghu|ghs)_[A-Za-z0-9_-]+)/gi,
-      "[redacted]",
-    )
-    .replace(
-      /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g,
-      "[redacted-jwt]",
-    )
-    .replace(
-      /\baccount(?:[ _-])?id\s*[:=]\s*["']?[^\s,;"']+/gi,
-      "accountId: [redacted]",
-    );
-
-  if (/\bv=0(?:\r?\n|$)|a=candidate:|\bm=audio\b/i.test(message)) {
-    return "[redacted protocol payload]";
-  }
-  return message.slice(0, MAX_ERROR_LENGTH);
+  return sanitizeText(value ?? "Unknown error", {
+    maxLength: MAX_ERROR_LENGTH,
+  });
 }
 
 function safeIdentifier(value) {

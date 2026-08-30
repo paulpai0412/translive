@@ -1,5 +1,9 @@
 import { createStartupSession } from "./startup-session.js";
 import {
+  latestTranscriptPersistenceEvent,
+  transcriptPersistencePresentation,
+} from "./renderer-state.js";
+import {
   channelStateLabel,
   diagnosticEventLabel,
   modeLabel,
@@ -19,12 +23,17 @@ const elements = Object.fromEntries(
     "account-login-cancel",
     "account-status",
     "auth-status",
+    "assertive-error",
     "blocked-action",
     "blocked-copy",
     "blocked-detail",
     "blocked-title",
     "cancel-connect-button",
     "cable-a-sink",
+    "consent-modal",
+    "consent-checkbox",
+    "consent-confirm",
+    "consent-decline",
     "connect-account-step",
     "connect-route-step",
     "connect-runtime-step",
@@ -58,6 +67,10 @@ const elements = Object.fromEntries(
     "diag-tx",
     "degraded-copy",
     "degraded-title",
+    "delete-confirm-modal",
+    "delete-confirm-input",
+    "delete-confirm-action",
+    "delete-confirm-cancel",
     "drawer-scrim",
     "headphones",
     "headphones-confirmed",
@@ -66,6 +79,7 @@ const elements = Object.fromEntries(
     "health-runtime",
     "live-mode-label",
     "live-route-summary",
+    "live-save-status",
     "live-status",
     "mini-overlay",
     "mini-primary",
@@ -77,6 +91,19 @@ const elements = Object.fromEntries(
     "ready-message",
     "refresh-devices",
     "restart-button",
+    "records-list",
+    "records-selection",
+    "records-refresh",
+    "records-delete-all",
+    "records-status",
+    "record-detail",
+    "aggregate-summary-button",
+    "stopped-open-records",
+    "summary-confirm-modal",
+    "summary-confirm-title",
+    "summary-confirm-copy",
+    "summary-confirm-action",
+    "summary-confirm-cancel",
     "route-profile",
     "settings-account-button",
     "settings-account-status",
@@ -85,6 +112,7 @@ const elements = Object.fromEntries(
     "settings-runtime-status",
     "rx-source",
     "rx-source-caption",
+    "rx-target-language",
     "rx-state",
     "rx-target-caption",
     "single-channel-id",
@@ -97,11 +125,14 @@ const elements = Object.fromEntries(
     "single-target-label",
     "start-button",
     "stop-button",
+    "stopped-generate-summary",
     "stopped-copy",
     "theme-button",
     "theme-label",
     "tx-sink",
     "tx-source-caption",
+    "tx-source-language",
+    "tx-target-language",
     "tx-state",
     "tx-target-caption",
   ].map((id) => [id, document.querySelector(`#${id}`)]),
@@ -110,6 +141,9 @@ const elements = Object.fromEntries(
 const ui = {
   account: "checking",
   active: {},
+  consent: { granted: false, skipForCurrentRun: false },
+  lastSavedRecord: undefined,
+  persistenceEvent: undefined,
   app: "checking",
   channels: { tx: "disabled", rx: "disabled" },
   startup: undefined,
@@ -119,6 +153,14 @@ const ui = {
   },
   mode: "meeting",
   muted: { tx: false, rx: false },
+  records: {
+    aggregates: [],
+    current: undefined,
+    selected: new Set(),
+    sessions: [],
+    summaryRequest: undefined,
+    tab: "transcript",
+  },
   quickApp: "teams",
   devices: { inputs: [], outputs: [] },
   runtime: "尚未檢查",
@@ -142,6 +184,7 @@ function setAppState(state) {
     elements["degraded-copy"].textContent = presentation.detail;
   }
   const isLive = state === "live" || state === "degraded";
+  updateSavingStatus();
   for (const button of document.querySelectorAll("[data-mode-button]")) {
     button.disabled = state !== "ready";
   }
@@ -212,10 +255,29 @@ function setAccountState(state) {
   elements["settings-account-status"].textContent = text;
 }
 
+function showAssertiveError(message) {
+  const text = String(message ?? "發生未預期錯誤。");
+  elements["assertive-error"].textContent = text;
+  elements["assertive-error"].hidden = false;
+  window.clearTimeout(showAssertiveError.timeout);
+  showAssertiveError.timeout = window.setTimeout(() => {
+    elements["assertive-error"].hidden = true;
+  }, 8_000);
+}
+
+function focusModal(modal, selector) {
+  window.requestAnimationFrame(() => {
+    modal.querySelector(selector)?.focus();
+  });
+}
+
 function setScrim() {
   const open =
     elements["diagnostics-drawer"].classList.contains("is-open") ||
-    elements["quick-setup-modal"].classList.contains("is-open");
+    elements["quick-setup-modal"].classList.contains("is-open") ||
+    elements["summary-confirm-modal"].classList.contains("is-open") ||
+    elements["consent-modal"].classList.contains("is-open") ||
+    elements["delete-confirm-modal"].classList.contains("is-open");
   elements["drawer-scrim"].classList.toggle("is-open", open);
 }
 
@@ -229,6 +291,50 @@ function setQuickSetup(open) {
   elements["quick-setup-modal"].classList.toggle("is-open", open);
   elements["quick-setup-modal"].setAttribute("aria-hidden", String(!open));
   setScrim();
+}
+
+function setSummaryConfirm(open) {
+  elements["summary-confirm-modal"].classList.toggle("is-open", open);
+  elements["summary-confirm-modal"].setAttribute("aria-hidden", String(!open));
+  setScrim();
+  if (open)
+    focusModal(elements["summary-confirm-modal"], "#summary-confirm-action");
+}
+
+function setConsentModal(open) {
+  elements["consent-modal"].classList.toggle("is-open", open);
+  elements["consent-modal"].setAttribute("aria-hidden", String(!open));
+  setScrim();
+  if (open) focusModal(elements["consent-modal"], "#consent-checkbox");
+}
+
+function setDeleteConfirm(open) {
+  elements["delete-confirm-modal"].classList.toggle("is-open", open);
+  elements["delete-confirm-modal"].setAttribute("aria-hidden", String(!open));
+  if (!open) elements["delete-confirm-input"].value = "";
+  elements["delete-confirm-action"].disabled = true;
+  setScrim();
+  if (open)
+    focusModal(elements["delete-confirm-modal"], "#delete-confirm-input");
+}
+
+function applyTranscriptPersistence(event) {
+  ui.persistenceEvent = latestTranscriptPersistenceEvent(
+    ui.persistenceEvent,
+    event,
+  );
+  const presentation = transcriptPersistencePresentation({
+    consentGranted: ui.consent.granted,
+    event: ui.persistenceEvent,
+    skipForCurrentRun: ui.consent.skipForCurrentRun,
+  });
+  elements["live-save-status"].textContent = presentation.live;
+  elements["stopped-copy"].textContent = presentation.stopped;
+  elements["stopped-generate-summary"].hidden = !presentation.summary;
+}
+
+function updateSavingStatus() {
+  applyTranscriptPersistence();
 }
 
 function selectedDevice(select) {
@@ -365,6 +471,17 @@ function routeConfig() {
       sinkEndpointKind: sink.kind,
     };
   }
+  config.persistTranscript =
+    ui.consent.granted && !ui.consent.skipForCurrentRun;
+  config.languages = {
+    rxTarget: elements["rx-target-language"]?.value ?? "繁體中文（台灣）",
+    txSource: elements["tx-source-language"]?.value ?? "未指定",
+    txTarget: elements["tx-target-language"]?.value ?? "未指定",
+  };
+  config.sourceLabels = {
+    rx: config.rx?.sourceEndpointName ?? "未指定來源",
+    tx: config.tx?.sourceEndpointName ?? "未指定來源",
+  };
   return config;
 }
 
@@ -705,6 +822,10 @@ function setConnectionStep(id, state, detail) {
 }
 
 async function startTranslation() {
+  if (!ui.consent.granted && !ui.consent.skipForCurrentRun) {
+    setConsentModal(true);
+    return;
+  }
   if (
     ui.startup ||
     Object.keys(ui.active).length > 0 ||
@@ -729,6 +850,7 @@ async function startTranslation() {
   ui.startup = startup;
   try {
     config = routeConfig();
+    ui.persistenceEvent = undefined;
     setAppState("connecting");
     resetLiveDisplay();
     setConnectionStep("connect-account-step", "done", "ChatGPT 已連線");
@@ -775,6 +897,7 @@ async function startTranslation() {
     for (const peer of Object.values(ui.active)) peer.stop();
     ui.active = {};
     if (config) window.translive.rendererBlocked(config, error.message);
+    showAssertiveError("無法建立翻譯連線，請檢查設定後再試。");
     showBlocked("無法建立翻譯連線", error.message);
   } finally {
     if (ui.startup === startup) ui.startup = undefined;
@@ -804,6 +927,8 @@ async function stopTranslation() {
       elements["stopped-copy"].textContent =
         "音訊連線已釋放。逐字稿與摘要將於下一階段提供。";
     }
+  } catch {
+    showAssertiveError("無法完成停止或保存逐字稿，請開啟診斷查看詳情。");
   } finally {
     setAppState("stopped");
   }
@@ -862,6 +987,16 @@ async function initializeTray() {
   }
 }
 
+async function initializeConsent() {
+  try {
+    const result = await window.translive.recordsConsentStatus();
+    ui.consent.granted = result.granted === true;
+  } catch {
+    ui.consent.granted = false;
+  }
+  updateSavingStatus();
+}
+
 async function initializeAccount() {
   setAccountState("checking");
   try {
@@ -887,11 +1022,462 @@ async function startAccountLogin() {
   }
 }
 
+function recordTime(value) {
+  return Number.isFinite(value)
+    ? new Date(value).toLocaleString("zh-TW", {
+        hour: "2-digit",
+        minute: "2-digit",
+        month: "2-digit",
+        day: "2-digit",
+      })
+    : "未提供時間";
+}
+
+function recordOffset(value) {
+  const milliseconds = Math.max(0, Math.round(value ?? 0));
+  const minutes = Math.floor(milliseconds / 60_000);
+  const seconds = Math.floor((milliseconds % 60_000) / 1_000);
+  const remainder = milliseconds % 1_000;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(remainder).padStart(3, "0")}`;
+}
+
+function recordModeLabel(mode) {
+  return modeLabel(mode ?? "meeting");
+}
+
+function summaryStateText() {
+  const request = ui.records.summaryRequest;
+  if (!request) return "";
+  return request.state === "generating" || request.state === "canceling"
+    ? "正在產生摘要…"
+    : "";
+}
+
+function updateRecordsSelection() {
+  const count = ui.records.selected.size;
+  elements["records-selection"].textContent =
+    count >= 2 ? `已選 ${count} 場紀錄` : "選擇 2 場以上紀錄即可匯整摘要";
+  elements["aggregate-summary-button"].disabled = count < 2;
+}
+
+function recordTitle(session) {
+  const platform =
+    { teams: "Teams", zoom: "Zoom", custom: "其他來源" }[session.platform] ??
+    "TransLive";
+  return `${recordTime(session.startedAtMs)} · ${platform}`;
+}
+
+function createRecordRow(session) {
+  const row = document.createElement("div");
+  row.className = "record-row";
+  row.classList.toggle(
+    "is-active",
+    ui.records.current?.kind === "session" &&
+      ui.records.current.id === session.id,
+  );
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.checked = ui.records.selected.has(session.id);
+  checkbox.setAttribute("aria-label", `選擇 ${recordTitle(session)}`);
+  checkbox.addEventListener("change", () => {
+    if (checkbox.checked) ui.records.selected.add(session.id);
+    else ui.records.selected.delete(session.id);
+    updateRecordsSelection();
+  });
+  const button = document.createElement("button");
+  button.type = "button";
+  const title = document.createElement("strong");
+  title.textContent = recordTitle(session);
+  const detail = document.createElement("small");
+  detail.textContent = `${recordModeLabel(session.mode)} · ${session.entryCount} 段 · ${session.hasSummary ? "已摘要" : "未摘要"}`;
+  button.append(title, detail);
+  button.addEventListener("click", () => void selectSession(session.id));
+  row.append(checkbox, button);
+  return row;
+}
+
+function createAggregateRow(aggregate) {
+  const row = document.createElement("div");
+  row.className = "record-row aggregate-row";
+  row.classList.toggle(
+    "is-active",
+    ui.records.current?.kind === "aggregate" &&
+      ui.records.current.id === aggregate.id,
+  );
+  const marker = document.createElement("span");
+  marker.textContent = "匯";
+  marker.setAttribute("aria-hidden", "true");
+  const button = document.createElement("button");
+  button.type = "button";
+  const title = document.createElement("strong");
+  title.textContent = `跨場摘要 · ${recordTime(aggregate.generatedAtMs)}`;
+  const detail = document.createElement("small");
+  detail.textContent = `${aggregate.sourceSessions.length} 場來源紀錄`;
+  button.append(title, detail);
+  button.addEventListener("click", () => void selectAggregate(aggregate.id));
+  row.append(marker, button);
+  return row;
+}
+
+function renderRecordsList() {
+  elements["records-list"].replaceChildren();
+  if (ui.records.sessions.length === 0 && ui.records.aggregates.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "placeholder-copy";
+    empty.textContent = "尚無已保存的逐字稿。完成一次翻譯後會顯示在這裡。";
+    elements["records-list"].append(empty);
+    return;
+  }
+  for (const session of ui.records.sessions) {
+    elements["records-list"].append(createRecordRow(session));
+  }
+  if (ui.records.aggregates.length > 0) {
+    const heading = document.createElement("p");
+    heading.className = "records-group-label";
+    heading.textContent = "跨場摘要匯整";
+    elements["records-list"].append(heading);
+    for (const aggregate of ui.records.aggregates) {
+      elements["records-list"].append(createAggregateRow(aggregate));
+    }
+  }
+}
+
+function detailAction(label, handler, className = "text-button") {
+  const button = document.createElement("button");
+  button.className = className;
+  button.type = "button";
+  button.textContent = label;
+  button.addEventListener("click", handler);
+  return button;
+}
+
+function renderSummaryPending() {
+  const detail = elements["record-detail"];
+  detail.replaceChildren();
+  const status = document.createElement("div");
+  status.className = "summary-state";
+  status.textContent = summaryStateText();
+  const cancel = detailAction(
+    "取消摘要",
+    () => {
+      void window.translive.summaryCancel(ui.records.summaryRequest.requestId);
+    },
+    "secondary-button",
+  );
+  detail.append(status, cancel);
+}
+
+function renderStructuredSummary(detail, summary) {
+  const sections = summary?.structured?.sections;
+  if (!sections || typeof sections !== "object") {
+    const markdown = document.createElement("pre");
+    markdown.className = "summary-markdown";
+    markdown.textContent = summary?.markdown ?? "摘要資料無法讀取。";
+    detail.append(markdown);
+    return;
+  }
+  for (const [heading, items] of Object.entries(sections)) {
+    const section = document.createElement("section");
+    section.className = "semantic-summary-section";
+    const title = document.createElement("h3");
+    title.textContent = heading;
+    const list = document.createElement("ul");
+    if (!Array.isArray(items) || items.length === 0) {
+      const item = document.createElement("li");
+      item.textContent = "未提供";
+      list.append(item);
+    } else {
+      for (const summaryItem of items) {
+        const item = document.createElement("li");
+        const citations = (summaryItem.citations ?? [])
+          .map(
+            (citation) =>
+              `【${citation.sessionId} @ ${recordOffset(citation.offsetMs)}】`,
+          )
+          .join("");
+        const taskDetails =
+          summaryItem.owner === undefined
+            ? ""
+            : `；負責人：${summaryItem.owner}；日期：${summaryItem.date}`;
+        item.textContent = `${summaryItem.text}${taskDetails}${citations}`;
+        list.append(item);
+      }
+    }
+    section.append(title, list);
+    detail.append(section);
+  }
+}
+
+async function exportSession(id) {
+  try {
+    const result = await window.translive.recordsExport(id);
+    if (result.exported === false) return;
+    elements["records-status"].textContent = "逐字稿已匯出。";
+  } catch {
+    showAssertiveError("無法匯出逐字稿，請稍後再試。");
+  }
+}
+
+async function exportAggregate(id) {
+  try {
+    const result = await window.translive.aggregatesExport(id);
+    if (result.exported === false) return;
+    elements["records-status"].textContent = "跨場摘要已匯出。";
+  } catch {
+    showAssertiveError("無法匯出跨場摘要，請稍後再試。");
+  }
+}
+
+function renderTranscript(session) {
+  const detail = elements["record-detail"];
+  detail.replaceChildren();
+  const title = document.createElement("h2");
+  title.textContent = recordTitle(session.metadata);
+  const actions = document.createElement("div");
+  actions.className = "record-detail-actions";
+  actions.append(
+    detailAction(session.summary ? "重新產生摘要" : "產生摘要", () =>
+      openSummaryConfirm({
+        kind: "session",
+        sessionIds: [session.metadata.id],
+      }),
+    ),
+    detailAction(
+      "匯出 Markdown",
+      () => void exportSession(session.metadata.id),
+    ),
+    detailAction(
+      "開啟 Markdown 資料夾",
+      () => void window.translive.recordsOpenFolder(session.metadata.id),
+    ),
+    detailAction(
+      "刪除",
+      () => void deleteSession(session.metadata.id),
+      "text-button danger-text",
+    ),
+  );
+  const tabs = document.createElement("div");
+  tabs.className = "record-tabs";
+  const transcriptTab = detailAction("逐字稿", () => {
+    ui.records.tab = "transcript";
+    renderSessionDetail(session);
+  });
+  transcriptTab.classList.toggle("is-active", ui.records.tab === "transcript");
+  const summaryTab = detailAction("單場摘要", () => {
+    ui.records.tab = "summary";
+    renderSessionDetail(session);
+  });
+  summaryTab.classList.toggle("is-active", ui.records.tab === "summary");
+  tabs.append(transcriptTab, summaryTab);
+  actions.append(tabs);
+  detail.append(title, actions);
+
+  if (ui.records.tab === "summary") {
+    if (!session.summary) {
+      const empty = document.createElement("p");
+      empty.className = "placeholder-copy";
+      empty.textContent = "尚未產生單場摘要。";
+      detail.append(empty);
+      return;
+    }
+    const kind = document.createElement("p");
+    kind.className = "summary-kind";
+    kind.textContent = "單場摘要";
+    detail.append(kind);
+    renderStructuredSummary(detail, session.summary);
+    return;
+  }
+
+  for (const entry of session.entries) {
+    const row = document.createElement("article");
+    row.className = "transcript-entry";
+    const meta = document.createElement("div");
+    const time = document.createElement("time");
+    time.textContent = recordOffset(entry.offsetMs ?? entry.atMs);
+    const side = document.createElement("span");
+    side.className = "entry-side";
+    side.textContent = `${entry.direction.toUpperCase()} · ${entry.side === "source" ? "來源" : "翻譯"}`;
+    meta.append(time, side);
+    const text = document.createElement("p");
+    text.textContent = entry.text;
+    row.append(meta, text);
+    detail.append(row);
+  }
+}
+
+function renderSessionDetail(session) {
+  if (ui.records.summaryRequest) {
+    renderSummaryPending();
+    return;
+  }
+  renderTranscript(session);
+}
+
+function renderAggregateDetail(aggregate) {
+  const detail = elements["record-detail"];
+  detail.replaceChildren();
+  const title = document.createElement("h2");
+  title.textContent = "跨場摘要匯整";
+  const actions = document.createElement("div");
+  actions.className = "record-detail-actions";
+  actions.append(
+    detailAction("重新產生", () =>
+      openSummaryConfirm({
+        kind: "aggregate",
+        sessionIds: aggregate.metadata.sourceSessions.map(
+          (source) => source.id,
+        ),
+      }),
+    ),
+    detailAction(
+      "匯出 Markdown",
+      () => void exportAggregate(aggregate.metadata.id),
+    ),
+    detailAction(
+      "開啟 Markdown 資料夾",
+      () => void window.translive.aggregatesOpenFolder(aggregate.metadata.id),
+    ),
+    detailAction(
+      "刪除",
+      () => void deleteAggregate(aggregate.metadata.id),
+      "text-button danger-text",
+    ),
+  );
+  const kind = document.createElement("p");
+  kind.className = "summary-kind";
+  kind.textContent = `來源 ${aggregate.metadata.sourceSessions.length} 場紀錄`;
+  detail.append(title, actions, kind);
+  renderStructuredSummary(detail, aggregate);
+}
+
+async function selectSession(id) {
+  try {
+    ui.records.current = { id, kind: "session" };
+    ui.records.tab = "transcript";
+    const session = await window.translive.recordsRead(id);
+    ui.records.current.data = session;
+    renderRecordsList();
+    renderSessionDetail(session);
+  } catch {
+    elements["records-status"].textContent = "無法讀取這場紀錄。";
+  }
+}
+
+async function selectAggregate(id) {
+  try {
+    ui.records.current = { id, kind: "aggregate" };
+    const aggregate = await window.translive.aggregatesRead(id);
+    ui.records.current.data = aggregate;
+    renderRecordsList();
+    renderAggregateDetail(aggregate);
+  } catch {
+    elements["records-status"].textContent = "無法讀取跨場摘要。";
+  }
+}
+
+async function deleteSession(id) {
+  if (!window.confirm("刪除這場逐字稿與單場摘要？此操作無法復原。")) return;
+  await window.translive.recordsDelete(id);
+  ui.records.selected.delete(id);
+  ui.records.current = undefined;
+  await loadRecords();
+}
+
+async function deleteAggregate(id) {
+  if (!window.confirm("刪除這份跨場摘要？此操作無法復原。")) return;
+  await window.translive.aggregatesDelete(id);
+  ui.records.current = undefined;
+  await loadRecords();
+}
+
+async function loadRecords() {
+  elements["records-status"].textContent = "正在載入本機紀錄…";
+  try {
+    const [sessions, aggregates] = await Promise.all([
+      window.translive.recordsList(),
+      window.translive.aggregatesList(),
+    ]);
+    ui.records.sessions = sessions;
+    ui.records.aggregates = aggregates;
+    ui.records.selected = new Set(
+      [...ui.records.selected].filter((id) =>
+        sessions.some((session) => session.id === id),
+      ),
+    );
+    updateRecordsSelection();
+    renderRecordsList();
+    elements["records-status"].textContent =
+      summaryStateText() ||
+      `${sessions.length} 場紀錄 · ${aggregates.length} 份跨場摘要`;
+    if (!ui.records.current && sessions[0]) await selectSession(sessions[0].id);
+  } catch {
+    elements["records-status"].textContent = "無法讀取本機紀錄。";
+  }
+}
+
+function openSummaryConfirm({ kind, sessionIds }) {
+  ui.records.pendingSummary = { kind, sessionIds };
+  const aggregate = kind === "aggregate";
+  elements["summary-confirm-title"].textContent = aggregate
+    ? "匯整跨場摘要"
+    : "產生單場摘要";
+  elements["summary-confirm-copy"].textContent = aggregate
+    ? `將 ${sessionIds.length} 場已選逐字稿再次送至 ChatGPT 文字模型，產生共同主題、決策演變、待辦與未決問題。`
+    : "將這場逐字稿再次送至 ChatGPT 文字模型，產生重點、決策、待辦與未決問題。";
+  setSummaryConfirm(true);
+}
+
+async function confirmSummary() {
+  const pending = ui.records.pendingSummary;
+  if (!pending) return;
+  try {
+    const started =
+      pending.kind === "aggregate"
+        ? await window.translive.summaryAggregateStart({
+            confirmed: true,
+            sessionIds: pending.sessionIds,
+          })
+        : await window.translive.summarySessionStart({
+            confirmed: true,
+            sessionId: pending.sessionIds[0],
+          });
+    ui.records.summaryRequest = started;
+    setSummaryConfirm(false);
+    renderSummaryPending();
+    elements["records-status"].textContent = "正在產生摘要…";
+  } catch {
+    setSummaryConfirm(false);
+    elements["records-status"].textContent = "無法開始摘要，請稍後再試。";
+  }
+}
+
+function handleSummaryEvent(event) {
+  if (event.state === "generating" || event.state === "canceling") return;
+  if (ui.records.summaryRequest?.requestId !== event.requestId) return;
+  ui.records.summaryRequest = undefined;
+  if (event.state === "completed") {
+    ui.records.current = {
+      id: event.summaryId,
+      kind: event.kind === "aggregate" ? "aggregate" : "session",
+    };
+    void loadRecords().then(() => {
+      if (event.kind === "aggregate") void selectAggregate(event.summaryId);
+      else void selectSession(event.summaryId);
+    });
+  } else if (event.state === "canceled") {
+    elements["records-status"].textContent = "摘要已取消。";
+    if (ui.records.current?.data) renderSessionDetail(ui.records.current.data);
+  } else {
+    elements["records-status"].textContent = "無法產生摘要，請稍後再試。";
+  }
+}
+
 function setView(view) {
   document.body.dataset.view = view;
   for (const button of document.querySelectorAll("[data-view-button]")) {
     button.classList.toggle("is-active", button.dataset.viewButton === view);
   }
+  if (view === "history") void loadRecords();
 }
 
 for (const button of document.querySelectorAll("[data-mode-button]")) {
@@ -907,6 +1493,28 @@ elements["account-login-cancel"].addEventListener("click", async () => {
   setAccountState("logged-out");
   setAppState("logged-out");
   elements["auth-status"].textContent = "登入已取消。";
+});
+elements["consent-checkbox"].addEventListener("change", (event) => {
+  elements["consent-confirm"].disabled = !event.target.checked;
+});
+elements["consent-confirm"].addEventListener("click", async () => {
+  try {
+    await window.translive.recordsConsentGrant({ confirmed: true });
+    ui.consent.granted = true;
+    ui.consent.skipForCurrentRun = false;
+    setConsentModal(false);
+    await startTranslation();
+  } catch {
+    showAssertiveError("無法保存逐字稿同意設定，這次不會保存逐字稿。");
+    ui.consent.skipForCurrentRun = true;
+    setConsentModal(false);
+    await startTranslation();
+  }
+});
+elements["consent-decline"].addEventListener("click", async () => {
+  ui.consent.skipForCurrentRun = true;
+  setConsentModal(false);
+  await startTranslation();
 });
 elements["blocked-action"].addEventListener("click", () => {
   if (ui.account === "connected") setAppState("ready");
@@ -934,6 +1542,7 @@ elements["close-diagnostics"].addEventListener("click", () => setDrawer(false));
 elements["drawer-scrim"].addEventListener("click", () => {
   setDrawer(false);
   setQuickSetup(false);
+  setSummaryConfirm(false);
 });
 elements["quick-setup-button"].addEventListener("click", () => {
   if (ui.mode !== "meeting") return;
@@ -950,6 +1559,50 @@ elements["quick-open-settings"].addEventListener(
   "click",
   () => void openQuickManualSettings(),
 );
+elements["records-refresh"].addEventListener("click", () => void loadRecords());
+elements["records-delete-all"].addEventListener("click", () =>
+  setDeleteConfirm(true),
+);
+elements["delete-confirm-input"].addEventListener("input", (event) => {
+  elements["delete-confirm-action"].disabled = event.target.value !== "DELETE";
+});
+elements["delete-confirm-cancel"].addEventListener("click", () =>
+  setDeleteConfirm(false),
+);
+elements["delete-confirm-action"].addEventListener("click", async () => {
+  try {
+    await window.translive.recordsDeleteAll({ confirmation: "DELETE" });
+    ui.records.current = undefined;
+    ui.records.selected.clear();
+    setDeleteConfirm(false);
+    await loadRecords();
+  } catch {
+    showAssertiveError("無法刪除全部紀錄，請稍後再試。");
+  }
+});
+elements["aggregate-summary-button"].addEventListener("click", () =>
+  openSummaryConfirm({
+    kind: "aggregate",
+    sessionIds: [...ui.records.selected],
+  }),
+);
+elements["summary-confirm-cancel"].addEventListener("click", () =>
+  setSummaryConfirm(false),
+);
+elements["summary-confirm-action"].addEventListener(
+  "click",
+  () => void confirmSummary(),
+);
+elements["stopped-open-records"].addEventListener("click", () =>
+  setView("history"),
+);
+elements["stopped-generate-summary"].addEventListener("click", () => {
+  if (!ui.lastSavedRecord?.id) return;
+  openSummaryConfirm({
+    kind: "session",
+    sessionIds: [ui.lastSavedRecord.id],
+  });
+});
 for (const button of document.querySelectorAll("[data-quick-app]")) {
   button.addEventListener("click", () => setQuickApp(button.dataset.quickApp));
 }
@@ -998,7 +1651,42 @@ elements["copy-diagnostics"].addEventListener("click", async () => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") setDrawer(false);
+  const openModal = [
+    elements["quick-setup-modal"],
+    elements["summary-confirm-modal"],
+    elements["consent-modal"],
+    elements["delete-confirm-modal"],
+  ].find((modal) => modal.classList.contains("is-open"));
+  if (event.key === "Tab" && openModal) {
+    const focusable = [
+      ...openModal.querySelectorAll("button, input, select"),
+    ].filter((element) => !element.disabled);
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first?.focus();
+    }
+    return;
+  }
+  if (event.key !== "Escape") return;
+  setDrawer(false);
+  if (elements["quick-setup-modal"].classList.contains("is-open")) {
+    setQuickSetup(false);
+  }
+  if (elements["summary-confirm-modal"].classList.contains("is-open")) {
+    setSummaryConfirm(false);
+  }
+  if (elements["consent-modal"].classList.contains("is-open")) {
+    ui.consent.skipForCurrentRun = true;
+    setConsentModal(false);
+  }
+  if (elements["delete-confirm-modal"].classList.contains("is-open")) {
+    setDeleteConfirm(false);
+  }
 });
 window.addEventListener("pagehide", () => {
   void cancelTranslationStartup();
@@ -1007,6 +1695,21 @@ window.addEventListener("pagehide", () => {
 
 window.translive.onEvent(async (event) => {
   updateDiagnostics(event);
+  if (event.type === "summary") {
+    handleSummaryEvent(event);
+    return;
+  }
+  if (event.type === "record") {
+    if (event.state === "saved") {
+      ui.lastSavedRecord = event.record;
+      ui.records.current = { id: event.record.id, kind: "session" };
+    }
+    applyTranscriptPersistence(event);
+    if (event.state === "failed") {
+      showAssertiveError("逐字稿保存失敗，請開啟診斷查看詳情。");
+    }
+    return;
+  }
   if (event.type === "meeting-setup") {
     if (event.state === "restore-failed") {
       elements["quick-setup-note"].textContent =
@@ -1083,4 +1786,5 @@ window.translive.onEvent(async (event) => {
 setMode("meeting");
 setView("translate");
 initializeTray();
+initializeConsent();
 initializeAccount();

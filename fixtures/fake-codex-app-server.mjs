@@ -11,6 +11,7 @@ process.on("SIGTERM", () => process.exit(0));
 let initialized = false;
 let threadCount = 0;
 const realtimeThreads = new Map();
+const tailThreads = new Set();
 
 function send(message) {
   process.stdout.write(`${JSON.stringify(message)}\n`);
@@ -119,6 +120,9 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
     }
     const direction = directionFor(request.params);
     realtimeThreads.set(request.params.threadId, direction);
+    if (request.params.transport.sdp === "fixture-tail") {
+      tailThreads.add(request.params.threadId);
+    }
     respond(request.id, {});
     const { threadId } = request.params;
     const realtimeSessionId = `fixture-session-${threadId}`;
@@ -215,13 +219,23 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
     }
     respond(request.id, {});
     const { threadId } = request.params;
+    if (tailThreads.has(threadId)) {
+      setTimeout(
+        () =>
+          send({
+            method: "thread/realtime/transcript/done",
+            params: { threadId, role: "assistant", text: "尾端逐字稿。" },
+          }),
+        20,
+      );
+    }
     setTimeout(
       () =>
         send({
           method: "thread/realtime/closed",
           params: { threadId, reason: "stopped" },
         }),
-      1,
+      30,
     );
     return;
   }

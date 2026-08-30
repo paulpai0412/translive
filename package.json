@@ -15,10 +15,12 @@
   },
   "knip": {
     "entry": [
-      "src/main.js",
       "src/account-controller.js",
       "src/preload.cjs",
       "src/renderer-entry.js",
+      "src/records-store.js",
+      "src/summary-controller.js",
+      "src/summary-service.js",
       "src/startup-session.js",
       "src/view-state.js"
     ],

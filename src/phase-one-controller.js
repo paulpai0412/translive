@@ -9,10 +9,12 @@ import {
   validateDualChannelConfig,
 } from "./dual-channel-run.js";
 import { RunEvidence } from "./evidence.js";
+import { sanitizeText } from "./text-sanitizer.js";
 
 const PINNED_CODEX_VERSION = "0.145.0";
 const MODEL = "gpt-live-1-codex";
 const VOICES = Object.freeze({ tx: "cove", rx: "cove" });
+const TRANSCRIPT_TAIL_DRAIN_MS = 750;
 const TRANSLATION_PROMPTS = Object.freeze({
   tx: [
     "You are a simultaneous interpreter.",
@@ -41,15 +43,13 @@ const TRANSLATION_PROMPTS = Object.freeze({
 });
 
 function safeMessage(error) {
-  const message = String(error?.message ?? error ?? "Unknown error");
-  if (
-    /authorization|access_token|refresh_token|id_token|bearer|\b(?:sk|gho|ghp|ghu|ghs)[_-]|account(?:_|-)?id|\bv=0(?:\r?\n|$)/i.test(
-      message,
-    )
-  ) {
+  const message = sanitizeText(error?.message ?? error ?? "Unknown error", {
+    maxLength: 500,
+  });
+  if (/\[已遮罩/.test(message)) {
     return "Codex app-server rejected the request. See the redacted evidence file.";
   }
-  return message.slice(0, 500);
+  return message;
 }
 
 function requestIdFrom(error) {
@@ -154,6 +154,7 @@ export class PhaseOneController {
   #evidenceDirectory;
   #inspectRuntime;
   #publish;
+  #records;
   #starting = false;
   #startingContext;
 
@@ -173,6 +174,7 @@ export class PhaseOneController {
         cwd,
       }),
     publish = () => {},
+    records,
   }) {
     this.#appVersion = appVersion;
     this.#codexExecutable = codexExecutable;
@@ -182,6 +184,7 @@ export class PhaseOneController {
     this.#inspectRuntime = inspectRuntime;
     this.#createClient = createClient;
     this.#publish = publish;
+    this.#records = records;
   }
 
   async preflight(config) {
@@ -227,7 +230,12 @@ export class PhaseOneController {
         threads: new Map(),
         buffered: [],
         canceled: false,
+        config,
         finalized: false,
+        finalizing: false,
+        finalizePromise: undefined,
+        lastTranscript: new Map(),
+        transcriptEntries: [],
         speechFallback: {
           buffer: "",
           sawDelta: false,
@@ -301,7 +309,9 @@ export class PhaseOneController {
             requestId: requestIdFrom(error),
           });
           await this.#finalize(context, {
-            reason: canceled ? "Translation startup canceled" : safeMessage(error),
+            reason: canceled
+              ? "Translation startup canceled"
+              : safeMessage(error),
             outcome: canceled ? "canceled" : "blocked",
           });
         } else if (!canceled) {
@@ -519,6 +529,7 @@ export class PhaseOneController {
         role: notification.params.role,
         text: notification.params.delta ?? notification.params.text,
       });
+      this.#recordTranscript(context, direction, notification, atMs);
       this.#handleRxSpeechFallback(context, direction, notification);
     }
     if (
@@ -538,6 +549,33 @@ export class PhaseOneController {
           this.#publish({ type: "error", message: safeMessage(error) }),
       );
     }
+  }
+
+  #recordTranscript(context, direction, notification, atMs) {
+    if (
+      notification.method !== "thread/realtime/transcript/done" ||
+      !["user", "assistant"].includes(notification.params?.role) ||
+      typeof notification.params?.text !== "string" ||
+      notification.params.text.trim().length === 0
+    ) {
+      return;
+    }
+    const side = notification.params.role === "user" ? "source" : "target";
+    const key = `${direction}:${side}`;
+    const previous = context.lastTranscript.get(key);
+    if (
+      previous?.text === notification.params.text &&
+      atMs - previous.atMs < 1_000
+    ) {
+      return;
+    }
+    context.lastTranscript.set(key, { atMs, text: notification.params.text });
+    context.transcriptEntries.push({
+      atMs,
+      direction,
+      side,
+      text: notification.params.text,
+    });
   }
 
   #handleRxSpeechFallback(context, direction, notification) {
@@ -650,21 +688,72 @@ export class PhaseOneController {
   }
 
   async #finalize(context, termination) {
-    if (context.finalized) return;
-    context.finalized = true;
+    if (context.finalizePromise) return context.finalizePromise;
+    context.finalizing = true;
+    context.finalizePromise = this.#finalizeContext(context, termination);
+    return context.finalizePromise;
+  }
+
+  async #finalizeContext(context, termination) {
     if (this.#active?.context === context) this.#active = undefined;
     let writeError;
     try {
-      await context.speechFallback?.queue;
       await context.run?.stop();
+      await new Promise((resolve) =>
+        setTimeout(resolve, TRANSCRIPT_TAIL_DRAIN_MS),
+      );
+      this.#flushRxSpeechFallback(context);
+      await context.speechFallback?.queue;
       context.evidence.finish(Date.now(), termination);
+      await this.#persistTranscript(context);
       await context.evidence.write(this.#evidenceDirectory);
     } catch (error) {
       writeError = error;
     } finally {
+      context.finalized = true;
       await context.client.close();
     }
     if (writeError) throw writeError;
+  }
+
+  async #persistTranscript(context) {
+    if (context.config.persistTranscript === false) {
+      this.#publish({ type: "record", state: "not-saved" });
+      return undefined;
+    }
+    if (!this.#records || context.transcriptEntries.length === 0) {
+      this.#publish({ type: "record", state: "not-saved" });
+      return undefined;
+    }
+    const evidence = context.evidence.snapshot();
+    try {
+      const metadata = await this.#records.saveSession({
+        id: evidence.runId,
+        metadata: {
+          endedAtMs: evidence.finishedAtMs,
+          languages: context.config.languages,
+          mode: context.config.mode ?? "meeting",
+          platform: context.config.platform ?? "custom",
+          sourceLabels: context.config.sourceLabels,
+          startedAtMs: evidence.startedAtMs,
+        },
+        entries: context.transcriptEntries,
+      });
+      this.#publish({
+        type: "record",
+        state: "saved",
+        record: metadata,
+        path: metadata.path,
+      });
+      return metadata;
+    } catch (error) {
+      this.#publish({
+        type: "record",
+        state: "failed",
+        message: "無法保存本機逐字稿。",
+      });
+      throw error;
+    }
   }
 
   #publishChannelState(active, direction) {

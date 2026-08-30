@@ -58,6 +58,7 @@ function controllerFor({
   inspectRuntime = readyRuntime(),
   codexArgs = [fixture],
   createClient,
+  records,
 } = {}) {
   return new PhaseOneController({
     appVersion: "0.0.0-test",
@@ -69,6 +70,7 @@ function controllerFor({
     publish,
     inspectRuntime,
     createClient,
+    records,
   });
 }
 
@@ -127,7 +129,9 @@ test("media mode creates only the RX realtime session", async () => {
   assert.deepEqual(result.status, { tx: "disabled", rx: "connecting" });
   await new Promise((resolve) => setTimeout(resolve, 80));
   assert.deepEqual(
-    events.filter((event) => event.type === "sdp").map((event) => event.direction),
+    events
+      .filter((event) => event.type === "sdp")
+      .map((event) => event.direction),
     ["rx"],
   );
   await controller.answerApplied("rx");
@@ -135,7 +139,9 @@ test("media mode creates only the RX realtime session", async () => {
   assert.deepEqual(controller.status(), { tx: "disabled", rx: "live" });
   await controller.stop("user-stop");
   const [file] = await readdir(evidenceDirectory);
-  const evidence = JSON.parse(await readFile(join(evidenceDirectory, file), "utf8"));
+  const evidence = JSON.parse(
+    await readFile(join(evidenceDirectory, file), "utf8"),
+  );
   assert.deepEqual(
     evidence.endpoints.map((endpoint) => endpoint.role),
     ["cableBRecordingSource", "headphonesSink"],
@@ -161,7 +167,9 @@ test("microphone mode creates only the TX realtime session", async () => {
   assert.deepEqual(result.status, { tx: "connecting", rx: "disabled" });
   await new Promise((resolve) => setTimeout(resolve, 80));
   assert.deepEqual(
-    events.filter((event) => event.type === "sdp").map((event) => event.direction),
+    events
+      .filter((event) => event.type === "sdp")
+      .map((event) => event.direction),
     ["tx"],
   );
   await controller.answerApplied("tx");
@@ -250,6 +258,107 @@ test("uses the same target-only RX path when the source is already Chinese", asy
   );
 
   await controller.stop("user-stop");
+});
+
+test("persists final source and target transcript entries only after audio stop", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-records-"),
+  );
+  const saved = [];
+  const controller = controllerFor({
+    evidenceDirectory,
+    records: {
+      saveSession: async (record) => saved.push(record),
+    },
+  });
+
+  await controller.start(
+    validConfig({ rx: { sdp: "fixture-chinese-target" } }),
+  );
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  assert.equal(saved.length, 0);
+
+  await controller.stop("user-stop");
+
+  assert.equal(saved.length, 1);
+  assert.equal(
+    saved[0].entries.some((entry) => entry.side === "source"),
+    true,
+  );
+  assert.equal(
+    saved[0].entries.some((entry) => entry.side === "target"),
+    true,
+  );
+  assert.equal(saved[0].metadata.mode, "meeting");
+  assert.doesNotMatch(JSON.stringify(saved[0]), /fixture-offer|audio|sdp/i);
+});
+
+test("drains a final transcript tail before publishing the saved record path", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-tail-"),
+  );
+  const saved = [];
+  const events = [];
+  const controller = controllerFor({
+    evidenceDirectory,
+    publish: (event) => events.push(event),
+    records: {
+      async saveSession(record) {
+        saved.push(record);
+        return {
+          ...record.metadata,
+          id: record.id,
+          path: "/safe/records/session-tail",
+        };
+      },
+    },
+  });
+
+  await controller.start(
+    validConfig({
+      tx: { sdp: "fixture-tail" },
+      rx: { sdp: "fixture-tail" },
+    }),
+  );
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  await controller.stop("user-stop");
+
+  assert.equal(
+    saved[0].entries.some((entry) => entry.text === "尾端逐字稿。"),
+    true,
+  );
+  assert.deepEqual(
+    events
+      .filter((event) => event.type === "record")
+      .map((event) => ({ state: event.state, path: event.path })),
+    [{ state: "saved", path: "/safe/records/session-tail" }],
+  );
+});
+
+test("does not swallow a transcript save failure after a bounded tail drain", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-record-failure-"),
+  );
+  const events = [];
+  const controller = controllerFor({
+    evidenceDirectory,
+    publish: (event) => events.push(event),
+    records: {
+      async saveSession() {
+        throw new Error("disk unavailable");
+      },
+    },
+  });
+
+  await controller.start(validConfig());
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  await assert.rejects(controller.stop("user-stop"), /disk unavailable/);
+  assert.equal(
+    events.some(
+      (event) => event.type === "record" && event.state === "failed",
+    ),
+    true,
+  );
 });
 
 test("cancels a main-side startup during runtime preflight without opening an app-server", async () => {

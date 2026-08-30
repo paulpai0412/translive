@@ -21,13 +21,7 @@
           即時翻譯
         </button>
         <button class="nav-item" data-view-button="settings">設定</button>
-        <button
-          class="nav-item"
-          aria-disabled="true"
-          title="紀錄將於下一階段提供"
-        >
-          紀錄
-        </button>
+        <button class="nav-item" data-view-button="history">紀錄</button>
       </nav>
       <div class="top-actions">
         <button class="account-chip" id="account-button" type="button">
@@ -252,6 +246,7 @@
           </div>
           <span id="live-mode-label">雙向會議</span>
           <span class="cloud-note">雲端傳輸中</span>
+          <span class="save-note" id="live-save-status">逐字稿未保存</span>
           <button class="danger-button" id="stop-button" type="button">
             停止
           </button>
@@ -352,10 +347,16 @@
         <div class="stopped-panel">
           <span class="success-mark">✓</span>
           <h1>翻譯已停止</h1>
-          <p id="stopped-copy">
-            音訊連線已釋放。逐字稿與摘要將於下一階段提供。
-          </p>
-          <button class="primary-button" id="restart-button">再次開始</button>
+          <p id="stopped-copy">音訊連線已釋放。</p>
+          <div class="stopped-actions">
+            <button class="primary-button" id="restart-button">再次開始</button>
+            <button class="secondary-button" id="stopped-open-records">
+              查看紀錄
+            </button>
+            <button class="text-button" id="stopped-generate-summary" hidden>
+              產生摘要
+            </button>
+          </div>
         </div>
       </section>
 
@@ -375,6 +376,39 @@
             <summary>技術資訊</summary>
             <code id="blocked-detail">NO_DETAILS</code>
           </details>
+        </div>
+      </section>
+
+      <section class="screen records-screen" data-view-show="history">
+        <div class="page-heading">
+          <div>
+            <p class="section-kicker">本機資料</p>
+            <h1>紀錄</h1>
+            <p>逐字稿、單場摘要與跨場摘要匯整。</p>
+          </div>
+          <div class="page-actions">
+            <button class="text-button danger-text" id="records-delete-all">刪除全部</button>
+            <button class="text-button" id="records-refresh">重新整理</button>
+          </div>
+        </div>
+        <div class="records-bulkbar">
+          <span id="records-selection">尚未選擇紀錄</span>
+          <button class="primary-button" id="aggregate-summary-button" disabled>
+            匯整摘要
+          </button>
+        </div>
+        <p class="records-status" id="records-status" role="status">
+          正在載入紀錄…
+        </p>
+        <div class="records-layout">
+          <div
+            class="records-list"
+            id="records-list"
+            aria-label="會議與媒體紀錄"
+          ></div>
+          <article class="record-detail" id="record-detail" aria-live="polite">
+            <p class="placeholder-copy">選取一場紀錄以查看逐字稿或摘要。</p>
+          </article>
         </div>
       </section>
 
@@ -518,6 +552,69 @@
         </button>
       </footer>
     </section>
+
+    <section
+      class="consent-modal"
+      id="consent-modal"
+      aria-hidden="true"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="consent-title"
+    >
+      <p class="section-kicker">隱私與儲存</p>
+      <h2 id="consent-title">是否保存明文逐字稿？</h2>
+      <p>逐字稿會以明文保存在這台電腦的 <code>TransLive\meetings</code>。不保存任何音訊。你可稍後在紀錄頁刪除。</p>
+      <label class="consent-option"><input id="consent-checkbox" type="checkbox" />我了解逐字稿將以明文保存於本機。</label>
+      <footer>
+        <button class="text-button" id="consent-decline">這次不保存</button>
+        <button class="primary-button" id="consent-confirm" disabled>同意並開始</button>
+      </footer>
+    </section>
+
+    <section
+      class="delete-confirm-modal"
+      id="delete-confirm-modal"
+      aria-hidden="true"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-confirm-title"
+    >
+      <p class="section-kicker danger-text">不可復原</p>
+      <h2 id="delete-confirm-title">刪除全部紀錄</h2>
+      <p>這會刪除所有本機逐字稿、單場摘要與跨場摘要。請輸入 <code>DELETE</code> 確認。</p>
+      <label>確認文字<input id="delete-confirm-input" autocomplete="off" /></label>
+      <footer>
+        <button class="text-button" id="delete-confirm-cancel">取消</button>
+        <button class="danger-button" id="delete-confirm-action" disabled>刪除全部</button>
+      </footer>
+    </section>
+
+    <section
+      class="summary-confirm-modal"
+      id="summary-confirm-modal"
+      aria-hidden="true"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="summary-confirm-title"
+    >
+      <p class="section-kicker">摘要</p>
+      <h2 id="summary-confirm-title">產生摘要</h2>
+      <p id="summary-confirm-copy">
+        將所選逐字稿再次送至 ChatGPT 文字模型產生摘要。
+      </p>
+      <p class="summary-confirm-note">
+        摘要不會使用 GPT‑Live 音訊 session；不會傳送音訊、OAuth token
+        或診斷資料。
+      </p>
+      <footer>
+        <button class="text-button" id="summary-confirm-cancel">取消</button>
+        <button class="primary-button" id="summary-confirm-action">
+          確認並產生
+        </button>
+      </footer>
+    </section>
+
+    <div class="assertive-error" id="assertive-error" role="alert" aria-live="assertive" hidden></div>
 
     <section class="mini-overlay" id="mini-overlay" aria-hidden="true">
       <header>

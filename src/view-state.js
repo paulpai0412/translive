@@ -24,6 +24,8 @@ export function diagnosticEventLabel(type) {
       account: "帳戶狀態更新",
       blocked: "連線受阻",
       "meeting-setup": "會議裝置設定",
+      record: "紀錄已保存",
+      summary: "摘要狀態更新",
       error: "錯誤",
       run: "翻譯連線已建立",
       sdp: "音訊連線協商",

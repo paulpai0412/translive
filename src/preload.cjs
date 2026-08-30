@@ -20,6 +20,32 @@ contextBridge.exposeInMainWorld("translive", {
     ipcRenderer.invoke("translive:meeting-setup-restore"),
   meetingSetupOpenSettings: (appName) =>
     ipcRenderer.invoke("translive:meeting-setup-open-settings", appName),
+  recordsConsentStatus: () =>
+    ipcRenderer.invoke("translive:records-consent-status"),
+  recordsConsentGrant: (request) =>
+    ipcRenderer.invoke("translive:records-consent-grant", request),
+  recordsList: () => ipcRenderer.invoke("translive:records-list"),
+  recordsRead: (id) => ipcRenderer.invoke("translive:records-read", id),
+  recordsDelete: (id) => ipcRenderer.invoke("translive:records-delete", id),
+  recordsDeleteAll: (request) =>
+    ipcRenderer.invoke("translive:records-delete-all", request),
+  recordsOpenFolder: (id) =>
+    ipcRenderer.invoke("translive:records-open-folder", id),
+  recordsExport: (id) => ipcRenderer.invoke("translive:records-export", id),
+  aggregatesList: () => ipcRenderer.invoke("translive:aggregates-list"),
+  aggregatesRead: (id) => ipcRenderer.invoke("translive:aggregates-read", id),
+  aggregatesDelete: (id) =>
+    ipcRenderer.invoke("translive:aggregates-delete", id),
+  aggregatesExport: (id) =>
+    ipcRenderer.invoke("translive:aggregates-export", id),
+  aggregatesOpenFolder: (id) =>
+    ipcRenderer.invoke("translive:aggregates-open-folder", id),
+  summarySessionStart: (request) =>
+    ipcRenderer.invoke("translive:summary-session-start", request),
+  summaryAggregateStart: (request) =>
+    ipcRenderer.invoke("translive:summary-aggregate-start", request),
+  summaryCancel: (requestId) =>
+    ipcRenderer.invoke("translive:summary-cancel", requestId),
   trayStatus: () => ipcRenderer.invoke("translive:tray-status"),
   traySetCloseBehavior: (behavior) =>
     ipcRenderer.invoke("translive:tray-set-close-behavior", behavior),
