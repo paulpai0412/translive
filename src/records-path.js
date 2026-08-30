@@ -1,4 +1,4 @@
-import { join, win32 } from "node:path";
+import { posix, win32 } from "node:path";
 
 export function recordsDirectory({
   platform = process.platform,
@@ -11,5 +11,5 @@ export function recordsDirectory({
       return win32.join(localAppData, "TransLive", "meetings");
     }
   }
-  return join(fallback, "meetings");
+  return posix.join(fallback, "meetings");
 }
