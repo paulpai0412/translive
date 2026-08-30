@@ -200,6 +200,45 @@ test("cancels an in-flight summary without an unhandled operation rejection", as
   assert.equal(events.at(-1).state, "canceled");
 });
 
+test("remains usable after dispose aborts an in-flight summary", async () => {
+  const records = await recordsFixture();
+  let attempts = 0;
+  const summaryService = {
+    generate: ({ kind, sessions, signal }) => {
+      attempts += 1;
+      if (attempts > 1)
+        return Promise.resolve(structuredSummary(kind, sessions));
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener(
+          "abort",
+          () =>
+            reject(
+              Object.assign(new Error("canceled"), { name: "AbortError" }),
+            ),
+          { once: true },
+        );
+      });
+    },
+  };
+  const controller = new SummaryController({ records, summaryService });
+
+  const first = await controller.startSessionSummary({
+    sessionId: "session-a",
+    confirmed: true,
+  });
+  await controller.dispose();
+  await assert.rejects(controller.wait(first.requestId), {
+    name: "AbortError",
+  });
+
+  const retry = await controller.startSessionSummary({
+    sessionId: "session-a",
+    confirmed: true,
+  });
+  assert.equal((await controller.wait(retry.requestId)).state, "completed");
+  assert.equal(attempts, 2);
+});
+
 test("does not recreate an aggregate after delete all while generation is in flight", async () => {
   const records = await recordsFixture();
   let resolveGeneration;

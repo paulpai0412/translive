@@ -6,17 +6,20 @@ function hasActiveTranslation(status) {
 
 export class TranslationLifecycle {
   #controller;
+  #disposeSummaries;
   #rendererControls;
   #restoreMeetingDevices;
   #publish;
 
   constructor({
     controller,
+    disposeSummaries = async () => {},
     rendererControls,
     restoreMeetingDevices,
     publish = () => {},
   }) {
     this.#controller = controller;
+    this.#disposeSummaries = disposeSummaries;
     this.#rendererControls = rendererControls;
     this.#restoreMeetingDevices = restoreMeetingDevices;
     this.#publish = publish;
@@ -29,10 +32,17 @@ export class TranslationLifecycle {
 
   async stop(
     reason = "user-stop",
-    { controlAction = "stop", rendererControl = true } = {},
+    {
+      controlAction = "stop",
+      forceRendererControl = false,
+      rendererControl = true,
+    } = {},
   ) {
     const status = this.#controller.status();
-    if (rendererControl && hasActiveTranslation(status)) {
+    if (
+      rendererControl &&
+      (forceRendererControl || hasActiveTranslation(status))
+    ) {
       try {
         await this.#rendererControls.request({ action: controlAction, reason });
       } catch {
@@ -60,8 +70,14 @@ export class TranslationLifecycle {
       cleanupWarning = true;
     }
     try {
+      await this.#disposeSummaries();
+    } catch {
+      cleanupWarning = true;
+    }
+    try {
       const stopped = await this.stop("account-logout", {
         controlAction: "logout",
+        forceRendererControl: true,
       });
       cleanupWarning ||= Boolean(stopped.meetingRestore?.reason);
     } catch {

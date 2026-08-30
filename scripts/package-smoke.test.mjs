@@ -74,3 +74,27 @@ test("package smoke resolves a staged verified Windows Codex bundle from package
     version: "0.150.0",
   });
 });
+
+test("package smoke rejects unapproved source and brand files", async () => {
+  const appDirectory = await mkdtemp(join(tmpdir(), "translive-packaged-app-"));
+  await writeStagedWindowsApp(appDirectory);
+  await Promise.all([
+    writeFile(join(appDirectory, "src", "private-token.txt"), "secret"),
+    writeFile(join(appDirectory, "src", ".npmrc"), "registry=private"),
+    writeFile(
+      join(appDirectory, "assets", "translive-brand", "private-key.pem"),
+      "private key",
+    ),
+  ]);
+
+  await assert.rejects(
+    smokePackage({ appDirectory, arch: "x64", platform: "win32" }),
+    (error) => {
+      assert.match(error.message, /unapproved files/i);
+      assert.match(error.message, /private-token\.txt/i);
+      assert.match(error.message, /\.npmrc/i);
+      assert.match(error.message, /private-key\.pem/i);
+      return true;
+    },
+  );
+});

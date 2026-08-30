@@ -3,7 +3,10 @@ import { fileURLToPath } from "node:url";
 import { join, resolve } from "node:path";
 
 import { resolveCodexLaunch } from "../src/codex-launch.js";
-import { RELEASE_METADATA } from "../src/release-config.js";
+import {
+  packagedPathIsAllowed,
+  RELEASE_METADATA,
+} from "../src/release-config.js";
 import { filesUnder } from "./file-tree.mjs";
 import { option } from "./package-options.mjs";
 
@@ -41,25 +44,12 @@ export async function smokePackage({ appDirectory, platform }) {
     });
   }
 
-  const packedFiles = await filesUnder(appDirectory);
-  const forbidden = packedFiles.filter((path) => {
-    const relative = path.slice(appDirectory.length + 1).replaceAll("\\", "/");
-    return (
-      /(?:^|\/)\.scratch(?:\/|$)/.test(relative) ||
-      /(?:^|\/)\.pi(?:\/|$)/.test(relative) ||
-      /(?:^|\/)fixtures(?:\/|$)/.test(relative) ||
-      /(?:^|\/)docs(?:\/|$)/.test(relative) ||
-      /(?:^|\/).*\.test\.[cm]?js$/i.test(relative) ||
-      /(?:^|\/)\.env(?:\.|$)/.test(relative) ||
-      /(?:^|\/)\.translive-evidence(?:\/|$)/.test(relative) ||
-      /(?:^|\/)node_modules(?:\/|$)/.test(relative) ||
-      /(?:^|\/)\.cache(?:\/|$)/.test(relative) ||
-      /\/home\/[^/]+\/\.pi\//.test(relative)
-    );
-  });
-  if (forbidden.length > 0) {
+  const unapproved = (await filesUnder(appDirectory))
+    .map((path) => path.slice(appDirectory.length + 1).replaceAll("\\", "/"))
+    .filter((path) => !packagedPathIsAllowed(path));
+  if (unapproved.length > 0) {
     throw new Error(
-      `Packaged app contains excluded files: ${forbidden.join(", ")}`,
+      `Packaged app contains unapproved files: ${unapproved.join(", ")}`,
     );
   }
   return { codexLaunch };

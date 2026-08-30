@@ -85,6 +85,47 @@ test("still stops main translation and restores devices when a renderer is alrea
   assert.deepEqual(calls, ["main:stop:tray-stop", "devices:restore"]);
 });
 
+test("logout releases pre-active renderer peers even when the main run is stopped", async () => {
+  const calls = [];
+  const lifecycle = new TranslationLifecycle({
+    controller: {
+      status: () => ({ tx: "stopped", rx: "disabled" }),
+      async stop(reason) {
+        calls.push(`main:stop:${reason}`);
+        return { status: { tx: "stopped", rx: "disabled" } };
+      },
+    },
+    rendererControls: {
+      async request(control) {
+        calls.push(`renderer:${control.action}`);
+      },
+    },
+    restoreMeetingDevices: async () => {
+      calls.push("devices:restore");
+      return { restored: true };
+    },
+  });
+  const account = {
+    async cancelLogin() {
+      calls.push("account:cancel-login");
+    },
+    async logout() {
+      calls.push("account:logout");
+      return { state: "logged-out" };
+    },
+  };
+
+  await lifecycle.logout(account);
+
+  assert.deepEqual(calls, [
+    "account:cancel-login",
+    "renderer:logout",
+    "main:stop:account-logout",
+    "devices:restore",
+    "account:logout",
+  ]);
+});
+
 test("live logout cancels pending OAuth before tearing down translation and invalidating ChatGPT", async () => {
   const calls = [];
   const lifecycle = new TranslationLifecycle({
@@ -125,6 +166,56 @@ test("live logout cancels pending OAuth before tearing down translation and inva
     "account:logout",
   ]);
   assert.deepEqual(result, { state: "logged-out", cleanupWarning: false });
+});
+
+test("logout aborts summaries before account invalidation and survives summary cleanup failure", async () => {
+  const calls = [];
+  const events = [];
+  const lifecycle = new TranslationLifecycle({
+    controller: {
+      status: () => ({ tx: "stopped", rx: "disabled" }),
+      async stop(reason) {
+        calls.push(`main:stop:${reason}`);
+        return { status: { tx: "stopped", rx: "disabled" } };
+      },
+    },
+    disposeSummaries: async () => {
+      calls.push("summaries:dispose");
+      throw new Error("summary cleanup failed");
+    },
+    publish: (event) => events.push(event),
+    rendererControls: {
+      async request(control) {
+        calls.push(`renderer:${control.action}`);
+      },
+    },
+    restoreMeetingDevices: async () => {
+      calls.push("devices:restore");
+      return { restored: true };
+    },
+  });
+  const account = {
+    async cancelLogin() {
+      calls.push("account:cancel-login");
+    },
+    async logout() {
+      calls.push("account:logout");
+      return { state: "logged-out" };
+    },
+  };
+
+  const result = await lifecycle.logout(account);
+
+  assert.deepEqual(calls, [
+    "account:cancel-login",
+    "summaries:dispose",
+    "renderer:logout",
+    "main:stop:account-logout",
+    "devices:restore",
+    "account:logout",
+  ]);
+  assert.equal(result.cleanupWarning, true);
+  assert.equal(events.at(-1)?.type, "cleanup");
 });
 
 test("logout invalidates ChatGPT and emits a safe cleanup warning after persistence and device failures", async () => {

@@ -64,9 +64,10 @@ export class MeetingSetupController {
       });
     }
 
-    const snapshot = await this.#adapter.snapshot();
-    if (restoreOnStop) await this.#store.save({ app, snapshot });
-    else await this.#store.clear();
+    const saved = restoreOnStop ? await this.#store.load() : undefined;
+    const snapshot = saved?.snapshot ?? (await this.#adapter.snapshot());
+    if (restoreOnStop && !saved) await this.#store.save({ app, snapshot });
+    else if (!restoreOnStop) await this.#store.clear();
     try {
       await this.#adapter.apply(desired);
       const current = await this.#adapter.current();

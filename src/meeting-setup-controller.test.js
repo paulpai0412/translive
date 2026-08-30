@@ -101,6 +101,7 @@ test("resolves browser display names to native IDs before changing Windows defau
         renderName: "Voicemeeter Input",
       },
     },
+    "load",
     "snapshot",
     {
       save: {
@@ -156,6 +157,7 @@ test("snapshots, applies, verifies, and restores Windows communication devices",
         renderName: "Voicemeeter Input",
       },
     },
+    "load",
     "snapshot",
     {
       save: {
@@ -178,6 +180,42 @@ test("snapshots, applies, verifies, and restores Windows communication devices",
     restore: { captureId: "previous-mic", renderId: "previous-speaker" },
   });
   assert.equal(store.value, undefined);
+});
+
+test("retains the first Windows device snapshot across repeated Quick Setup applies", async () => {
+  let snapshots = 0;
+  const { adapter, calls, store } = fixture({
+    async snapshot() {
+      snapshots += 1;
+      calls.push(`snapshot:${snapshots}`);
+      return snapshots === 1
+        ? { captureId: "original-mic", renderId: "original-speaker" }
+        : { captureId: "virtual-mic", renderId: "virtual-speaker" };
+    },
+  });
+  const controller = new MeetingSetupController({
+    adapter,
+    platform: "win32",
+    store,
+  });
+
+  await controller.apply({ app: "teams", endpoints, restoreOnStop: true });
+  await controller.apply({ app: "zoom", endpoints, restoreOnStop: true });
+
+  assert.equal(snapshots, 1);
+  assert.deepEqual(store.value, {
+    app: "teams",
+    snapshot: { captureId: "original-mic", renderId: "original-speaker" },
+  });
+  assert.equal(
+    calls.filter((call) => typeof call === "object" && call.save).length,
+    1,
+  );
+
+  await controller.restore();
+  assert.deepEqual(calls.at(-2), {
+    restore: { captureId: "original-mic", renderId: "original-speaker" },
+  });
 });
 
 test("restores and clears the snapshot when Windows refuses to apply endpoints", async () => {

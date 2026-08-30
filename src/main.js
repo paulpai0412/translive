@@ -407,6 +407,7 @@ app.whenReady().then(async () => {
   rendererControls = new RendererControlBridge({ send: sendRendererControl });
   translationLifecycle = new TranslationLifecycle({
     controller,
+    disposeSummaries: () => summaryController.dispose(),
     rendererControls,
     restoreMeetingDevices,
     publish,
