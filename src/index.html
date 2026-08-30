@@ -440,6 +440,9 @@
           <button id="settings-runtime-button">
             Codex runtime<span id="settings-runtime-status">尚未檢查</span>
           </button>
+          <button id="settings-retention-button">
+            本機保存上限<span id="settings-retention-status">正在檢查</span>
+          </button>
         </div>
       </section>
     </main>
@@ -448,11 +451,13 @@
       class="diagnostics-drawer"
       id="diagnostics-drawer"
       aria-hidden="true"
+      aria-labelledby="diagnostics-title"
+      role="dialog"
     >
       <header>
         <div>
           <p class="section-kicker">健康狀態</p>
-          <h2>診斷 <span>Diagnostics</span></h2>
+          <h2 id="diagnostics-title">診斷 <span>Diagnostics</span></h2>
         </div>
         <button
           class="icon-button"
@@ -493,7 +498,7 @@
         </div>
       </details>
       <button class="secondary-button full-width" id="copy-diagnostics">
-        複製診斷資訊
+        匯出遮罩診斷包
       </button>
     </aside>
     <div class="drawer-scrim" id="drawer-scrim"></div>

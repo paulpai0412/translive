@@ -126,6 +126,32 @@ test("requires typed DELETE for destructive session deletion and exports a safe 
   assert.deepEqual(await store.listSessions(), []);
 });
 
+test("bounds plaintext retention and reports actionable local storage status", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "translive-record-retention-"));
+  const store = new RecordsStore({
+    directory,
+    limits: { maxBytes: 1_000_000, maxSessions: 1 },
+  });
+  await store.grantPlaintextConsent({ confirmed: true });
+  await store.saveSession(sessionInput());
+
+  const status = await store.retentionStatus();
+  assert.deepEqual(
+    {
+      maxBytes: status.maxBytes,
+      maxSessions: status.maxSessions,
+      sessionCount: status.sessionCount,
+    },
+    { maxBytes: 1_000_000, maxSessions: 1, sessionCount: 1 },
+  );
+  assert.ok(status.bytes > 0);
+
+  await assert.rejects(
+    store.saveSession(sessionInput({ id: "session-over-limit" })),
+    /保存上限|retention/i,
+  );
+});
+
 test("validates aggregate summary source sessions inside the serialized write", async () => {
   const directory = await mkdtemp(join(tmpdir(), "translive-record-source-"));
   const store = new RecordsStore({ directory });

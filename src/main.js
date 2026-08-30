@@ -15,6 +15,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { AccountController } from "./account-controller.js";
+import { resolveCodexLaunch } from "./codex-launch.js";
+import { buildDiagnostics } from "./diagnostics-service.js";
 import { MeetingSetupController } from "./meeting-setup-controller.js";
 import { sanitizeMeetingSetupRequest } from "./meeting-setup-request.js";
 import { MeetingSetupStore } from "./meeting-setup-store.js";
@@ -22,15 +24,26 @@ import { PhaseOneController } from "./phase-one-controller.js";
 import { allowsLocalAudioPermission } from "./permissions.js";
 import { recordsDirectory } from "./records-path.js";
 import { RecordsStore } from "./records-store.js";
+import { RendererControlBridge } from "./renderer-control-bridge.js";
+import { RELEASE_METADATA } from "./release-config.js";
 import { CodexSummaryService } from "./summary-service.js";
 import { SummaryController } from "./summary-controller.js";
+import { TranslationLifecycle } from "./translation-lifecycle.js";
 import { TrayController } from "./tray-controller.js";
 import { TrayPreferences } from "./tray-preferences.js";
 import { WindowsMeetingDeviceAdapter } from "./windows-meeting-device-adapter.js";
 
 const sourceDirectory = dirname(fileURLToPath(import.meta.url));
+const windowIconPath = join(
+  sourceDirectory,
+  "../assets/translive-brand",
+  process.platform === "win32" ? "translive.ico" : "translive-tray.png",
+);
+app.setAppUserModelId(RELEASE_METADATA.appId);
 let mainWindow;
 let accountController;
+let accountState = "unknown";
+let codexLaunch;
 let activeMode = "meeting";
 let controller;
 let meetingSetupController;
@@ -39,6 +52,8 @@ let recordsStore;
 let summaryController;
 let trayController;
 let trayState = "ready";
+let rendererControls;
+let translationLifecycle;
 
 function configurePermissions() {
   const currentSession = session.defaultSession;
@@ -82,7 +97,15 @@ async function restoreMeetingDevices() {
   return result;
 }
 
+function sendRendererControl(event) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    throw new Error("Renderer window is unavailable");
+  }
+  mainWindow.webContents.send("translive:event", event);
+}
+
 function publish(event) {
+  if (event.type === "account") accountState = event.state;
   trayState = stateForEvent(event);
   trayController?.update({
     appState: trayState,
@@ -109,7 +132,7 @@ async function exportMarkdown({ fileName, markdown, title }) {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    icon: join(sourceDirectory, "../assets/translive-brand/translive-tray.png"),
+    icon: windowIconPath,
     width: 1_060,
     height: 820,
     minWidth: 880,
@@ -140,7 +163,11 @@ function createWindow() {
 }
 
 function registerIpc() {
-  ipcMain.handle("translive:account-status", () => accountController.status());
+  ipcMain.handle("translive:account-status", async () => {
+    const result = await accountController.status();
+    accountState = result.state;
+    return result;
+  });
   ipcMain.handle("translive:account-login", async () => {
     const login = await accountController.startLogin();
     try {
@@ -151,7 +178,9 @@ function registerIpc() {
       throw error;
     }
   });
-  ipcMain.handle("translive:account-logout", () => accountController.logout());
+  ipcMain.handle("translive:account-logout", () =>
+    translationLifecycle.logout(accountController),
+  );
   ipcMain.handle("translive:account-login-cancel", () =>
     accountController.cancelLogin(),
   );
@@ -173,22 +202,16 @@ function registerIpc() {
     controller.answerApplied(direction),
   );
   ipcMain.handle("translive:stop", async () => {
-    let result;
-    let stopError;
-    try {
-      result = await controller.stop();
-    } catch (error) {
-      stopError = error;
-    }
-    const meetingRestore = await restoreMeetingDevices();
+    const result = await translationLifecycle.stop("user-stop", {
+      rendererControl: false,
+    });
     trayState = "stopped";
     trayController?.update({
       appState: trayState,
       mode: activeMode,
-      status: result?.status ?? controller.status(),
+      status: result.status ?? controller.status(),
     });
-    if (stopError) throw stopError;
-    return { ...result, meetingRestore };
+    return result;
   });
   ipcMain.handle("translive:cancel-start", async () =>
     controller.cancelStart(),
@@ -216,8 +239,35 @@ function registerIpc() {
   ipcMain.handle("translive:meeting-setup-open-settings", (_event, appName) =>
     meetingSetupController.openManualSettings(appName),
   );
+  ipcMain.handle("translive:diagnostics-export", async () => {
+    const bundle = buildDiagnostics({
+      accountState,
+      appVersion: app.getVersion(),
+      evidence: controller.diagnostics(),
+      status: controller.status(),
+    });
+    const destination = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: "translive-diagnostics.json",
+      filters: [{ name: "JSON", extensions: ["json"] }],
+      title: "匯出遮罩診斷包",
+    });
+    if (destination.canceled || !destination.filePath)
+      return { exported: false };
+    await writeFile(
+      destination.filePath,
+      `${JSON.stringify(bundle, null, 2)}\n`,
+      {
+        encoding: "utf8",
+        flag: "wx",
+      },
+    );
+    return { exported: true };
+  });
   ipcMain.handle("translive:records-consent-status", () =>
     recordsStore.consentStatus(),
+  );
+  ipcMain.handle("translive:records-retention-status", () =>
+    recordsStore.retentionStatus(),
   );
   ipcMain.handle("translive:records-consent-grant", (_event, request) =>
     recordsStore.grantPlaintextConsent({
@@ -287,6 +337,9 @@ function registerIpc() {
     trayController.showWindow();
     return { shown: true };
   });
+  ipcMain.on("translive:renderer-control-ack", (_event, acknowledgement) =>
+    rendererControls?.acknowledge(acknowledgement ?? {}),
+  );
   ipcMain.on("translive:metric", (_event, metric) =>
     controller.recordMetric(metric),
   );
@@ -302,7 +355,14 @@ function registerIpc() {
 
 app.whenReady().then(async () => {
   configurePermissions();
+  codexLaunch = await resolveCodexLaunch({
+    allowExternalPackaged:
+      process.env.TRANSLIVE_ALLOW_EXTERNAL_PACKAGED_CODEX === "1",
+    appPath: app.getAppPath(),
+    isPackaged: app.isPackaged,
+  });
   accountController = new AccountController({
+    codexExecutable: codexLaunch.executable,
     cwd: app.getAppPath(),
     publish,
   });
@@ -314,11 +374,16 @@ app.whenReady().then(async () => {
   });
   summaryController = new SummaryController({
     records: recordsStore,
-    summaryService: new CodexSummaryService({ cwd: app.getAppPath() }),
+    summaryService: new CodexSummaryService({
+      codexExecutable: codexLaunch.executable,
+      cwd: app.getAppPath(),
+    }),
     publish,
   });
   controller = new PhaseOneController({
     appVersion: app.getVersion(),
+    codexExecutable: codexLaunch.executable,
+    codexVersion: codexLaunch.version ?? process.env.TRANSLIVE_CODEX_VERSION,
     cwd: app.getAppPath(),
     evidenceDirectory:
       process.env.TRANSLIVE_EVIDENCE_DIR ||
@@ -339,16 +404,20 @@ app.whenReady().then(async () => {
   });
   const startupRestore = await meetingSetupController.restorePending();
   createWindow();
+  rendererControls = new RendererControlBridge({ send: sendRendererControl });
+  translationLifecycle = new TranslationLifecycle({
+    controller,
+    rendererControls,
+    restoreMeetingDevices,
+    publish,
+  });
   trayController = new TrayController({
     app,
     controller: {
       status: () => controller.status(),
-      setMuted: (direction, muted) => controller.setMuted(direction, muted),
-      stop: async () => {
-        const result = await controller.stop("tray-stop");
-        const meetingRestore = await restoreMeetingDevices();
-        return { ...result, meetingRestore };
-      },
+      setMuted: (direction, muted) =>
+        translationLifecycle.setMuted(direction, muted),
+      stop: () => translationLifecycle.stop("tray-stop"),
     },
     iconPath: join(
       sourceDirectory,
@@ -389,10 +458,12 @@ app.on("before-quit", (event) => {
   quitting = true;
   event.preventDefault();
   Promise.allSettled([
-    controller.dispose(),
+    translationLifecycle?.stop("app-quit", { rendererControl: false }),
     accountController.dispose(),
     summaryController.dispose(),
-    restoreMeetingDevices(),
     trayController.dispose(),
-  ]).finally(() => app.quit());
+  ]).finally(() => {
+    rendererControls?.dispose();
+    app.quit();
+  });
 });

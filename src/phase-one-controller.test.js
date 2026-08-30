@@ -354,9 +354,7 @@ test("does not swallow a transcript save failure after a bounded tail drain", as
   await new Promise((resolve) => setTimeout(resolve, 80));
   await assert.rejects(controller.stop("user-stop"), /disk unavailable/);
   assert.equal(
-    events.some(
-      (event) => event.type === "record" && event.state === "failed",
-    ),
+    events.some((event) => event.type === "record" && event.state === "failed"),
     true,
   );
 });

@@ -153,6 +153,7 @@ export class PhaseOneController {
   #cwd;
   #evidenceDirectory;
   #inspectRuntime;
+  #lastEvidence;
   #publish;
   #records;
   #starting = false;
@@ -343,6 +344,10 @@ export class PhaseOneController {
     return this.#active?.run.status() ?? { tx: "stopped", rx: "stopped" };
   }
 
+  diagnostics() {
+    return this.#active?.context.evidence.snapshot() ?? this.#lastEvidence;
+  }
+
   async cancelStart() {
     this.#cancelStartRequested = true;
     const context = this.#startingContext;
@@ -467,6 +472,7 @@ export class PhaseOneController {
       reason: safeMessage(error),
       outcome: "blocked",
     });
+    this.#lastEvidence = evidence.snapshot();
     try {
       await evidence.write(this.#evidenceDirectory);
     } catch (writeError) {
@@ -705,6 +711,7 @@ export class PhaseOneController {
       this.#flushRxSpeechFallback(context);
       await context.speechFallback?.queue;
       context.evidence.finish(Date.now(), termination);
+      this.#lastEvidence = context.evidence.snapshot();
       await this.#persistTranscript(context);
       await context.evidence.write(this.#evidenceDirectory);
     } catch (error) {

@@ -68,7 +68,9 @@ export function directionsForMode(mode = "meeting") {
 
 export function validateDualChannelConfig(config) {
   const directions = directionsForMode(config.mode);
-  directions.forEach((direction) => assertEndpoint(config?.[direction], direction));
+  directions.forEach((direction) =>
+    assertEndpoint(config?.[direction], direction),
+  );
   const endpoints = directions.flatMap((direction) => [
     config[direction].sourceEndpointId,
     config[direction].sinkEndpointId,
@@ -83,13 +85,17 @@ export function validateDualChannelConfig(config) {
     directions.includes("tx") &&
     isVirtualEndpoint(config.tx.sourceEndpointName)
   ) {
-    throw new Error("TX source must be a physical microphone, not a virtual endpoint");
+    throw new Error(
+      "TX source must be a physical microphone, not a virtual endpoint",
+    );
   }
   if (
     directions.includes("rx") &&
     isVirtualEndpoint(config.rx.sinkEndpointName)
   ) {
-    throw new Error("RX sink must be physical headphones, not a virtual endpoint");
+    throw new Error(
+      "RX sink must be physical headphones, not a virtual endpoint",
+    );
   }
 
   const profile = config.routeProfile ?? "vb-cable";
@@ -104,7 +110,9 @@ export function validateDualChannelConfig(config) {
       directions.includes("rx") &&
       !matchesCableRole(config.rx.sourceEndpointName, "b", "output")
     ) {
-      throw new Error("RX source must be the Cable-B Output recording endpoint");
+      throw new Error(
+        "RX source must be the Cable-B Output recording endpoint",
+      );
     }
     return;
   }

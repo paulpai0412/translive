@@ -9,7 +9,8 @@ if (runtime.semanticVersion !== pinnedVersion) {
     `Pinned Codex ${pinnedVersion} is required; found ${runtime.semanticVersion ?? "unknown"}`,
   );
 }
-if (!runtime.loggedIn) throw new Error("Codex login status is not authenticated");
+if (!runtime.loggedIn)
+  throw new Error("Codex login status is not authenticated");
 const client = new CodexAppServer({ executable, cwd: process.cwd() });
 
 try {

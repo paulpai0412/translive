@@ -1,17 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { readFile, readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { readFile } from "node:fs/promises";
 
-async function filesUnder(directory) {
-  const entries = await readdir(directory, { withFileTypes: true });
-  const nested = await Promise.all(
-    entries.map(async (entry) => {
-      const path = join(directory, entry.name);
-      return entry.isDirectory() ? filesUnder(path) : [path];
-    }),
-  );
-  return nested.flat();
-}
+import { filesUnder } from "./file-tree.mjs";
 
 const fileGroups = await Promise.all([
   filesUnder("src"),
@@ -29,10 +19,31 @@ for (const file of javascript) {
 }
 
 const packageJson = await readFile("package.json", "utf8");
+let packageMetadata;
 try {
-  JSON.parse(packageJson);
+  packageMetadata = JSON.parse(packageJson);
 } catch (error) {
   throw new Error(`package.json is not valid JSON: ${error.message}`);
+}
+if (
+  packageMetadata.productName !== "TransLive" ||
+  packageMetadata.translive?.appId !== "com.paulpai.translive" ||
+  packageMetadata.version !== "0.1.0-beta.1"
+) {
+  throw new Error("package.json must contain branded TransLive release metadata");
+}
+for (const script of [
+  "codex:bundle",
+  "package:dir",
+  "package:smoke",
+  "package:verify",
+]) {
+  if (typeof packageMetadata.scripts?.[script] !== "string") {
+    throw new Error(`package.json is missing ${script}`);
+  }
+}
+if (packageMetadata.devDependencies?.["@electron/packager"] !== "20.3.0") {
+  throw new Error("package.json must pin @electron/packager for reproducible packaging");
 }
 const jsConfig = await readFile("jsconfig.json", "utf8");
 try {
@@ -43,6 +54,12 @@ try {
 const html = await readFile("src/index.html", "utf8");
 const main = await readFile("src/main.js", "utf8");
 await readFile("assets/translive-brand/translive-tray.png");
+await readFile("assets/translive-brand/translive.ico");
+await readFile("docs/release/windows-packaging.md");
+await readFile("scripts/package.mjs");
+await readFile("scripts/package-smoke.mjs");
+await readFile("scripts/create-release-icon.mjs");
+await readFile("scripts/generate-codex-manifest.mjs");
 const windowsMeetingScript = await readFile(
   "scripts/windows-meeting-devices.ps1",
   "utf8",
@@ -50,12 +67,16 @@ const windowsMeetingScript = await readFile(
 if (!main.includes('preload: join(sourceDirectory, "preload.cjs")')) {
   throw new Error("main.js must load the restricted preload bridge");
 }
+if (!main.includes("app.setAppUserModelId(RELEASE_METADATA.appId)")) {
+  throw new Error("main.js must set the branded Windows AppUserModelID");
+}
 for (const required of [
   'ipcMain.handle("translive:account-status"',
   'ipcMain.handle("translive:account-login"',
   'ipcMain.handle("translive:account-login-cancel"',
   'ipcMain.handle("translive:cancel-start"',
   'ipcMain.handle("translive:meeting-setup-apply"',
+  'ipcMain.handle("translive:diagnostics-export"',
   'ipcMain.handle("translive:records-list"',
   'ipcMain.handle("translive:summary-session-start"',
   "new RecordsStore",
@@ -64,6 +85,10 @@ for (const required of [
   'ipcMain.handle("translive:tray-status"',
   "shell.openExternal(login.authUrl)",
   "new TrayController",
+  "new RendererControlBridge",
+  "new TranslationLifecycle",
+  "resolveCodexLaunch",
+  'ipcMain.on("translive:renderer-control-ack"',
   "windows-meeting-devices.ps1",
 ]) {
   if (!main.includes(required)) {
@@ -102,6 +127,7 @@ for (const required of [
   'data-view-button="history"',
   'id="records-list"',
   'id="summary-confirm-modal"',
+  'id="settings-retention-status"',
   'aria-live="polite"',
   'role="alert"',
 ]) {
@@ -120,11 +146,14 @@ if (/<script(?![^>]*\bsrc=)/i.test(html)) {
 }
 const preload = await readFile("src/preload.cjs", "utf8");
 for (const required of [
+  "diagnosticsExport",
   "recordsList",
+  "recordsRetentionStatus",
   "aggregatesExport",
   "summarySessionStart",
   "summaryAggregateStart",
   "summaryCancel",
+  "rendererControlAck",
 ]) {
   if (!preload.includes(required)) {
     throw new Error(`preload.cjs is missing records contract: ${required}`);
@@ -139,6 +168,20 @@ if (!renderer.includes('elements["tx-sink"]')) {
 }
 if (!renderer.includes("exportAggregate")) {
   throw new Error("renderer-entry.js must expose aggregate export feedback");
+}
+if (!renderer.includes("diagnosticsExport")) {
+  throw new Error("renderer-entry.js must expose redacted diagnostic export");
+}
+if (!renderer.includes('event.type === "renderer-control"')) {
+  throw new Error("renderer-entry.js must acknowledge main-to-renderer controls");
+}
+const releaseConfig = await readFile("src/release-config.js", "utf8");
+if (releaseConfig.includes('value.startsWith("node_modules/")')) {
+  throw new Error("release-config.js must not package arbitrary node_modules");
+}
+const packageScript = await readFile("scripts/package.mjs", "utf8");
+if (!packageScript.includes("assertWindowsCodexBundle")) {
+  throw new Error("package.mjs must require verified bundled Codex on Windows");
 }
 const gitignore = await readFile(".gitignore", "utf8");
 if (!gitignore.includes(".translive-evidence/")) {

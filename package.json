@@ -1,17 +1,24 @@
 {
   "name": "translive",
-  "version": "0.0.0",
+  "version": "0.1.0-beta.1",
   "private": true,
   "type": "module",
   "main": "src/main.js",
   "scripts": {
     "check": "node scripts/check.mjs",
+    "codex:bundle": "node scripts/generate-codex-manifest.mjs",
+    "package:dir": "node scripts/package.mjs",
+    "package:smoke": "node scripts/package-smoke.mjs",
+    "package:verify": "npm run package:dir -- --platform=linux --arch=x64 --policy=dev && npm run package:smoke -- --platform=linux --arch=x64",
     "probe:codex": "node scripts/probe-codex-app-server.mjs",
     "start": "electron .",
     "test": "node --test"
   },
   "engines": {
     "node": ">=24"
+  },
+  "translive": {
+    "appId": "com.paulpai.translive"
   },
   "knip": {
     "entry": [
@@ -22,7 +29,11 @@
       "src/summary-controller.js",
       "src/summary-service.js",
       "src/startup-session.js",
-      "src/view-state.js"
+      "src/view-state.js",
+      "scripts/check.mjs",
+      "scripts/generate-codex-manifest.mjs",
+      "scripts/package.mjs",
+      "scripts/package-smoke.mjs"
     ],
     "project": [
       "src/**/*.{js,cjs}",
@@ -31,6 +42,8 @@
     ]
   },
   "devDependencies": {
+    "@electron/packager": "20.3.0",
     "electron": "44.0.0"
-  }
+  },
+  "productName": "TransLive"
 }

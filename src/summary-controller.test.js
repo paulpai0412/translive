@@ -225,6 +225,43 @@ test("does not recreate an aggregate after delete all while generation is in fli
   assert.deepEqual(await records.listAggregates(), []);
 });
 
+test("does not recreate an aggregate after deleting a selected source while generation is in flight", async () => {
+  const records = await recordsFixture();
+  let resolveGeneration;
+  const summaryService = {
+    generate: (input) =>
+      new Promise((resolve) => {
+        resolveGeneration = () =>
+          resolve(structuredSummary(input.kind, input.sessions));
+      }),
+  };
+  const events = [];
+  const controller = new SummaryController({
+    records,
+    summaryService,
+    publish: (event) => events.push(event),
+  });
+
+  const started = await controller.startAggregateSummary({
+    sessionIds: ["session-a", "session-b"],
+    confirmed: true,
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  await records.deleteSession("session-a");
+  resolveGeneration();
+
+  await assert.rejects(controller.wait(started.requestId));
+  assert.deepEqual(
+    (await records.listSessions()).map((session) => session.id),
+    ["session-b"],
+  );
+  assert.deepEqual(await records.listAggregates(), []);
+  assert.equal(
+    events.some((event) => event.state === "completed"),
+    false,
+  );
+});
+
 test("cancels during aggregate persistence without retaining the just-written summary", async () => {
   const records = await recordsFixture();
   const originalSave = records.saveAggregateSummary.bind(records);

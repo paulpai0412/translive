@@ -149,23 +149,48 @@ test("closes a client when official login startup fails", async () => {
   };
   const controller = new AccountController({ createClient: () => client });
 
-  await assert.rejects(controller.startLogin(), /upstream login startup failed/);
+  await assert.rejects(
+    controller.startLogin(),
+    /upstream login startup failed/,
+  );
   assert.equal(client.closed, true);
 });
 
-test("logs out through Codex without returning account data", async () => {
-  const client = new FakeAccountClient();
+test("logout cancels a pending browser login and ignores a late OAuth success", async () => {
+  const pendingLoginClient = new FakeAccountClient();
+  const logoutClient = new FakeAccountClient();
   const events = [];
+  const clients = [pendingLoginClient, logoutClient];
   const controller = new AccountController({
-    createClient: () => client,
+    createClient: () => clients.shift(),
     publish: (event) => events.push(event),
   });
 
-  await controller.logout();
+  await controller.startLogin();
+  assert.deepEqual(await controller.logout(), { state: "logged-out" });
+  pendingLoginClient.emit("notification", {
+    method: "account/login/completed",
+    params: { loginId: "login-1", success: true },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
 
-  assert.deepEqual(client.requests, [{ method: "account/logout", params: {} }]);
-  assert.deepEqual(events, [{ type: "account", state: "logged-out" }]);
-  assert.equal(client.closed, true);
+  assert.deepEqual(pendingLoginClient.requests, [
+    {
+      method: "account/login/start",
+      params: { type: "chatgpt", codexStreamlinedLogin: true },
+    },
+    { method: "account/login/cancel", params: { loginId: "login-1" } },
+  ]);
+  assert.deepEqual(logoutClient.requests, [
+    { method: "account/logout", params: {} },
+  ]);
+  assert.equal(pendingLoginClient.closed, true);
+  assert.equal(logoutClient.closed, true);
+  assert.deepEqual(events.at(-1), { type: "account", state: "logged-out" });
+  assert.equal(
+    events.some((event) => event.state === "connected"),
+    false,
+  );
 });
 
 test("reports an official login failure without forwarding its detail", async () => {
@@ -179,7 +204,11 @@ test("reports an official login failure without forwarding its detail", async ()
   await controller.startLogin();
   client.emit("notification", {
     method: "account/login/completed",
-    params: { loginId: "login-1", success: false, error: "private upstream detail" },
+    params: {
+      loginId: "login-1",
+      success: false,
+      error: "private upstream detail",
+    },
   });
   await new Promise((resolve) => setImmediate(resolve));
 

@@ -164,7 +164,9 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
       );
     }
     const deltas =
-      direction === "rx" ? ["這是一段", "即時中文。"] : ["fixture ", "translation."];
+      direction === "rx"
+        ? ["這是一段", "即時中文。"]
+        : ["fixture ", "translation."];
     deltas.forEach((delta, index) =>
       setTimeout(
         () =>

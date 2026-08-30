@@ -1,3 +1,7 @@
+import {
+  createRendererControlHandler,
+  releaseRendererResources as releaseResources,
+} from "./renderer-control.js";
 import { createStartupSession } from "./startup-session.js";
 import {
   latestTranscriptPersistenceEvent,
@@ -110,6 +114,8 @@ const elements = Object.fromEntries(
     "settings-logout-button",
     "settings-runtime-button",
     "settings-runtime-status",
+    "settings-retention-button",
+    "settings-retention-status",
     "rx-source",
     "rx-source-caption",
     "rx-target-language",
@@ -165,6 +171,29 @@ const ui = {
   devices: { inputs: [], outputs: [] },
   runtime: "尚未檢查",
 };
+const focusOrigins = new WeakMap();
+
+async function releaseRendererResources() {
+  const startup = ui.startup;
+  await releaseResources({
+    active: () => ui.active,
+    cancelStartup: () => startup?.cancel(),
+    clearActive: () => {
+      ui.active = {};
+    },
+  });
+}
+
+const handleRendererControl = createRendererControlHandler({
+  active: () => ui.active,
+  clearActive: () => {
+    ui.active = {};
+  },
+  onStop: async () => {
+    const startup = ui.startup;
+    if (startup) await startup.cancel();
+  },
+});
 
 function directionsForMode(mode = ui.mode) {
   return DIRECTIONS_BY_MODE[mode];
@@ -265,10 +294,21 @@ function showAssertiveError(message) {
   }, 8_000);
 }
 
-function focusModal(modal, selector) {
-  window.requestAnimationFrame(() => {
-    modal.querySelector(selector)?.focus();
-  });
+function setModalVisibility(modal, open, selector) {
+  if (open) {
+    if (document.activeElement instanceof HTMLElement) {
+      focusOrigins.set(modal, document.activeElement);
+    }
+    modal.classList.add("is-open");
+    modal.setAttribute("aria-hidden", "false");
+    window.requestAnimationFrame(() => modal.querySelector(selector)?.focus());
+  } else {
+    modal.classList.remove("is-open");
+    modal.setAttribute("aria-hidden", "true");
+    const origin = focusOrigins.get(modal);
+    if (origin?.isConnected) origin.focus();
+  }
+  setScrim();
 }
 
 function setScrim() {
@@ -282,40 +322,37 @@ function setScrim() {
 }
 
 function setDrawer(open) {
-  elements["diagnostics-drawer"].classList.toggle("is-open", open);
-  elements["diagnostics-drawer"].setAttribute("aria-hidden", String(!open));
-  setScrim();
+  setModalVisibility(
+    elements["diagnostics-drawer"],
+    open,
+    "#close-diagnostics",
+  );
 }
 
 function setQuickSetup(open) {
-  elements["quick-setup-modal"].classList.toggle("is-open", open);
-  elements["quick-setup-modal"].setAttribute("aria-hidden", String(!open));
-  setScrim();
+  setModalVisibility(elements["quick-setup-modal"], open, "#close-quick-setup");
 }
 
 function setSummaryConfirm(open) {
-  elements["summary-confirm-modal"].classList.toggle("is-open", open);
-  elements["summary-confirm-modal"].setAttribute("aria-hidden", String(!open));
-  setScrim();
-  if (open)
-    focusModal(elements["summary-confirm-modal"], "#summary-confirm-action");
+  setModalVisibility(
+    elements["summary-confirm-modal"],
+    open,
+    "#summary-confirm-action",
+  );
 }
 
 function setConsentModal(open) {
-  elements["consent-modal"].classList.toggle("is-open", open);
-  elements["consent-modal"].setAttribute("aria-hidden", String(!open));
-  setScrim();
-  if (open) focusModal(elements["consent-modal"], "#consent-checkbox");
+  setModalVisibility(elements["consent-modal"], open, "#consent-checkbox");
 }
 
 function setDeleteConfirm(open) {
-  elements["delete-confirm-modal"].classList.toggle("is-open", open);
-  elements["delete-confirm-modal"].setAttribute("aria-hidden", String(!open));
   if (!open) elements["delete-confirm-input"].value = "";
   elements["delete-confirm-action"].disabled = true;
-  setScrim();
-  if (open)
-    focusModal(elements["delete-confirm-modal"], "#delete-confirm-input");
+  setModalVisibility(
+    elements["delete-confirm-modal"],
+    open,
+    "#delete-confirm-input",
+  );
 }
 
 function applyTranscriptPersistence(event) {
@@ -431,9 +468,12 @@ async function applyQuickSetup() {
       elements["quick-setup-note"].textContent =
         "TransLive 無法確認會議 App 實際使用的裝置。請開啟其裝置設定，手動選擇上方裝置名稱。";
     }
-  } catch (error) {
+  } catch {
     elements["quick-setup-note"].textContent =
-      `快速設定無法完成：${error.message}`;
+      "快速設定無法完成。請開啟 Windows 音訊設定，手動確認麥克風與喇叭。";
+    showAssertiveError(
+      "快速設定無法完成。請手動確認 Teams／Zoom 的麥克風與喇叭。",
+    );
     setQuickStep("quick-verify-step", "pending", "需要人工確認");
   } finally {
     elements["apply-quick-setup"].disabled = false;
@@ -527,9 +567,13 @@ async function refreshDevices() {
     );
     elements["health-devices"].className = "ok";
     updateReadyMessage();
-  } catch (error) {
+  } catch {
     elements["health-devices"].className = "warn";
-    elements["ready-message"].textContent = `無法列出裝置：${error.message}`;
+    elements["ready-message"].textContent =
+      "無法列出音訊裝置。請確認 Windows 麥克風權限與裝置連線後再試。";
+    showAssertiveError(
+      "無法列出音訊裝置。請確認 Windows 麥克風權限與裝置連線。",
+    );
   }
 }
 
@@ -890,12 +934,12 @@ async function startTranslation() {
   } catch (error) {
     const canceled = error?.name === "AbortError" || startup.isCanceled();
     if (canceled) {
+      await releaseRendererResources();
       setAppState("ready");
       updateReadyMessage();
       return;
     }
-    for (const peer of Object.values(ui.active)) peer.stop();
-    ui.active = {};
+    await releaseRendererResources();
     if (config) window.translive.rendererBlocked(config, error.message);
     showAssertiveError("無法建立翻譯連線，請檢查設定後再試。");
     showBlocked("無法建立翻譯連線", error.message);
@@ -908,16 +952,14 @@ async function cancelTranslationStartup() {
   const startup = ui.startup;
   if (!startup) return;
   await startup.cancel();
-  ui.active = {};
+  await releaseRendererResources();
   setAppState("ready");
   updateReadyMessage();
 }
 
 async function stopTranslation() {
   await cancelTranslationStartup();
-  const peers = ui.active;
-  ui.active = {};
-  for (const peer of Object.values(peers)) peer.stop();
+  await releaseRendererResources();
   try {
     const result = await window.translive.stop();
     if (result.meetingRestore?.reason) {
@@ -948,7 +990,10 @@ function showBlocked(title, detail) {
   elements["blocked-title"].textContent = title;
   elements["blocked-copy"].textContent =
     "請檢查登入、音訊裝置和路由設定。音訊尚未繼續傳送。";
-  elements["blocked-detail"].textContent = detail || "NO_DETAILS";
+  const safeDetail = detail
+    ? "已遮罩技術資訊，請匯出診斷包查看。"
+    : "無額外技術資訊";
+  elements["blocked-detail"].textContent = safeDetail;
   elements["blocked-action"].textContent =
     ui.account === "connected" ? "返回設定" : "重新連接 ChatGPT";
   setAppState("blocked");
@@ -997,6 +1042,16 @@ async function initializeConsent() {
   updateSavingStatus();
 }
 
+async function initializeRetention() {
+  try {
+    const status = await window.translive.recordsRetentionStatus();
+    elements["settings-retention-status"].textContent =
+      `${status.sessionCount}/${status.maxSessions} 場 · ${formatBytes(status.bytes)}/${formatBytes(status.maxBytes)}`;
+  } catch {
+    elements["settings-retention-status"].textContent = "無法取得保存狀態";
+  }
+}
+
 async function initializeAccount() {
   setAccountState("checking");
   try {
@@ -1020,6 +1075,12 @@ async function startAccountLogin() {
     setAppState("logged-out");
     elements["auth-status"].textContent = "無法開啟登入流程，請稍後再試。";
   }
+}
+
+function formatBytes(value) {
+  const bytes = Math.max(0, Number(value) || 0);
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function recordTime(value) {
@@ -1377,17 +1438,25 @@ async function selectAggregate(id) {
 
 async function deleteSession(id) {
   if (!window.confirm("刪除這場逐字稿與單場摘要？此操作無法復原。")) return;
-  await window.translive.recordsDelete(id);
-  ui.records.selected.delete(id);
-  ui.records.current = undefined;
-  await loadRecords();
+  try {
+    await window.translive.recordsDelete(id);
+    ui.records.selected.delete(id);
+    ui.records.current = undefined;
+    await loadRecords();
+  } catch {
+    showAssertiveError("無法刪除這場紀錄，請稍後再試。");
+  }
 }
 
 async function deleteAggregate(id) {
   if (!window.confirm("刪除這份跨場摘要？此操作無法復原。")) return;
-  await window.translive.aggregatesDelete(id);
-  ui.records.current = undefined;
-  await loadRecords();
+  try {
+    await window.translive.aggregatesDelete(id);
+    ui.records.current = undefined;
+    await loadRecords();
+  } catch {
+    showAssertiveError("無法刪除跨場摘要，請稍後再試。");
+  }
 }
 
 async function loadRecords() {
@@ -1468,7 +1537,9 @@ function handleSummaryEvent(event) {
     elements["records-status"].textContent = "摘要已取消。";
     if (ui.records.current?.data) renderSessionDetail(ui.records.current.data);
   } else {
-    elements["records-status"].textContent = "無法產生摘要，請稍後再試。";
+    elements["records-status"].textContent =
+      "無法產生摘要，請檢查 ChatGPT 登入與網路後再試。";
+    showAssertiveError("無法產生摘要，請檢查 ChatGPT 登入與網路後再試。");
   }
 }
 
@@ -1634,6 +1705,9 @@ elements["theme-button"].addEventListener("click", () => {
 elements["settings-runtime-button"].addEventListener("click", () =>
   setDrawer(true),
 );
+elements["settings-retention-button"].addEventListener("click", () =>
+  setView("history"),
+);
 elements["tray-close-behavior"].addEventListener("change", async (event) => {
   const result = await window.translive.traySetCloseBehavior(
     event.target.value,
@@ -1641,12 +1715,13 @@ elements["tray-close-behavior"].addEventListener("change", async (event) => {
   event.target.value = result.closeBehavior;
 });
 elements["copy-diagnostics"].addEventListener("click", async () => {
-  const detail = `mode=${ui.mode}\naccount=${ui.account}\nruntime=${ui.runtime}`;
   try {
-    await navigator.clipboard.writeText(detail);
-    elements["copy-diagnostics"].textContent = "已複製";
+    const result = await window.translive.diagnosticsExport();
+    if (result.exported) {
+      elements["copy-diagnostics"].textContent = "已匯出遮罩診斷包";
+    }
   } catch {
-    elements["copy-diagnostics"].textContent = "請手動複製";
+    showAssertiveError("無法匯出遮罩診斷包，請確認儲存位置後再試。");
   }
 });
 
@@ -1689,12 +1764,33 @@ document.addEventListener("keydown", (event) => {
   }
 });
 window.addEventListener("pagehide", () => {
-  void cancelTranslationStartup();
-  for (const peer of Object.values(ui.active)) peer.stop();
+  void releaseRendererResources();
 });
 
 window.translive.onEvent(async (event) => {
+  if (event.type === "renderer-control") {
+    let acknowledgement;
+    try {
+      acknowledgement = await handleRendererControl(event);
+      if (event.action === "mute") {
+        ui.muted[event.direction] = Boolean(event.muted);
+        setChannelState(event.direction, event.muted ? "muted" : "live");
+      }
+    } catch {
+      acknowledgement = { controlId: event.controlId, state: "failed" };
+    }
+    window.translive.rendererControlAck(acknowledgement);
+    return;
+  }
   updateDiagnostics(event);
+  if (event.type === "cleanup") {
+    if (event.state === "warning") {
+      const message = "已登出，但部分本機清理未完成。請開啟診斷確認。";
+      elements["stopped-copy"].textContent = message;
+      showAssertiveError(message);
+    }
+    return;
+  }
   if (event.type === "summary") {
     handleSummaryEvent(event);
     return;
@@ -1772,8 +1868,7 @@ window.translive.onEvent(async (event) => {
     return;
   }
   if (event.type === "blocked") {
-    for (const peer of Object.values(ui.active)) peer.stop();
-    ui.active = {};
+    await releaseRendererResources();
     showBlocked("無法建立翻譯連線", event.message);
     return;
   }
@@ -1787,4 +1882,5 @@ setMode("meeting");
 setView("translate");
 initializeTray();
 initializeConsent();
+initializeRetention();
 initializeAccount();

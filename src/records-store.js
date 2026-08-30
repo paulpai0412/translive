@@ -5,6 +5,7 @@ import {
   readFile,
   rename,
   rm,
+  stat,
   writeFile,
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -16,6 +17,34 @@ const ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 const MODES = new Set(["meeting", "media", "microphone"]);
 const PLATFORMS = new Set(["teams", "zoom", "custom"]);
 const PACKAGE_SCHEMA_VERSION = 1;
+const PACKAGE_OVERHEAD_BYTES = 1_024;
+const DEFAULT_RETENTION_LIMITS = Object.freeze({
+  maxBytes: 250 * 1024 * 1024,
+  maxSessions: 100,
+});
+
+function normalizedRetentionLimits(limits = {}) {
+  const maxBytes = Number.isSafeInteger(limits.maxBytes)
+    ? limits.maxBytes
+    : DEFAULT_RETENTION_LIMITS.maxBytes;
+  const maxSessions = Number.isSafeInteger(limits.maxSessions)
+    ? limits.maxSessions
+    : DEFAULT_RETENTION_LIMITS.maxSessions;
+  if (maxBytes <= 0 || maxSessions <= 0) {
+    throw new Error("Retention limits must be positive");
+  }
+  return { maxBytes, maxSessions };
+}
+
+function packageBytes(files) {
+  return (
+    PACKAGE_OVERHEAD_BYTES +
+    Object.values(files).reduce(
+      (total, content) => total + Buffer.byteLength(content, "utf8"),
+      0,
+    )
+  );
+}
 
 function assertIdentifier(id, label = "Record") {
   if (!ID_PATTERN.test(String(id))) {
@@ -159,11 +188,13 @@ async function readJson(
 
 export class RecordsStore {
   #directory;
+  #limits;
   #mutationQueue = Promise.resolve();
   #now;
 
-  constructor({ directory, now = Date.now }) {
+  constructor({ directory, limits, now = Date.now }) {
     this.#directory = directory;
+    this.#limits = normalizedRetentionLimits(limits);
     this.#now = now;
   }
 
@@ -180,6 +211,19 @@ export class RecordsStore {
     } catch {
       return { granted: false };
     }
+  }
+
+  async retentionStatus() {
+    const [sessions, bytes] = await Promise.all([
+      this.#listPackages(this.#sessionsDirectory(), "session"),
+      this.#storageBytes(),
+    ]);
+    return {
+      bytes,
+      maxBytes: this.#limits.maxBytes,
+      maxSessions: this.#limits.maxSessions,
+      sessionCount: sessions.length,
+    };
   }
 
   async grantPlaintextConsent({ confirmed }) {
@@ -239,6 +283,10 @@ export class RecordsStore {
           "Session already exists with different transcript data",
         );
       }
+      await this.#assertRetention({
+        additionalBytes: packageBytes(files),
+        additionalSessions: 1,
+      });
       await this.#writePackage({
         parent: this.#sessionsDirectory(),
         id: sessionId,
@@ -366,12 +414,22 @@ export class RecordsStore {
   async deleteSession(id) {
     const sessionId = assertIdentifier(id, "Session");
     await this.#serialize(`session:${sessionId}`, async () => {
+      const aggregates = await this.#listPackages(
+        this.#summariesDirectory(),
+        "aggregate-summary",
+      );
+      const dependentAggregates = aggregates.filter(({ metadata }) =>
+        metadata.sourceSessions?.some((source) => source.id === sessionId),
+      );
       await Promise.all([
         rm(this.sessionFolder(sessionId), { force: true, recursive: true }),
         rm(this.#summaryFolder(this.#sessionSummaryPackageId(sessionId)), {
           force: true,
           recursive: true,
         }),
+        ...dependentAggregates.map(({ folder }) =>
+          rm(folder, { force: true, recursive: true }),
+        ),
       ]);
     });
   }
@@ -463,6 +521,13 @@ export class RecordsStore {
         structured: structured ?? {},
       };
     }
+    const existingBytes = existing
+      ? await this.#packageBytes(existing.folder)
+      : 0;
+    await this.#assertRetention({
+      additionalBytes: packageBytes(files) - existingBytes,
+      additionalSessions: 0,
+    });
     await this.#writePackage({
       parent: this.#summariesDirectory(),
       id: packageId,
@@ -599,6 +664,45 @@ export class RecordsStore {
         );
     } catch {
       return [];
+    }
+  }
+
+  async #assertRetention({ additionalBytes, additionalSessions }) {
+    const status = await this.retentionStatus();
+    if (status.sessionCount + additionalSessions > status.maxSessions) {
+      throw new Error("已達本機逐字稿保存上限，請刪除舊紀錄後再試");
+    }
+    if (status.bytes + Math.max(0, additionalBytes) > status.maxBytes) {
+      throw new Error("已達本機保存容量上限，請刪除舊紀錄後再試");
+    }
+  }
+
+  async #storageBytes() {
+    const folders = [this.#sessionsDirectory(), this.#summariesDirectory()];
+    const sizes = await Promise.all(
+      folders.map((folder) => this.#folderBytes(folder)),
+    );
+    return sizes.reduce((total, bytes) => total + bytes, 0);
+  }
+
+  async #packageBytes(folder) {
+    return this.#folderBytes(folder);
+  }
+
+  async #folderBytes(folder) {
+    try {
+      const entries = await readdir(folder, { withFileTypes: true });
+      const sizes = await Promise.all(
+        entries.map(async (entry) => {
+          const path = join(folder, entry.name);
+          if (entry.isDirectory()) return this.#folderBytes(path);
+          const info = await stat(path);
+          return info.size;
+        }),
+      );
+      return sizes.reduce((total, bytes) => total + bytes, 0);
+    } catch {
+      return 0;
     }
   }
 

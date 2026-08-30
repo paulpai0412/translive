@@ -110,7 +110,7 @@ test("stores distinct single-session and aggregate summaries with source session
   const aggregate = await store.saveAggregateSummary({
     generatedAtMs: 11,
     id: "aggregate-001",
-    markdown: "# 跨場摘要匯整\n\n## 共同主題\n- 生產\n",
+    markdown: "# 跨場摘要匯整\n\n## 共同主題\n- 僅限 session-a 的內容\n",
     sourceSessions: [
       { id: "session-a", timestamps: [1] },
       { id: "session-b", timestamps: [3] },
@@ -138,7 +138,13 @@ test("stores distinct single-session and aggregate summaries with source session
   );
 
   await store.deleteSession("session-a");
-  await store.deleteAggregate("aggregate-001");
+  assert.deepEqual(await store.listAggregates(), []);
+  await assert.rejects(store.readAggregate("aggregate-001"));
+  await assert.rejects(
+    readFile(
+      join(directory, "summaries", "aggregate-aggregate-001", "summary.md"),
+    ),
+  );
   const [remaining] = await store.listSessions();
   assert.equal(remaining.id, "session-b");
   assert.equal(remaining.durationMs, 1);

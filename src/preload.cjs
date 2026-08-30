@@ -20,8 +20,12 @@ contextBridge.exposeInMainWorld("translive", {
     ipcRenderer.invoke("translive:meeting-setup-restore"),
   meetingSetupOpenSettings: (appName) =>
     ipcRenderer.invoke("translive:meeting-setup-open-settings", appName),
+  diagnosticsExport: () =>
+    ipcRenderer.invoke("translive:diagnostics-export"),
   recordsConsentStatus: () =>
     ipcRenderer.invoke("translive:records-consent-status"),
+  recordsRetentionStatus: () =>
+    ipcRenderer.invoke("translive:records-retention-status"),
   recordsConsentGrant: (request) =>
     ipcRenderer.invoke("translive:records-consent-grant", request),
   recordsList: () => ipcRenderer.invoke("translive:records-list"),
@@ -55,6 +59,8 @@ contextBridge.exposeInMainWorld("translive", {
     ipcRenderer.send("translive:renderer-error", { direction, message }),
   rendererBlocked: (config, reason) =>
     ipcRenderer.send("translive:renderer-blocked", { config, reason }),
+  rendererControlAck: (acknowledgement) =>
+    ipcRenderer.send("translive:renderer-control-ack", acknowledgement),
   onEvent: (listener) => {
     const handler = (_event, payload) => listener(payload);
     ipcRenderer.on("translive:event", handler);

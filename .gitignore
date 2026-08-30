@@ -3,6 +3,9 @@
 node_modules/
 dist/
 out/
+/release/
+/assets/codex/win32/codex.exe
+/assets/codex/win32/codex.exe.sig
 coverage/
 .translive-evidence/
 .env

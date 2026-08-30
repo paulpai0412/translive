@@ -1,4 +1,7 @@
-import { CodexAppServer, DEFAULT_CODEX_APP_SERVER_ARGS } from "./codex-app-server.js";
+import {
+  CodexAppServer,
+  DEFAULT_CODEX_APP_SERVER_ARGS,
+} from "./codex-app-server.js";
 
 function accountState(account) {
   return account?.type === "chatgpt" ? "connected" : "logged-out";
@@ -32,7 +35,9 @@ export class AccountController {
     const client = this.#createClient();
     try {
       await client.start();
-      const result = await client.request("account/read", { refreshToken: true });
+      const result = await client.request("account/read", {
+        refreshToken: true,
+      });
       return { state: accountState(result.account) };
     } finally {
       await client.close();
@@ -80,8 +85,9 @@ export class AccountController {
       };
       this.#login = login;
       retained = true;
-      client.on("notification", (notification) =>
-        void this.#handleNotification(login, notification),
+      client.on(
+        "notification",
+        (notification) => void this.#handleNotification(login, notification),
       );
       this.#publish({ type: "account", state: "waiting" });
       return login.result;
@@ -112,12 +118,15 @@ export class AccountController {
     }
   }
 
-  async logout() {
+  async logout({ cancelPendingLogin = true } = {}) {
+    if (cancelPendingLogin) await this.cancelLogin();
     const client = this.#createClient();
     try {
       await client.start();
       await client.request("account/logout", {});
-      this.#publish({ type: "account", state: "logged-out" });
+      const result = { state: "logged-out" };
+      this.#publish({ type: "account", ...result });
+      return result;
     } finally {
       await client.close();
     }
