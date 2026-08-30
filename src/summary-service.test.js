@@ -157,7 +157,10 @@ test("uses a pinned-valid ephemeral text turn and never forwards tokens", async 
   assert.equal(thread.params.approvalPolicy, "never");
   assert.equal(thread.params.sandbox, "read-only");
   assert.equal(turn.params.approvalPolicy, "never");
-  assert.equal(turn.params.sandboxPolicy, "read-only");
+  assert.deepEqual(turn.params.sandboxPolicy, {
+    type: "readOnly",
+    networkAccess: false,
+  });
   assert.match(turn.params.input[0].text, /只輸出符合以下 JSON schema/);
   assert.doesNotMatch(serialized, /sk-secret-value/);
   assert.doesNotMatch(serialized, /audio|sdp/i);

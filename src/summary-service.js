@@ -373,7 +373,7 @@ export class CodexSummaryService {
             text_elements: [],
           },
         ],
-        sandboxPolicy: "read-only",
+        sandboxPolicy: { type: "readOnly", networkAccess: false },
         threadId,
       });
       turnId = turnResult?.turn?.id;
