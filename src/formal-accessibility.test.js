@@ -112,6 +112,57 @@ test("renderer advances deferred RX target captions only when speech fallback di
   assert.match(renderer, /部分尾端翻譯未朗讀，字幕與逐字稿已保留。/);
 });
 
+test("keeps saved-record paths concise, diagnostics current, and captions outside the main renderer", async () => {
+  const [html, css, preload, renderer] = await Promise.all([
+    readFile(new URL("./index.html", import.meta.url), "utf8"),
+    readFile(new URL("./styles.css", import.meta.url), "utf8"),
+    readFile(new URL("./preload.cjs", import.meta.url), "utf8"),
+    readFile(new URL("./renderer-entry.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(
+    renderer,
+    /stopped-copy"\]\.title = presentation\.pathDetail \?\? ""/,
+  );
+  assert.match(css, /\.stopped-panel p,[\s\S]{0,180}overflow-wrap: anywhere/);
+  assert.match(
+    renderer,
+    /diagnosticsPresentation\(\{[\s\S]{0,100}mode: ui\.mode/,
+  );
+  assert.doesNotMatch(
+    renderer,
+    /elements\[`diag-\$\{event\.direction\}`\]\.textContent = event\.state/,
+  );
+  assert.match(
+    renderer,
+    /function setMode\(mode\)[\s\S]{0,1800}renderDiagnostics\(\)/,
+  );
+  assert.match(
+    renderer,
+    /function setChannelState\(direction, state\)[\s\S]{0,1000}renderDiagnostics\(\)/,
+  );
+  assert.match(preload, /miniCaptionShow/);
+  assert.match(preload, /miniCaptionUpdate/);
+  assert.match(renderer, /miniCaptionShow\(miniCaptionSnapshot\(\)\)/);
+  assert.match(renderer, /miniCaptionUpdate\(miniCaptionSnapshot\(\)\)/);
+  assert.doesNotMatch(html, /id="mini-overlay"/);
+  assert.doesNotMatch(css, /\.mini-overlay/);
+});
+
+test("applies route-valid device recommendations while preserving manual physical choices", async () => {
+  const renderer = await readFile(
+    new URL("./renderer-entry.js", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(renderer, /recommendModeDevices\(\{/);
+  assert.match(renderer, /applyModeDeviceRecommendations\(\);/);
+  assert.match(renderer, /rememberManualPhysicalDevice\("physicalMic"\)/);
+  assert.match(renderer, /rememberManualPhysicalDevice\("headphones"\)/);
+  assert.match(renderer, /headphones-confirmed"\]\.checked = false/);
+  assert.match(renderer, /route-profile"\]\.addEventListener\("change"/);
+});
+
 test("enumerates audio devices as soon as ChatGPT is connected", async () => {
   const renderer = await readFile(
     new URL("./renderer-entry.js", import.meta.url),

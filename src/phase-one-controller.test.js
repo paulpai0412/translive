@@ -497,7 +497,10 @@ test("suppresses ordered delayed echoes and duplicate finals without replaying s
   await controller.start(media);
   client.assistant("第一段完成。", { final: true });
   await timers.fireHead();
-  assert.deepEqual(client.appendRequests.map((request) => request.text), ["第一段完成。"]);
+  assert.deepEqual(
+    client.appendRequests.map((request) => request.text),
+    ["第一段完成。"],
+  );
 
   // A duplicate source final can arrive before the append RPC acknowledges.
   client.assistant("第一段完成。", { final: true });
@@ -706,7 +709,9 @@ test("drains an eligible stop tail, reports a sub-minimum tail as unsent, and su
   };
   const shortEvents = [];
   const short = controllerFor({
-    evidenceDirectory: await mkdtemp(join(tmpdir(), "translive-controller-short-tail-")),
+    evidenceDirectory: await mkdtemp(
+      join(tmpdir(), "translive-controller-short-tail-"),
+    ),
     createClient: () => shortClient,
     publish: (event) => shortEvents.push(event),
     pacingPolicy: testPacingPolicy({

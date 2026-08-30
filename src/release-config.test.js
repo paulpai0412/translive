@@ -24,7 +24,13 @@ test("packages only production runtime files and excludes secrets, evidence, and
   for (const path of [
     "package.json",
     "src/adaptive-pacing-controller.js",
+    "src/device-recommendations.js",
     "src/json-file-store.js",
+    "src/mini-caption-window.js",
+    "src/mini-caption.html",
+    "src/mini-caption.css",
+    "src/mini-caption-preload.cjs",
+    "src/mini-caption-renderer.js",
     "src/main.js",
     "src/windows-audio-defaults-controller.js",
     "src/windows-audio-defaults-store.js",

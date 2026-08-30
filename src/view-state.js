@@ -43,6 +43,24 @@ export function modeLabel(mode) {
   return MODE_LABELS[mode] ?? "翻譯";
 }
 
+export function diagnosticsPresentation({ mode, status = {} }) {
+  const active =
+    {
+      meeting: new Set(["tx", "rx"]),
+      media: new Set(["rx"]),
+      microphone: new Set(["tx"]),
+    }[mode] ?? new Set(["tx", "rx"]);
+  return {
+    mode: modeLabel(mode),
+    tx: channelStateLabel(
+      active.has("tx") ? (status.tx ?? "disabled") : "disabled",
+    ),
+    rx: channelStateLabel(
+      active.has("rx") ? (status.rx ?? "disabled") : "disabled",
+    ),
+  };
+}
+
 export function runStatePresentation({ appState, mode, status = {} }) {
   if (appState === "degraded") {
     if (mode === "media") {

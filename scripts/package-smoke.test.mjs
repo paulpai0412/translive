@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -33,6 +33,17 @@ async function writeStagedWindowsApp(appDirectory) {
       }),
     ),
     writeFile(join(appDirectory, "src", "main.js"), "export {};\n"),
+    writeFile(
+      join(appDirectory, "src", "mini-caption.html"),
+      "<!doctype html>\n",
+    ),
+    writeFile(join(appDirectory, "src", "mini-caption.css"), ""),
+    writeFile(join(appDirectory, "src", "mini-caption-preload.cjs"), ""),
+    writeFile(join(appDirectory, "src", "mini-caption-renderer.js"), ""),
+    writeFile(
+      join(appDirectory, "src", "mini-caption-window.js"),
+      "export {};\n",
+    ),
     writeFile(join(appDirectory, "scripts", "windows-meeting-devices.ps1"), ""),
     writeFile(
       join(appDirectory, "assets", "translive-brand", "translive-mark.svg"),
@@ -73,6 +84,17 @@ test("package smoke resolves a staged verified Windows Codex bundle from package
     source: "bundled",
     version: "0.150.0",
   });
+});
+
+test("package smoke requires all separate mini-caption runtime assets", async () => {
+  const appDirectory = await mkdtemp(join(tmpdir(), "translive-packaged-app-"));
+  await writeStagedWindowsApp(appDirectory);
+  await rm(join(appDirectory, "src", "mini-caption-preload.cjs"));
+
+  await assert.rejects(
+    smokePackage({ appDirectory, arch: "x64", platform: "win32" }),
+    /mini-caption-preload/i,
+  );
 });
 
 test("package smoke rejects unapproved source and brand files", async () => {

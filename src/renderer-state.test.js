@@ -28,11 +28,30 @@ test("keeps live persistence status honest before and after a save result", () =
     }),
     {
       live: "逐字稿已保存",
-      stopped:
-        "逐字稿已保存至 C:\\Users\\Ada\\AppData\\Local\\TransLive\\meetings\\session。",
+      stopped: "逐字稿已保存至本機紀錄。",
+      pathDetail:
+        "C:\\Users\\Ada\\AppData\\Local\\TransLive\\meetings\\session",
       summary: true,
     },
   );
+});
+
+test("keeps a long Windows record path out of the stopped message while retaining it for assistive detail", () => {
+  const path =
+    "C:\\Users\\TimmyPai\\AppData\\Local\\TransLive\\meetings\\sessions\\53f3c44d-81cb-4839-814f-3203743a9888";
+  const presentation = transcriptPersistencePresentation({
+    consentGranted: true,
+    event: { path, state: "saved" },
+    skipForCurrentRun: false,
+  });
+
+  assert.deepEqual(presentation, {
+    live: "逐字稿已保存",
+    stopped: "逐字稿已保存至本機紀錄。",
+    pathDetail: path,
+    summary: true,
+  });
+  assert.equal(presentation.stopped.includes(path), false);
 });
 
 test("surfaces a save failure without offering a summary CTA", () => {

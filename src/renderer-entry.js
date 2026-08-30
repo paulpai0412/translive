@@ -1,4 +1,11 @@
 import {
+  emptyDevicePreferences,
+  loadDevicePreferences,
+  recommendModeDevices,
+  rememberDeviceLabel,
+  saveDevicePreferences,
+} from "./device-recommendations.js";
+import {
   createRendererControlHandler,
   releaseRendererResources as releaseResources,
 } from "./renderer-control.js";
@@ -12,6 +19,7 @@ import {
 import {
   channelStateLabel,
   diagnosticEventLabel,
+  diagnosticsPresentation,
   modeLabel,
   runStatePresentation,
 } from "./view-state.js";
@@ -58,7 +66,6 @@ const elements = Object.fromEntries(
     "close-quick-setup",
     "tray-close-behavior",
     "close-diagnostics",
-    "close-mini",
     "copy-diagnostics",
     "diagnostics-button",
     "diagnostics-button-live",
@@ -88,10 +95,6 @@ const elements = Object.fromEntries(
     "live-route-summary",
     "live-save-status",
     "live-status",
-    "mini-overlay",
-    "mini-primary",
-    "mini-secondary",
-    "mini-status",
     "mini-overlay-button",
     "meeting-platform",
     "physical-mic",
@@ -175,9 +178,22 @@ const ui = {
   },
   quickApp: "teams",
   devices: { inputs: [], outputs: [] },
+  devicePreferences: emptyDevicePreferences(),
+  missingRecommendedDevices: [],
+  selectedHeadphonesId: "",
   runtime: "尚未檢查",
 };
 const focusOrigins = new WeakMap();
+
+function localDeviceStorage() {
+  try {
+    return window.localStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+ui.devicePreferences = loadDevicePreferences(localDeviceStorage());
 
 async function releaseRendererResources() {
   const startup = ui.startup;
@@ -266,6 +282,9 @@ function setMode(mode) {
     elements["live-route-summary"].textContent = "VoiceMeeter · Cove";
   }
   elements["single-mute-button"].dataset.direction = singleDirection;
+  applyModeDeviceRecommendations();
+  renderDiagnostics();
+  publishMiniCaption();
   updateReadyMessage();
 }
 
@@ -373,6 +392,7 @@ function applyTranscriptPersistence(event) {
   });
   elements["live-save-status"].textContent = presentation.live;
   elements["stopped-copy"].textContent = presentation.stopped;
+  elements["stopped-copy"].title = presentation.pathDetail ?? "";
   elements["stopped-generate-summary"].hidden = !presentation.summary;
 }
 
@@ -547,6 +567,63 @@ function populateSelect(select, devices, previous) {
   }
 }
 
+const DEVICE_SELECTS = Object.freeze({
+  headphones: "headphones",
+  physicalMic: "physical-mic",
+  rxSource: "rx-source",
+  txSink: "tx-sink",
+});
+
+function setRecommendedDevice(slot, device) {
+  const select = elements[DEVICE_SELECTS[slot]];
+  if (!select || !device?.deviceId) return false;
+  if (![...select.options].some((option) => option.value === device.deviceId)) {
+    return false;
+  }
+  const changed = select.value !== device.deviceId;
+  select.value = device.deviceId;
+  if (slot === "headphones") {
+    if (changed) elements["headphones-confirmed"].checked = false;
+    ui.selectedHeadphonesId = device.deviceId;
+  }
+  return changed;
+}
+
+function applyModeDeviceRecommendations() {
+  if (!ui.devices.inputs.length && !ui.devices.outputs.length) {
+    ui.missingRecommendedDevices = [];
+    return;
+  }
+  const recommendation = recommendModeDevices({
+    devices: ui.devices,
+    mode: ui.mode,
+    preferences: ui.devicePreferences,
+    routeProfile: elements["route-profile"].value,
+  });
+  ui.missingRecommendedDevices = recommendation.missing;
+  for (const [slot, device] of Object.entries(recommendation.selections)) {
+    setRecommendedDevice(slot, device);
+  }
+}
+
+function rememberManualPhysicalDevice(slot) {
+  const select = elements[DEVICE_SELECTS[slot]];
+  const option = select?.selectedOptions[0];
+  if (!option?.value) return;
+  if (slot === "headphones") {
+    if (ui.selectedHeadphonesId !== option.value) {
+      elements["headphones-confirmed"].checked = false;
+    }
+    ui.selectedHeadphonesId = option.value;
+  }
+  ui.devicePreferences = rememberDeviceLabel(ui.devicePreferences, {
+    label: option.textContent,
+    mode: ui.mode,
+    slot,
+  });
+  saveDevicePreferences(localDeviceStorage(), ui.devicePreferences);
+}
+
 async function refreshDevices() {
   elements["ready-message"].textContent = "正在要求麥克風權限並檢查裝置…";
   try {
@@ -571,6 +648,7 @@ async function refreshDevices() {
       outputs,
       elements["headphones"].value,
     );
+    applyModeDeviceRecommendations();
     elements["health-devices"].className = "ok";
     updateReadyMessage();
   } catch {
@@ -589,7 +667,18 @@ function updateReadyMessage() {
     media: "只建立 RX 翻譯連線，不使用麥克風。",
     microphone: "只建立 TX 翻譯連線，不使用耳機或 RX 來源。",
   }[ui.mode];
-  elements["ready-message"].textContent = description;
+  const missingLabels = {
+    headphones: "耳機輸出",
+    physicalMic: "實體麥克風",
+    rxSource: "虛擬音訊來源",
+    txSink: "虛擬麥克風輸出",
+  };
+  const missing = ui.missingRecommendedDevices
+    .map((slot) => missingLabels[slot])
+    .filter(Boolean);
+  elements["ready-message"].textContent = missing.length
+    ? `找不到${missing.join("、")}，請確認路由裝置後重新檢查。`
+    : description;
 }
 
 function setChannelState(direction, state) {
@@ -607,6 +696,8 @@ function setChannelState(direction, state) {
     button.disabled = !["live", "muted"].includes(state);
     button.textContent = ui.muted[direction] ? "取消靜音" : "靜音";
   }
+  renderDiagnostics();
+  publishMiniCaption();
 }
 
 function applyAggregate(aggregate) {
@@ -626,6 +717,21 @@ function mergeCaption(current, incoming, final) {
   return current.endsWith(incoming) ? current : `${current}${incoming}`;
 }
 
+function miniCaptionSnapshot() {
+  const direction = activeSingleDirection();
+  const captions = ui.captions[direction];
+  return {
+    mode: modeLabel(ui.mode),
+    primary: captions.target || captions.source || "等待翻譯字幕…",
+    secondary: ui.mode === "meeting" ? ui.captions.tx.target || "" : "",
+    status: `${modeLabel(ui.mode)} · ${channelStateLabel(ui.channels[direction])}`,
+  };
+}
+
+function publishMiniCaption() {
+  window.translive.miniCaptionUpdate(miniCaptionSnapshot());
+}
+
 function renderCaptions() {
   for (const direction of ["tx", "rx"]) {
     const captions = ui.captions[direction];
@@ -639,10 +745,7 @@ function renderCaptions() {
   elements["single-source-caption"].textContent =
     captions.source || "等待輸入音訊…";
   elements["single-target-caption"].textContent = captions.target || "—";
-  const targetText = captions.target || captions.source || "等待翻譯字幕…";
-  elements["mini-primary"].textContent = targetText;
-  elements["mini-secondary"].textContent =
-    ui.mode === "meeting" ? ui.captions.tx.target || "" : "";
+  publishMiniCaption();
 }
 
 function resetLiveDisplay() {
@@ -1044,14 +1147,26 @@ function advanceSpeechFallbackCaption({ direction, characters, state }) {
   renderCaptions();
 }
 
+function renderDiagnostics(status = ui.channels) {
+  const presentation = diagnosticsPresentation({
+    mode: ui.mode,
+    status,
+  });
+  elements["diag-mode"].textContent = presentation.mode;
+  elements["diag-tx"].textContent = presentation.tx;
+  elements["diag-rx"].textContent = presentation.rx;
+}
+
 function updateDiagnostics(event) {
+  const status =
+    event.type === "state" && event.direction
+      ? { ...ui.channels, [event.direction]: event.state }
+      : ui.channels;
+  renderDiagnostics(status);
   elements["diag-last-event"].textContent = diagnosticEventLabel(event.type);
   elements["diag-event-detail"].textContent = event.direction
     ? `${event.type} · ${event.direction.toUpperCase()}`
     : event.type;
-  if (event.type === "state") {
-    elements[`diag-${event.direction}`].textContent = event.state;
-  }
 }
 
 function applyGlobalAudioStatus({ state } = {}) {
@@ -1621,6 +1736,16 @@ function setView(view) {
 for (const button of document.querySelectorAll("[data-mode-button]")) {
   button.addEventListener("click", () => setMode(button.dataset.modeButton));
 }
+elements["route-profile"].addEventListener("change", () => {
+  applyModeDeviceRecommendations();
+  updateReadyMessage();
+});
+elements["physical-mic"].addEventListener("change", () =>
+  rememberManualPhysicalDevice("physicalMic"),
+);
+elements["headphones"].addEventListener("change", () =>
+  rememberManualPhysicalDevice("headphones"),
+);
 for (const button of document.querySelectorAll("[data-view-button]")) {
   button.addEventListener("click", () => setView(button.dataset.viewButton));
 }
@@ -1744,13 +1869,12 @@ elements["stopped-generate-summary"].addEventListener("click", () => {
 for (const button of document.querySelectorAll("[data-quick-app]")) {
   button.addEventListener("click", () => setQuickApp(button.dataset.quickApp));
 }
-elements["mini-overlay-button"].addEventListener("click", () => {
-  elements["mini-overlay"].classList.add("is-open");
-  elements["mini-overlay"].setAttribute("aria-hidden", "false");
-});
-elements["close-mini"].addEventListener("click", () => {
-  elements["mini-overlay"].classList.remove("is-open");
-  elements["mini-overlay"].setAttribute("aria-hidden", "true");
+elements["mini-overlay-button"].addEventListener("click", async () => {
+  try {
+    await window.translive.miniCaptionShow(miniCaptionSnapshot());
+  } catch {
+    showAssertiveError("無法開啟迷你字幕視窗，請稍後再試。");
+  }
 });
 elements["account-button"].addEventListener("click", () => setView("settings"));
 elements["settings-account-button"].addEventListener(

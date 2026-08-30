@@ -30,6 +30,15 @@ export async function smokePackage({ appDirectory, platform }) {
     throw new Error("Packaged version does not match release metadata");
   }
   await stat(join(appDirectory, "src", "main.js"));
+  for (const asset of [
+    "mini-caption.html",
+    "mini-caption.css",
+    "mini-caption-preload.cjs",
+    "mini-caption-renderer.js",
+    "mini-caption-window.js",
+  ]) {
+    await stat(join(appDirectory, "src", asset));
+  }
   await stat(join(appDirectory, "scripts", "windows-meeting-devices.ps1"));
   await stat(
     join(appDirectory, "assets", "translive-brand", "translive-mark.svg"),

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TransLive 迷你字幕</title>
+    <link rel="stylesheet" href="./mini-caption.css" />
+  </head>
+  <body>
+    <header class="drag-region">
+      <span id="mini-mode">TransLive</span>
+      <button id="return-main" type="button">回到主視窗</button>
+    </header>
+    <main aria-live="polite" aria-atomic="false">
+      <p id="mini-status">等待翻譯</p>
+      <p id="mini-primary">等待翻譯字幕…</p>
+      <p id="mini-secondary"></p>
+    </main>
+    <script type="module" src="./mini-caption-renderer.js"></script>
+  </body>
+</html>

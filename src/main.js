@@ -6,6 +6,7 @@ import {
   Menu,
   nativeImage,
   Notification,
+  screen,
   session,
   shell,
   Tray,
@@ -20,6 +21,7 @@ import { buildDiagnostics } from "./diagnostics-service.js";
 import { MeetingSetupController } from "./meeting-setup-controller.js";
 import { sanitizeMeetingSetupRequest } from "./meeting-setup-request.js";
 import { MeetingSetupStore } from "./meeting-setup-store.js";
+import { MiniCaptionWindowController } from "./mini-caption-window.js";
 import { PhaseOneController } from "./phase-one-controller.js";
 import { allowsLocalAudioPermission } from "./permissions.js";
 import { recordsDirectory } from "./records-path.js";
@@ -50,6 +52,7 @@ let codexLaunch;
 let activeMode = "meeting";
 let controller;
 let meetingSetupController;
+let miniCaptionWindowController;
 let quitting = false;
 let recordsStore;
 let summaryController;
@@ -155,7 +158,13 @@ function createWindow() {
   trayController?.setWindow(mainWindow);
   mainWindow.once("ready-to-show", () => mainWindow.show());
   mainWindow.on("close", (event) => {
-    if (quitting || !trayController?.shouldHideOnClose()) return;
+    if (quitting) return;
+    if (!trayController?.shouldHideOnClose()) {
+      event.preventDefault();
+      miniCaptionWindowController?.dispose();
+      app.quit();
+      return;
+    }
     event.preventDefault();
     void trayController.handleWindowClose().then((result) => {
       if (result.notice && Notification.isSupported()) {
@@ -192,6 +201,17 @@ function registerIpc() {
     accountController.cancelLogin(),
   );
   ipcMain.handle("translive:audio-defaults-status", () => globalAudioState);
+  ipcMain.handle("translive:mini-caption-show", (event, snapshot) => {
+    if (event.sender !== mainWindow?.webContents) return { shown: false };
+    return miniCaptionWindowController?.show(snapshot) ?? { shown: false };
+  });
+  ipcMain.on("translive:mini-caption-update", (event, snapshot) => {
+    if (event.sender !== mainWindow?.webContents) return;
+    miniCaptionWindowController?.update(snapshot);
+  });
+  ipcMain.on("translive:mini-caption-return", () =>
+    miniCaptionWindowController?.hideAndFocusMain(),
+  );
   ipcMain.handle("translive:preflight", (_event, config) =>
     controller.preflight(config),
   );
@@ -436,6 +456,22 @@ if (!isPrimaryInstance) {
       : Promise.resolve({ state: "legacy-recovery-needed" });
     const globalAudioStartup = await globalAudioStartupPromise;
     globalAudioState = globalAudioStartup;
+    miniCaptionWindowController = new MiniCaptionWindowController({
+      createWindow: (options) =>
+        new BrowserWindow({
+          ...options,
+          icon: windowIconPath,
+          webPreferences: {
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: true,
+            preload: join(sourceDirectory, "mini-caption-preload.cjs"),
+          },
+        }),
+      getMainWindow: () => mainWindow,
+      getWorkArea: () => screen.getPrimaryDisplay().workArea,
+      pagePath: join(sourceDirectory, "mini-caption.html"),
+    });
     createWindow();
     rendererControls = new RendererControlBridge({ send: sendRendererControl });
     translationLifecycle = new TranslationLifecycle({
@@ -510,6 +546,7 @@ if (!isPrimaryInstance) {
         }
       })
       .finally(() => {
+        miniCaptionWindowController?.dispose();
         rendererControls?.dispose();
         app.quit();
       });

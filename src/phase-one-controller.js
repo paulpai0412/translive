@@ -680,10 +680,7 @@ export class PhaseOneController {
     const sourceDeltas = state.source.deltas;
     if (sourceDeltas) {
       state.source.deltas = "";
-      if (
-        !skipFinalDedupe &&
-        this.#isRecentSourceFinal(state, text, atMs)
-      ) {
+      if (!skipFinalDedupe && this.#isRecentSourceFinal(state, text, atMs)) {
         return { suppressed: true };
       }
       this.#rememberSourceFinal(state, text, atMs);
@@ -699,10 +696,7 @@ export class PhaseOneController {
       ? { suppressed: false }
       : this.#consumeSpeechEcho(state, notification, atMs);
     if (echo.suppressed) return echo;
-    if (
-      !skipFinalDedupe &&
-      this.#isRecentSourceFinal(state, text, atMs)
-    ) {
+    if (!skipFinalDedupe && this.#isRecentSourceFinal(state, text, atMs)) {
       return { suppressed: true };
     }
     this.#rememberSourceFinal(state, text, atMs);

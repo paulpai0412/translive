@@ -8,6 +8,10 @@ contextBridge.exposeInMainWorld("translive", {
     ipcRenderer.invoke("translive:account-login-cancel"),
   audioDefaultsStatus: () =>
     ipcRenderer.invoke("translive:audio-defaults-status"),
+  miniCaptionShow: (snapshot) =>
+    ipcRenderer.invoke("translive:mini-caption-show", snapshot),
+  miniCaptionUpdate: (snapshot) =>
+    ipcRenderer.send("translive:mini-caption-update", snapshot),
   preflight: (config) => ipcRenderer.invoke("translive:preflight", config),
   start: (config) => ipcRenderer.invoke("translive:start", config),
   answerApplied: (direction) =>

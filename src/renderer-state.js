@@ -54,7 +54,8 @@ export function transcriptPersistencePresentation({
   if (event?.state === "saved") {
     return {
       live: "逐字稿已保存",
-      stopped: `逐字稿已保存至 ${event.path ?? "本機 TransLive meetings"}。`,
+      stopped: "逐字稿已保存至本機紀錄。",
+      pathDetail: typeof event.path === "string" ? event.path : undefined,
       summary: true,
     };
   }

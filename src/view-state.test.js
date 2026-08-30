@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   channelStateLabel,
   diagnosticEventLabel,
+  diagnosticsPresentation,
   modeLabel,
   runStatePresentation,
 } from "./view-state.js";
@@ -51,6 +52,42 @@ test("keeps raw event codes out of visible diagnostic summaries", () => {
   assert.equal(diagnosticEventLabel("record"), "紀錄已保存");
   assert.equal(diagnosticEventLabel("summary"), "摘要狀態更新");
   assert.equal(diagnosticEventLabel("pacing"), "翻譯節奏調整");
+});
+
+test("derives diagnostics from the selected active mode and localized channel state", () => {
+  assert.deepEqual(
+    diagnosticsPresentation({
+      mode: "media",
+      status: { tx: "disabled", rx: "live" },
+    }),
+    {
+      mode: "媒體翻譯",
+      rx: "翻譯中",
+      tx: "未啟用",
+    },
+  );
+  assert.deepEqual(
+    diagnosticsPresentation({
+      mode: "media",
+      status: { tx: "live", rx: "connecting" },
+    }),
+    {
+      mode: "媒體翻譯",
+      rx: "連線中",
+      tx: "未啟用",
+    },
+  );
+  assert.deepEqual(
+    diagnosticsPresentation({
+      mode: "microphone",
+      status: { tx: "muted", rx: "live" },
+    }),
+    {
+      mode: "麥克風翻譯",
+      rx: "未啟用",
+      tx: "已靜音",
+    },
+  );
 });
 
 test("names each selected mode in Traditional Chinese", () => {

@@ -130,7 +130,7 @@ for (const required of [
   'id="route-profile"',
   'id="tx-sink"',
   'id="diagnostics-drawer"',
-  'id="mini-overlay"',
+  'id="mini-overlay-button"',
   'id="quick-setup-modal"',
   'id="tray-close-behavior"',
   'data-view-button="history"',
@@ -164,6 +164,8 @@ for (const required of [
   "summaryAggregateStart",
   "summaryCancel",
   "audioDefaultsStatus",
+  "miniCaptionShow",
+  "miniCaptionUpdate",
   "rendererControlAck",
 ]) {
   if (!preload.includes(required)) {

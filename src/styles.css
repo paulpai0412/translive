@@ -114,8 +114,7 @@ button:disabled {
 .nav-item,
 .icon-button,
 .text-button,
-.channel-state button,
-.mini-overlay button {
+.channel-state button {
   background: transparent;
   border: 0;
   cursor: pointer;
@@ -661,6 +660,7 @@ body[data-mode="microphone"] #single-target-label::before {
 .stopped-panel,
 .blocked-panel {
   background: var(--surface);
+  min-width: 0;
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 32px;
@@ -676,6 +676,8 @@ body[data-mode="microphone"] #single-target-label::before {
 .blocked-panel p {
   color: var(--muted);
   line-height: 1.55;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .success-mark {
   align-items: center;
@@ -1143,38 +1145,6 @@ body[data-mode="microphone"] #single-target-label::before {
 }
 .full-width {
   width: 100%;
-}
-
-.mini-overlay {
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: 12px;
-  bottom: 26px;
-  box-shadow: var(--shadow);
-  display: none;
-  left: 26px;
-  max-width: 520px;
-  padding: 14px 16px;
-  position: fixed;
-  width: calc(100% - 52px);
-  z-index: 45;
-}
-.mini-overlay.is-open {
-  display: block;
-}
-.mini-overlay header {
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
-}
-.mini-overlay header > div {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-}
-.mini-overlay p {
-  line-height: 1.45;
-  margin: 9px 0 0;
 }
 
 @media (max-width: 1099px) {
