@@ -50,6 +50,7 @@ test("keeps raw event codes out of visible diagnostic summaries", () => {
   assert.equal(diagnosticEventLabel("tray"), "系統匣操作");
   assert.equal(diagnosticEventLabel("record"), "紀錄已保存");
   assert.equal(diagnosticEventLabel("summary"), "摘要狀態更新");
+  assert.equal(diagnosticEventLabel("pacing"), "翻譯節奏調整");
 });
 
 test("names each selected mode in Traditional Chinese", () => {

@@ -1,4 +1,8 @@
 import {
+  AdaptivePacingController,
+  NATURAL_SYNC_PACING_POLICY,
+} from "./adaptive-pacing-controller.js";
+import {
   CodexAppServer,
   DEFAULT_CODEX_APP_SERVER_ARGS,
 } from "./codex-app-server.js";
@@ -14,7 +18,6 @@ import { sanitizeText } from "./text-sanitizer.js";
 const PINNED_CODEX_VERSION = "0.145.0";
 const MODEL = "gpt-live-1-codex";
 const VOICES = Object.freeze({ tx: "cove", rx: "cove" });
-const TRANSCRIPT_TAIL_DRAIN_MS = 750;
 const TRANSLATION_PROMPTS = Object.freeze({
   tx: [
     "You are a simultaneous interpreter.",
@@ -23,6 +26,7 @@ const TRANSLATION_PROMPTS = Object.freeze({
     "Speak every interpretation aloud through the audio output; never return text only.",
     "Do not wait for sentence completion; begin speaking after each stable short phrase while continuing to listen.",
     "Keep a rolling delay near one to two seconds and translate in short clauses without restarting spoken words.",
+    "Use concise equivalent wording at a stable, natural conversational pace; do not rush speech to catch up.",
     "Never answer, explain, acknowledge, add filler, summarize, or delegate.",
     "Preserve names, numbers, dates, technical terms, intent, emotion, and pace.",
   ].join(" "),
@@ -37,8 +41,9 @@ const TRANSLATION_PROMPTS = Object.freeze({
     "Speak every interpretation aloud through the audio output; never return text only.",
     "Do not wait for sentence completion; begin speaking after each stable short phrase while continuing to listen.",
     "Keep a rolling delay near one to two seconds and translate in short clauses without restarting spoken words.",
+    "Use concise equivalent wording at a stable, natural conversational pace; do not rush speech to catch up.",
     "Never answer, explain, acknowledge, add filler, summarize, or delegate.",
-    "Preserve intent, emotion, and pace.",
+    "Preserve names, numbers, dates, technical terms, intent, emotion, and pace.",
   ].join(" "),
 });
 
@@ -61,6 +66,31 @@ function startupCanceledError() {
   const error = new Error("Translation startup canceled");
   error.name = "AbortError";
   return error;
+}
+
+function mergeStreamingText(current, incoming) {
+  const previous = String(current ?? "");
+  const next = String(incoming ?? "");
+  if (!next || previous.endsWith(next)) return previous;
+  if (next.startsWith(previous)) return next;
+  const overlap = Math.min(previous.length, next.length);
+  for (let length = overlap; length > 0; length -= 1) {
+    if (previous.endsWith(next.slice(0, length))) {
+      return `${previous}${next.slice(length)}`;
+    }
+  }
+  return `${previous}${next}`;
+}
+
+function afterSharedPrefix(previous, finalText) {
+  if (finalText.startsWith(previous)) return finalText.slice(previous.length);
+  return "";
+}
+
+function waitFor(milliseconds) {
+  return new Promise((resolve) =>
+    setTimeout(resolve, Math.max(0, milliseconds)),
+  );
 }
 
 function endpointRecords(config = {}) {
@@ -154,8 +184,11 @@ export class PhaseOneController {
   #evidenceDirectory;
   #inspectRuntime;
   #lastEvidence;
+  #pacingPolicy;
   #publish;
   #records;
+  #schedulePacing;
+  #cancelPacingSchedule;
   #starting = false;
   #startingContext;
 
@@ -174,6 +207,9 @@ export class PhaseOneController {
         args: codexArgs,
         cwd,
       }),
+    pacingPolicy = NATURAL_SYNC_PACING_POLICY,
+    schedulePacing = setTimeout,
+    cancelPacingSchedule = clearTimeout,
     publish = () => {},
     records,
   }) {
@@ -184,6 +220,9 @@ export class PhaseOneController {
     this.#evidenceDirectory = evidenceDirectory;
     this.#inspectRuntime = inspectRuntime;
     this.#createClient = createClient;
+    this.#pacingPolicy = pacingPolicy;
+    this.#schedulePacing = schedulePacing;
+    this.#cancelPacingSchedule = cancelPacingSchedule;
     this.#publish = publish;
     this.#records = records;
   }
@@ -238,11 +277,17 @@ export class PhaseOneController {
         lastTranscript: new Map(),
         transcriptEntries: [],
         speechFallback: {
-          buffer: "",
-          sawDelta: false,
-          lastText: "",
-          count: 0,
+          accepting: true,
+          echoHistory: [],
+          echoes: [],
+          generation: 0,
+          inFlight: new Map(),
+          pacer: new AdaptivePacingController({
+            policy: this.#pacingPolicy,
+          }),
           queue: Promise.resolve(),
+          source: { deltas: "", finals: [] },
+          timer: undefined,
         },
       };
       this.#startingContext = context;
@@ -375,7 +420,6 @@ export class PhaseOneController {
     if (!active)
       return { status: { tx: "stopped", rx: "stopped" }, aggregate: "stopped" };
     this.#active = undefined;
-    this.#flushRxSpeechFallback(active.context);
     await this.#finalize(active.context, { reason, outcome: "stopped" });
     this.#publish({ type: "stopped", status: active.run.status() });
     return { status: active.run.status(), aggregate: "stopped" };
@@ -529,14 +573,23 @@ export class PhaseOneController {
       notification.method === "thread/realtime/transcript/delta" ||
       notification.method === "thread/realtime/transcript/done"
     ) {
-      this.#publish({
-        type: "transcript",
+      const pacing = this.#handleRxSpeechFallback(
+        context,
         direction,
-        role: notification.params.role,
-        text: notification.params.delta ?? notification.params.text,
-      });
-      this.#recordTranscript(context, direction, notification, atMs);
-      this.#handleRxSpeechFallback(context, direction, notification);
+        notification,
+      );
+      if (!pacing.suppressed) {
+        this.#publish({
+          type: "transcript",
+          direction,
+          role: notification.params.role,
+          text: notification.params.delta ?? notification.params.text,
+          final: notification.method === "thread/realtime/transcript/done",
+          deferred:
+            direction === "rx" && notification.params.role === "assistant",
+        });
+        this.#recordTranscript(context, direction, notification, atMs);
+      }
     }
     if (
       notification.method === "thread/realtime/error" ||
@@ -584,77 +637,367 @@ export class PhaseOneController {
     });
   }
 
-  #handleRxSpeechFallback(context, direction, notification) {
-    if (direction !== "rx" || notification.params?.role !== "assistant") return;
+  #handleRxSpeechFallback(
+    context,
+    direction,
+    notification,
+    { skipEcho = false, skipFinalDedupe = false } = {},
+  ) {
+    if (direction !== "rx" || notification.params?.role !== "assistant") {
+      return { suppressed: false };
+    }
     const state = context.speechFallback;
-    if (!state || state.disabled) return;
+    // After bounded stop draining, do not publish a new deferred target that
+    // cannot be spoken or explicitly reported as unsent.
+    if (!state?.accepting) return { suppressed: true };
 
+    const atMs = Date.now();
     if (notification.method === "thread/realtime/transcript/delta") {
-      state.sawDelta = true;
-      state.buffer += notification.params.delta ?? "";
-      const characters = [...state.buffer].length;
-      if (/[，。！？；,.!?;]\s*$/.test(state.buffer) || characters >= 12) {
-        this.#flushRxSpeechFallback(context);
+      const echo = skipEcho
+        ? { suppressed: false }
+        : this.#consumeSpeechEcho(state, notification, atMs);
+      if (echo.suppressed) return echo;
+      const previous = state.source.deltas;
+      state.source.deltas = mergeStreamingText(
+        previous,
+        notification.params.delta,
+      );
+      const incoming = state.source.deltas.slice(previous.length);
+      if (!incoming) return { suppressed: true };
+      this.#applyPacingDecisions(
+        context,
+        state.pacer.ingest({ text: incoming, atMs }),
+        atMs,
+      );
+      return { suppressed: false };
+    }
+
+    if (notification.method !== "thread/realtime/transcript/done") {
+      return { suppressed: false };
+    }
+
+    const text = String(notification.params.text ?? "");
+    const sourceDeltas = state.source.deltas;
+    if (sourceDeltas) {
+      state.source.deltas = "";
+      if (
+        !skipFinalDedupe &&
+        this.#isRecentSourceFinal(state, text, atMs)
+      ) {
+        return { suppressed: true };
       }
+      this.#rememberSourceFinal(state, text, atMs);
+      const suffix = afterSharedPrefix(sourceDeltas, text);
+      const decisions = suffix
+        ? state.pacer.ingest({ text: suffix, final: true, atMs })
+        : state.pacer.drain({ atMs });
+      this.#applyPacingDecisions(context, decisions, atMs);
+      return { suppressed: false };
+    }
+
+    const echo = skipEcho
+      ? { suppressed: false }
+      : this.#consumeSpeechEcho(state, notification, atMs);
+    if (echo.suppressed) return echo;
+    if (
+      !skipFinalDedupe &&
+      this.#isRecentSourceFinal(state, text, atMs)
+    ) {
+      return { suppressed: true };
+    }
+    this.#rememberSourceFinal(state, text, atMs);
+    this.#applyPacingDecisions(
+      context,
+      state.pacer.ingest({ text, final: true, atMs }),
+      atMs,
+    );
+    return { suppressed: false };
+  }
+
+  #consumeSpeechEcho(state, notification, atMs) {
+    const text = String(
+      notification.params?.delta ?? notification.params?.text ?? "",
+    );
+    const expected = state.echoes[0];
+    // Flat experimental transcript notifications have no itemId. Hold a
+    // matching notification even before the append RPC acknowledges it; on
+    // RPC failure the held events are replayed through source handling.
+    if (expected) {
+      if (notification.method === "thread/realtime/transcript/delta") {
+        const received = mergeStreamingText(expected.received, text);
+        if (expected.text.startsWith(received)) {
+          expected.received = received;
+          if (!expected.accepted) expected.held.push(notification);
+          return { suppressed: true };
+        }
+      }
+      if (
+        notification.method === "thread/realtime/transcript/done" &&
+        (text === expected.text ||
+          (text === "" && expected.received === expected.text))
+      ) {
+        if (!expected.accepted) {
+          expected.completed = true;
+          expected.held.push(notification);
+        } else {
+          state.echoes.shift();
+          this.#rememberEcho(state, expected.text, atMs);
+        }
+        return { suppressed: true };
+      }
+    }
+    if (this.#isRecentEcho(state, text, atMs)) return { suppressed: true };
+    return { suppressed: false };
+  }
+
+  #rememberBounded(entries, value) {
+    entries.push(value);
+    const limit = this.#pacingPolicy.maxEchoHistory ?? 16;
+    if (entries.length > limit) entries.splice(0, entries.length - limit);
+  }
+
+  #rememberEcho(state, text, atMs) {
+    this.#rememberBounded(state.echoHistory, { atMs, text });
+  }
+
+  #isRecentEcho(state, text, atMs) {
+    const windowMs = this.#pacingPolicy.echoDedupeMs ?? 5_000;
+    return state.echoHistory.some(
+      (entry) => entry.text === text && atMs - entry.atMs <= windowMs,
+    );
+  }
+
+  #rememberSourceFinal(state, text, atMs) {
+    if (text) this.#rememberBounded(state.source.finals, { atMs, text });
+  }
+
+  #isRecentSourceFinal(state, text, atMs) {
+    const windowMs = this.#pacingPolicy.sourceFinalDedupeMs ?? 1_000;
+    return state.source.finals.some(
+      (entry) => entry.text === text && atMs - entry.atMs <= windowMs,
+    );
+  }
+
+  #applyPacingDecisions(context, decisions, atMs) {
+    const state = context.speechFallback;
+    if (!state?.accepting) return;
+    for (const decision of decisions) this.#publishPacingDecision(decision);
+    context.evidence.recordPacing("rx", state.pacer.metrics({ atMs }));
+    this.#armRxSpeechHead(context);
+  }
+
+  #publishPacingDecision(decision) {
+    const event = {
+      type: "pacing",
+      direction: "rx",
+      decision: decision.type,
+    };
+    for (const field of [
+      "backlogMs",
+      "characters",
+      "dispatchAtMs",
+      "estimatedDurationMs",
+    ]) {
+      if (Number.isFinite(decision[field])) event[field] = decision[field];
+    }
+    if (typeof decision.kind === "string") event.kind = decision.kind;
+    if (typeof decision.reason === "string") event.reason = decision.reason;
+    if (typeof decision.state === "string") event.state = decision.state;
+    this.#publish(event);
+  }
+
+  #pacingIsCurrent(context, state, generation) {
+    return (
+      state?.accepting && state.generation === generation && !context.finalized
+    );
+  }
+
+  #armRxSpeechHead(context) {
+    const state = context.speechFallback;
+    if (!state?.accepting || state.timer || state.inFlight.size > 0) return;
+    const now = Date.now();
+    const head = state.pacer.pendingHead();
+    const wakeAtMs =
+      head?.dispatchAtMs ?? state.pacer.nextWakeAtMs({ atMs: now });
+    if (!Number.isFinite(wakeAtMs)) return;
+    const generation = state.generation;
+    const token = { generation, headId: head?.id, timer: undefined };
+    const delayMs = Math.max(0, wakeAtMs - now);
+    token.timer = this.#schedulePacing(() => {
+      if (state.timer !== token) return;
+      state.timer = undefined;
+      if (token.headId) {
+        this.#enqueueRxSpeech(context, token.headId, token.generation);
+        return;
+      }
+      if (!this.#pacingIsCurrent(context, state, token.generation)) return;
+      const atMs = Date.now();
+      this.#applyPacingDecisions(context, state.pacer.refill({ atMs }), atMs);
+    }, delayMs);
+    state.timer = token;
+  }
+
+  #clearRxSpeechTimer(state) {
+    if (!state?.timer) return;
+    this.#cancelPacingSchedule(state.timer.timer);
+    state.timer = undefined;
+  }
+
+  #enqueueRxSpeech(context, id, generation) {
+    const state = context.speechFallback;
+    const task = state.queue.then(() =>
+      this.#dispatchRxSpeech(context, id, generation),
+    );
+    state.queue = task.catch(() => {});
+    return task;
+  }
+
+  async #dispatchRxSpeech(context, id, generation) {
+    const state = context.speechFallback;
+    if (!this.#pacingIsCurrent(context, state, generation)) return;
+    const decision = state.pacer.dispatch({ id, atMs: Date.now() });
+    if (decision.type === "wait") {
+      this.#armRxSpeechHead(context);
       return;
     }
-
-    if (notification.method === "thread/realtime/transcript/done") {
-      if (state.buffer.trim()) this.#flushRxSpeechFallback(context);
-      else if (!state.sawDelta) {
-        this.#enqueueRxSpeech(context, notification.params.text);
-      }
-      state.sawDelta = false;
-    }
-  }
-
-  #flushRxSpeechFallback(context) {
-    const state = context.speechFallback;
-    if (!state) return;
-    const text = state.buffer.trim();
-    state.buffer = "";
-    if (text) this.#enqueueRxSpeech(context, text);
-  }
-
-  #enqueueRxSpeech(context, value) {
-    const state = context.speechFallback;
-    const text = String(value ?? "").trim();
-    if (!state || state.disabled || !text || text === state.lastText) return;
+    if (decision.type !== "dispatch") return;
     const threadId = [...context.threads].find(
       ([, direction]) => direction === "rx",
     )?.[0];
     if (!threadId) return;
-    if (state.count >= 100) {
-      state.disabled = true;
-      context.evidence.recordError(
-        "rx",
-        new Error("RX speech fallback stopped after 100 chunks"),
-      );
+
+    // Register before awaiting the RPC. The flat transcript API has no
+    // correlation ID, so echo matching is an ordered, bounded heuristic.
+    const expected = {
+      accepted: false,
+      completed: false,
+      held: [],
+      received: "",
+      text: decision.text,
+    };
+    state.echoes.push(expected);
+    state.inFlight.set(expected, {
+      characters: decision.characters,
+      id: decision.id,
+    });
+    let failure;
+    try {
+      await context.client.appendSpeech(threadId, decision.text);
+    } catch (error) {
+      failure = error;
+    }
+    state.inFlight.delete(expected);
+
+    if (!this.#pacingIsCurrent(context, state, generation)) {
+      state.echoes = state.echoes.filter((entry) => entry !== expected);
+      return;
+    }
+    if (failure) {
+      state.echoes = state.echoes.filter((entry) => entry !== expected);
+      for (const held of expected.held) {
+        this.#handleRxSpeechFallback(context, "rx", held, {
+          skipEcho: true,
+          skipFinalDedupe: true,
+        });
+      }
+      context.evidence.recordError("rx", failure, {
+        requestId: requestIdFrom(failure),
+      });
+      this.#publish({
+        type: "error",
+        direction: "rx",
+        message: `Could not speak translated Chinese: ${safeMessage(failure)}`,
+        aggregate: context.run?.aggregateStatus(),
+      });
+      this.#armRxSpeechHead(context);
       return;
     }
 
-    state.lastText = text;
-    state.count += 1;
-    state.queue = state.queue.then(async () => {
-      try {
-        await context.client.appendSpeech(threadId, text);
-        this.#publish({
-          type: "speech-fallback",
-          direction: "rx",
-          characters: [...text].length,
-        });
-      } catch (error) {
-        context.evidence.recordError("rx", error, {
-          requestId: requestIdFrom(error),
-        });
-        this.#publish({
-          type: "error",
-          direction: "rx",
-          message: `Could not speak translated Chinese: ${safeMessage(error)}`,
-          aggregate: context.run?.aggregateStatus(),
-        });
-      }
+    expected.accepted = true;
+    if (expected.completed) {
+      state.echoes = state.echoes.filter((entry) => entry !== expected);
+      this.#rememberEcho(state, expected.text, Date.now());
+    }
+    expected.held = [];
+    this.#publish({
+      type: "speech-fallback",
+      direction: "rx",
+      characters: decision.characters,
+      estimatedDurationMs: decision.estimatedDurationMs,
     });
+    const atMs = Date.now();
+    this.#applyPacingDecisions(context, state.pacer.refill({ atMs }), atMs);
+  }
+
+  #cancelRxSpeechFallback(context, { publishUnsent = false } = {}) {
+    const state = context.speechFallback;
+    if (!state) return { characters: 0, segments: 0 };
+    this.#clearRxSpeechTimer(state);
+    const inFlight = [...state.inFlight.values()].reduce(
+      (total, segment) => ({
+        characters: total.characters + segment.characters,
+        segments: total.segments + 1,
+      }),
+      { characters: 0, segments: 0 },
+    );
+    state.generation += 1;
+    state.accepting = false;
+    state.echoes = [];
+    state.inFlight.clear();
+    const canceled = state.pacer.cancel();
+    const unsent = {
+      characters: canceled.characters + inFlight.characters,
+      segments: canceled.segments + inFlight.segments,
+    };
+    if (publishUnsent && unsent.characters > 0) {
+      this.#publish({
+        type: "speech-fallback",
+        direction: "rx",
+        state: "unsent",
+        characters: unsent.characters,
+        segments: unsent.segments,
+      });
+    }
+    context.evidence.recordPacing(
+      "rx",
+      state.pacer.metrics({ atMs: Date.now() }),
+    );
+    return unsent;
+  }
+
+  async #drainRxSpeechFallback(context) {
+    const state = context.speechFallback;
+    if (!state?.accepting) return;
+    const deadline = Date.now() + this.#pacingPolicy.drainTimeoutMs;
+    const generation = state.generation;
+    while (this.#pacingIsCurrent(context, state, generation)) {
+      const now = Date.now();
+      const decisions = state.pacer.drain({ atMs: now });
+      this.#applyPacingDecisions(context, decisions, now);
+      const head = state.pacer.pendingHead();
+      if (!head) {
+        const remaining = deadline - Date.now();
+        if (state.inFlight.size > 0 && remaining > 0) {
+          await Promise.race([state.queue, waitFor(remaining)]);
+        }
+        return;
+      }
+      if (head.dispatchAtMs > deadline) return;
+      this.#clearRxSpeechTimer(state);
+      const delayMs = head.dispatchAtMs - Date.now();
+      if (delayMs > 0) await waitFor(delayMs);
+      if (
+        Date.now() > deadline ||
+        !this.#pacingIsCurrent(context, state, generation)
+      ) {
+        return;
+      }
+      const task = this.#enqueueRxSpeech(context, head.id, generation);
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) return;
+      await Promise.race([task, waitFor(remaining)]);
+      if (state.inFlight.size > 0 && Date.now() >= deadline) return;
+    }
   }
 
   #recordControllerError(context, error) {
@@ -704,12 +1047,13 @@ export class PhaseOneController {
     if (this.#active?.context === context) this.#active = undefined;
     let writeError;
     try {
+      // Keep accepting only through this bounded tail window: stopRealtime can
+      // still emit a final transcript after its RPC responds. Afterwards every
+      // unsent segment is explicitly reported and future timer work is canceled.
       await context.run?.stop();
-      await new Promise((resolve) =>
-        setTimeout(resolve, TRANSCRIPT_TAIL_DRAIN_MS),
-      );
-      this.#flushRxSpeechFallback(context);
-      await context.speechFallback?.queue;
+      await waitFor(this.#pacingPolicy.tailTranscriptDrainMs);
+      await this.#drainRxSpeechFallback(context);
+      this.#cancelRxSpeechFallback(context, { publishUnsent: true });
       context.evidence.finish(Date.now(), termination);
       this.#lastEvidence = context.evidence.snapshot();
       await this.#persistTranscript(context);

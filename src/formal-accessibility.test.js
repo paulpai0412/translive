@@ -99,6 +99,19 @@ test("shows a safe global Windows audio-routing status", async () => {
   assert.doesNotMatch(renderer, /global-audio.*renderId/);
 });
 
+test("renderer advances deferred RX target captions only when speech fallback dispatches", async () => {
+  const renderer = await readFile(
+    new URL("./renderer-entry.js", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(renderer, /if \(deferred\) \{/);
+  assert.match(renderer, /event\.type === "speech-fallback"/);
+  assert.match(renderer, /advanceSpeechFallbackCaption\(event\)/);
+  assert.match(renderer, /if \(state === "unsent"\) \{/);
+  assert.match(renderer, /部分尾端翻譯未朗讀，字幕與逐字稿已保留。/);
+});
+
 test("enumerates audio devices as soon as ChatGPT is connected", async () => {
   const renderer = await readFile(
     new URL("./renderer-entry.js", import.meta.url),

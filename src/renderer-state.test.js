@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  advancePacedTargetCaption,
+  bufferPacedTargetCaption,
   latestTranscriptPersistenceEvent,
   transcriptPersistencePresentation,
 } from "./renderer-state.js";
@@ -46,6 +48,23 @@ test("surfaces a save failure without offering a summary CTA", () => {
       summary: false,
     },
   );
+});
+
+test("holds RX target captions until a speech fallback segment is dispatched", () => {
+  let caption = { pending: "", visible: "" };
+  caption = bufferPacedTargetCaption(caption, "這是一段即時", false);
+  caption = bufferPacedTargetCaption(caption, "中文翻譯內容。", false);
+
+  assert.deepEqual(caption, {
+    pending: "這是一段即時中文翻譯內容。",
+    visible: "",
+  });
+
+  caption = advancePacedTargetCaption(caption, 13);
+  assert.deepEqual(caption, {
+    pending: "",
+    visible: "這是一段即時中文翻譯內容。",
+  });
 });
 
 test("keeps the latest failed persistence result across a later stopped screen transition", () => {

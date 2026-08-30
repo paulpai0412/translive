@@ -67,12 +67,12 @@ npm start
 3. Select the four endpoints shown in the routing table.
 4. Confirm the headphone checkbox, then click **Test headphones**. The user-gesture tone must play only through the selected headphone endpoint.
 5. Click **Route preflight**. It checks endpoint kinds, uniqueness, pinned Codex version, and login status. It must pass before starting.
-6. In Zoom/Teams manually set microphone and speaker for the selected profile exactly as shown above. TransLive intentionally does not alter Windows or meeting-app settings.
+6. TransLive temporarily switches Windows default capture/render roles to VoiceMeeter for its app lifetime and restores the prior roles only on complete exit. In Zoom/Teams confirm microphone and speaker still match the selected profile; app-specific overrides can take precedence over the Windows defaults.
 7. Click **Start dual channel**. The app starts with each channel in `connecting`; it becomes `live` only after its WebRTC answer is applied. Both directions use Cove in Phase 1 because the Windows `0.150.0-alpha.8` live test produced transcripts but no audio RTP with Juniper.
 
 RX does not declare a source language. GPT-Live detects the source automatically and always renders the result in Taiwan Traditional Chinese. Non-Chinese speech is translated; input already in Traditional Chinese is faithfully reproduced instead of being silenced or routed through a separate language gate. Mixed-language speech follows the same target-only path.
 
-RX uses `thread/realtime/appendSpeech` when native Traditional-Chinese audio is absent. Assistant transcript deltas are spoken in-order whenever the buffer reaches **12 Chinese characters** or a punctuation boundary. Live testing showed that 8-character chunks were accepted but produced no audible speech, even with an added comma, so Phase 1 keeps the 12-character minimum. A 100-chunk circuit breaker prevents recursive speech loops.
+RX uses `thread/realtime/appendSpeech` when native Traditional-Chinese audio is absent. `AdaptivePacingController` uses semantic boundaries and estimated natural playout duration—not a fixed character trigger—to schedule only the queue head. The GPT-Live minimum audible capability remains policy-configured (currently verified at 12 Chinese characters); a final tail below that capability is retained in transcript/captions and reported as unsent rather than silently discarded. Outstanding segments are rolling and bounded; admission pressure coalesces only future text and never reorders committed speech.
 
 A blocked start (missing Codex entitlement, login/version mismatch, permission denial, rejected V3 request, or SDP/output-routing failure) is a valid Phase 1 no-go result. The app writes redacted blocked-attempt evidence; do not substitute another model.
 

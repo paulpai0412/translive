@@ -10,6 +10,19 @@ const GATES = Object.freeze({
   ttfaP95Ms: 2_500,
   lagP95Ms: 4_000,
 });
+const PACING_NUMERIC_FIELDS = Object.freeze([
+  "backlogMs",
+  "coalescedSegments",
+  "dispatchedSegments",
+  "fastStartSegments",
+  "lagWarningCount",
+  "maxBacklogMs",
+  "outstandingSegments",
+  "scheduledSegments",
+  "steadySegments",
+  "targetBacklogMs",
+  "waitCount",
+]);
 
 function safeTime(value) {
   return Number.isFinite(value) ? Math.round(value) : Date.now();
@@ -59,6 +72,21 @@ function gate(check, passedWhen) {
 
 function allSamples(timing, metric) {
   return Object.values(timing).flatMap((channel) => channel[metric] ?? []);
+}
+
+function pacingMetrics(metrics) {
+  const safe = Object.fromEntries(
+    PACING_NUMERIC_FIELDS.filter((field) => Number.isFinite(metrics?.[field])).map(
+      (field) => [field, Math.round(metrics[field])],
+    ),
+  );
+  if (/^[a-z-]{1,100}$/.test(metrics?.policyId ?? "")) {
+    safe.policyId = metrics.policyId;
+  }
+  if (Number.isInteger(metrics?.policyVersion)) {
+    safe.policyVersion = metrics.policyVersion;
+  }
+  return safe;
 }
 
 export class RunEvidence {
@@ -111,6 +139,7 @@ export class RunEvidence {
         rx: { ttfaMs: [], activityGapMs: [], rttMs: [] },
       },
       metrics: { tx: {}, rx: {} },
+      pacing: { tx: {}, rx: {} },
       errors: [],
       termination: { reason: null, outcome: "running" },
       gate: { result: "insufficient", checks: {} },
@@ -181,6 +210,11 @@ export class RunEvidence {
       direction,
       role: String(role ?? "unknown"),
     });
+  }
+
+  recordPacing(direction, metrics) {
+    if (!(direction in this.#data.pacing)) return;
+    this.#data.pacing[direction] = pacingMetrics(metrics);
   }
 
   recordError(direction, error, { requestId, atMs = Date.now() } = {}) {

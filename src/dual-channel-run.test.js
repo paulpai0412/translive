@@ -418,6 +418,33 @@ test("records redacted aggregate evidence without transcripts, SDP, or tokens", 
   assert.doesNotMatch(JSON.stringify(stateEvents), /short-token|v=0/);
 });
 
+test("records only aggregate pacing metrics without transcript text", () => {
+  const evidence = new RunEvidence({
+    appVersion: "test",
+    codex: {},
+    endpoints: [],
+  });
+
+  evidence.recordPacing("rx", {
+    backlogMs: 1_900,
+    dispatchedSegments: 2,
+    lagWarningCount: 1,
+    policyId: "natural-sync",
+    policyVersion: 1,
+    transcript: "這段文字不得寫入 evidence",
+  });
+  const snapshot = evidence.snapshot();
+
+  assert.deepEqual(snapshot.pacing.rx, {
+    backlogMs: 1_900,
+    dispatchedSegments: 2,
+    lagWarningCount: 1,
+    policyId: "natural-sync",
+    policyVersion: 1,
+  });
+  assert.doesNotMatch(JSON.stringify(snapshot), /這段文字/);
+});
+
 test("does not claim an interpretation-lag pass from uncorrelated audio activity", () => {
   const evidence = new RunEvidence({
     appVersion: "test",

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
+import { NATURAL_SYNC_PACING_POLICY } from "./adaptive-pacing-controller.js";
 import { PhaseOneController } from "./phase-one-controller.js";
 
 const fixture = fileURLToPath(
@@ -58,6 +59,9 @@ function controllerFor({
   inspectRuntime = readyRuntime(),
   codexArgs = [fixture],
   createClient,
+  pacingPolicy,
+  schedulePacing,
+  cancelPacingSchedule,
   records,
 } = {}) {
   return new PhaseOneController({
@@ -70,8 +74,114 @@ function controllerFor({
     publish,
     inspectRuntime,
     createClient,
+    pacingPolicy,
+    schedulePacing,
+    cancelPacingSchedule,
     records,
   });
+}
+
+class PacingClient extends EventEmitter {
+  appendRequests = [];
+  closed = false;
+  thread = { id: "pacing-rx-thread" };
+
+  async start() {}
+
+  async startEphemeralThread() {
+    return this.thread;
+  }
+
+  async startRealtime() {}
+
+  async stopRealtime() {}
+
+  async appendSpeech(threadId, text) {
+    this.appendRequests.push({ atMs: Date.now(), text, threadId });
+  }
+
+  async close() {
+    this.closed = true;
+  }
+
+  assistant(delta, { final = false } = {}) {
+    this.emit("notification", {
+      method: final
+        ? "thread/realtime/transcript/done"
+        : "thread/realtime/transcript/delta",
+      params: {
+        threadId: this.thread.id,
+        role: "assistant",
+        ...(final ? { text: delta } : { delta }),
+      },
+    });
+  }
+}
+
+class DeferredPacingClient extends PacingClient {
+  pendingAppends = [];
+
+  appendSpeech(threadId, text) {
+    this.appendRequests.push({ atMs: Date.now(), text, threadId });
+    return new Promise((resolve, reject) => {
+      this.pendingAppends.push({ reject, resolve, text });
+    });
+  }
+
+  resolveAppend(text) {
+    const pending = this.pendingAppends.find((entry) => entry.text === text);
+    if (!pending) throw new Error(`No pending append for ${text}`);
+    pending.resolve();
+  }
+
+  rejectAppend(text) {
+    const pending = this.pendingAppends.find((entry) => entry.text === text);
+    if (!pending) throw new Error(`No pending append for ${text}`);
+    pending.reject(new Error("append rejected"));
+  }
+}
+
+function manualPacingTimers() {
+  let nextId = 1;
+  const timers = new Map();
+  return {
+    clear(id) {
+      timers.delete(id);
+    },
+    schedule(callback, delay) {
+      const id = nextId++;
+      timers.set(id, { callback, delay });
+      return id;
+    },
+    async fireHead() {
+      const [id, timer] = timers.entries().next().value ?? [];
+      if (!timer) throw new Error("No pacing timer is armed");
+      timers.delete(id);
+      timer.callback();
+      await new Promise((resolve) => setImmediate(resolve));
+    },
+    get size() {
+      return timers.size;
+    },
+  };
+}
+
+function testPacingPolicy(overrides = {}) {
+  return {
+    ...NATURAL_SYNC_PACING_POLICY,
+    boundaryToleranceMs: 0,
+    chineseCharactersPerSecond: 1_000,
+    drainTimeoutMs: 20,
+    fastStartTargetMs: 40,
+    maxOutstandingSegments: 1,
+    maxScheduledBacklogMs: 300,
+    maxSegmentPlayoutMs: 100,
+    minimumAudibleCharacters: 4,
+    minimumEstimatedSpeechMs: 1,
+    steadySegmentTargetMs: 40,
+    tailTranscriptDrainMs: 0,
+    ...overrides,
+  };
 }
 
 class PendingStartClient extends EventEmitter {
@@ -198,7 +308,7 @@ test("keeps channels connecting until the renderer confirms both SDP answers", a
     events
       .filter((event) => event.type === "speech-fallback")
       .map(({ direction, characters }) => ({ direction, characters })),
-    [{ direction: "rx", characters: 9 }],
+    [{ direction: "rx", characters: 13 }],
   );
   await controller.answerApplied("tx");
   assert.deepEqual(controller.status(), { tx: "live", rx: "connecting" });
@@ -259,6 +369,362 @@ test("uses the same target-only RX path when the source is already Chinese", asy
   );
 
   await controller.stop("user-stop");
+});
+
+test("paces RX fallback in order and cancels unsent natural-playout work on stop", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-pacing-"),
+  );
+  const events = [];
+  const client = new PacingClient();
+  const pendingTimers = new Map();
+  const clearedTimers = [];
+  let nextTimer = 1;
+  const controller = controllerFor({
+    evidenceDirectory,
+    createClient: () => client,
+    publish: (event) => events.push(event),
+    pacingPolicy: {
+      ...NATURAL_SYNC_PACING_POLICY,
+      chineseCharactersPerSecond: 1,
+      fastStartTargetMs: 10_000,
+      maxScheduledBacklogMs: 10_000,
+      maxSegmentPlayoutMs: 10_000,
+      minimumAudibleCharacters: 4,
+    },
+    schedulePacing(callback, delay) {
+      if (delay === 0) return setTimeout(callback, 0);
+      const id = nextTimer++;
+      pendingTimers.set(id, { callback, delay });
+      return id;
+    },
+    cancelPacingSchedule(id) {
+      clearedTimers.push(id);
+      pendingTimers.delete(id);
+    },
+  });
+  const { tx: _tx, ...media } = validConfig({ mode: "media" });
+
+  await controller.start(media);
+  client.assistant("短。");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(client.appendRequests, []);
+
+  client.assistant("第一段。");
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.deepEqual(
+    client.appendRequests.map((request) => request.text),
+    ["短。第一段。"],
+  );
+
+  // The original final transcript must remain visible/persistable; only the
+  // subsequent appendSpeech echo is suppressed.
+  client.assistant("短。第一段。", { final: true });
+  client.assistant("短。第一段。");
+  client.assistant("短。第一段。", { final: true });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(pendingTimers.size, 0);
+
+  client.assistant("第二段。");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(pendingTimers.size, 1);
+  await controller.stop("user-stop");
+
+  assert.equal(clearedTimers.length, 1);
+  assert.equal(pendingTimers.size, 0);
+  assert.deepEqual(
+    client.appendRequests.map((request) => request.text),
+    ["短。第一段。"],
+  );
+  assert.equal(
+    events.some((event) => event.type === "speech-fallback" && "text" in event),
+    false,
+  );
+});
+
+test("arms only the RX pacing head and refills a rolling outstanding queue in order", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-pacing-head-"),
+  );
+  const client = new PacingClient();
+  const timers = manualPacingTimers();
+  const controller = controllerFor({
+    evidenceDirectory,
+    createClient: () => client,
+    pacingPolicy: testPacingPolicy({ maxOutstandingSegments: 2 }),
+    schedulePacing: timers.schedule,
+    cancelPacingSchedule: timers.clear,
+  });
+  const { tx: _tx, ...media } = validConfig({ mode: "media" });
+
+  await controller.start(media);
+  client.assistant("第一段完成。", { final: true });
+  client.assistant("第二段完成。", { final: true });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(timers.size, 1);
+
+  await timers.fireHead();
+  assert.deepEqual(
+    client.appendRequests.map((request) => request.text),
+    ["第一段完成。"],
+  );
+  assert.equal(timers.size, 1);
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  await timers.fireHead();
+  assert.deepEqual(
+    client.appendRequests.map((request) => request.text),
+    ["第一段完成。", "第二段完成。"],
+  );
+  await controller.stop("user-stop");
+});
+
+test("suppresses ordered delayed echoes and duplicate finals without replaying speech", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-pacing-echoes-"),
+  );
+  const client = new DeferredPacingClient();
+  const timers = manualPacingTimers();
+  const controller = controllerFor({
+    evidenceDirectory,
+    createClient: () => client,
+    pacingPolicy: testPacingPolicy(),
+    schedulePacing: timers.schedule,
+    cancelPacingSchedule: timers.clear,
+  });
+  const { tx: _tx, ...media } = validConfig({ mode: "media" });
+
+  await controller.start(media);
+  client.assistant("第一段完成。", { final: true });
+  await timers.fireHead();
+  assert.deepEqual(client.appendRequests.map((request) => request.text), ["第一段完成。"]);
+
+  // A duplicate source final can arrive before the append RPC acknowledges.
+  client.assistant("第一段完成。", { final: true });
+  client.resolveAppend("第一段完成。");
+  await new Promise((resolve) => setImmediate(resolve));
+  client.assistant("第一段完成。");
+  client.assistant("第一段完成。", { final: true });
+
+  client.assistant("第二段完成。", { final: true });
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  await timers.fireHead();
+  client.resolveAppend("第二段完成。");
+  await new Promise((resolve) => setImmediate(resolve));
+  client.assistant("第二段完成。");
+  client.assistant("第二段完成。", { final: true });
+
+  // A delayed duplicate echo for A must not be interpreted as fresh source.
+  client.assistant("第一段完成。");
+  client.assistant("第一段完成。", { final: true });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(
+    client.appendRequests.map((request) => request.text),
+    ["第一段完成。", "第二段完成。"],
+  );
+  await controller.stop("user-stop");
+});
+
+test("holds a matching append echo that arrives before the RPC acknowledgement", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-pacing-pre-ack-echo-"),
+  );
+  const client = new DeferredPacingClient();
+  const timers = manualPacingTimers();
+  const controller = controllerFor({
+    evidenceDirectory,
+    createClient: () => client,
+    pacingPolicy: testPacingPolicy(),
+    schedulePacing: timers.schedule,
+    cancelPacingSchedule: timers.clear,
+  });
+  const { tx: _tx, ...media } = validConfig({ mode: "media" });
+
+  await controller.start(media);
+  client.assistant("第一段完成。", { final: true });
+  await timers.fireHead();
+  client.assistant("第一段完成。");
+  client.assistant("第一段完成。", { final: true });
+  client.resolveAppend("第一段完成。");
+  await new Promise((resolve) => setImmediate(resolve));
+  while (timers.size > 0) {
+    await timers.fireHead();
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+
+  assert.deepEqual(
+    client.appendRequests.map((request) => request.text),
+    ["第一段完成。"],
+  );
+  await controller.stop("user-stop");
+});
+
+test("replays held pre-ack notifications as source when appendSpeech fails", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-pacing-pre-ack-failure-"),
+  );
+  const client = new DeferredPacingClient();
+  const timers = manualPacingTimers();
+  const controller = controllerFor({
+    evidenceDirectory,
+    createClient: () => client,
+    pacingPolicy: testPacingPolicy(),
+    schedulePacing: timers.schedule,
+    cancelPacingSchedule: timers.clear,
+  });
+  const { tx: _tx, ...media } = validConfig({ mode: "media" });
+
+  await controller.start(media);
+  client.assistant("第一段完成。", { final: true });
+  await timers.fireHead();
+  client.assistant("第一段完成。");
+  client.assistant("第一段完成。", { final: true });
+  client.rejectAppend("第一段完成。");
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  await timers.fireHead();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(
+    client.appendRequests.map((request) => request.text),
+    ["第一段完成。", "第一段完成。"],
+  );
+  client.resolveAppend("第一段完成。");
+  await controller.stop("user-stop");
+});
+
+test("deduplicates cumulative source deltas before they enter the pacing queue", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-pacing-source-delta-"),
+  );
+  const client = new PacingClient();
+  const timers = manualPacingTimers();
+  const controller = controllerFor({
+    evidenceDirectory,
+    createClient: () => client,
+    pacingPolicy: testPacingPolicy({ maxOutstandingSegments: 2 }),
+    schedulePacing: timers.schedule,
+    cancelPacingSchedule: timers.clear,
+  });
+  const { tx: _tx, ...media } = validConfig({ mode: "media" });
+
+  await controller.start(media);
+  client.assistant("第一段完成。");
+  client.assistant("第一段完成。");
+  client.assistant("第一段完成。", { final: true });
+  await new Promise((resolve) => setImmediate(resolve));
+  while (timers.size > 0) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await timers.fireHead();
+  }
+
+  assert.deepEqual(
+    client.appendRequests.map((request) => request.text),
+    ["第一段完成。"],
+  );
+  await controller.stop("user-stop");
+});
+
+test("keeps the suffix of a same-prefix transcript final eligible for speech", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-pacing-correction-"),
+  );
+  const client = new PacingClient();
+  const timers = manualPacingTimers();
+  const controller = controllerFor({
+    evidenceDirectory,
+    createClient: () => client,
+    pacingPolicy: testPacingPolicy({ maxOutstandingSegments: 2 }),
+    schedulePacing: timers.schedule,
+    cancelPacingSchedule: timers.clear,
+  });
+  const { tx: _tx, ...media } = validConfig({ mode: "media" });
+
+  await controller.start(media);
+  client.assistant("第三段", { final: false });
+  client.assistant("第三段完成。修正尾段。", { final: true });
+  await new Promise((resolve) => setImmediate(resolve));
+  while (timers.size > 0) await timers.fireHead();
+
+  assert.equal(
+    client.appendRequests.map((request) => request.text).join(""),
+    "第三段完成。修正尾段。",
+  );
+  await controller.stop("user-stop");
+});
+
+test("drains an eligible stop tail, reports a sub-minimum tail as unsent, and suppresses late append completion", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-pacing-stop-"),
+  );
+  const events = [];
+  const client = new DeferredPacingClient();
+  client.stopRealtime = async () => {
+    client.assistant("可播放的尾端翻譯內容。", { final: true });
+  };
+  const controller = controllerFor({
+    evidenceDirectory,
+    createClient: () => client,
+    publish: (event) => events.push(event),
+    pacingPolicy: testPacingPolicy({
+      drainTimeoutMs: 30,
+      tailTranscriptDrainMs: 0,
+    }),
+  });
+  const { tx: _tx, ...media } = validConfig({ mode: "media" });
+
+  await controller.start(media);
+  const stopping = controller.stop("user-stop");
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.deepEqual(
+    client.appendRequests.map((request) => request.text),
+    ["可播放的尾端翻譯內容。"],
+  );
+  await stopping;
+  assert.equal(
+    events.some(
+      (event) =>
+        event.type === "speech-fallback" &&
+        event.state === "unsent" &&
+        event.characters === Array.from("可播放的尾端翻譯內容。").length,
+    ),
+    true,
+  );
+  client.resolveAppend("可播放的尾端翻譯內容。");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(
+    events
+      .slice(events.findIndex((event) => event.type === "stopped") + 1)
+      .some((event) => event.type === "speech-fallback"),
+    false,
+  );
+
+  const shortClient = new PacingClient();
+  shortClient.stopRealtime = async () => {
+    shortClient.assistant("太短。", { final: true });
+  };
+  const shortEvents = [];
+  const short = controllerFor({
+    evidenceDirectory: await mkdtemp(join(tmpdir(), "translive-controller-short-tail-")),
+    createClient: () => shortClient,
+    publish: (event) => shortEvents.push(event),
+    pacingPolicy: testPacingPolicy({
+      minimumAudibleCharacters: 12,
+      tailTranscriptDrainMs: 0,
+    }),
+  });
+  await short.start(media);
+  await short.stop("user-stop");
+  assert.equal(
+    shortEvents.some(
+      (event) =>
+        event.type === "speech-fallback" &&
+        event.state === "unsent" &&
+        event.characters === 3,
+    ),
+    true,
+  );
 });
 
 test("persists final source and target transcript entries only after audio stop", async () => {

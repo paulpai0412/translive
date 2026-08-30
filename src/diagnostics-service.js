@@ -26,7 +26,9 @@ function safeMetrics(value) {
   for (const [key, metric] of Object.entries(value)) {
     if (!metric || typeof metric !== "object") continue;
     const values = Object.fromEntries(
-      Object.entries(metric).filter(([, item]) => safeNumber(item) !== undefined),
+      Object.entries(metric).filter(
+        ([, item]) => safeNumber(item) !== undefined,
+      ),
     );
     if (Object.keys(values).length > 0) output[key] = values;
   }
@@ -94,6 +96,7 @@ export function buildDiagnostics({
     endpoints: safeEndpoints(evidence?.endpoints),
     errors: safeErrors(evidence?.errors),
     metrics: safeMetrics(evidence?.metrics),
+    pacing: safeMetrics(evidence?.pacing),
     route: {
       mode: safeText(route.mode),
       platform: safeText(route.platform),

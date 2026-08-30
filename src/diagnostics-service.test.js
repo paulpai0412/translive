@@ -29,7 +29,19 @@ test("exports only redacted trustworthy diagnostics without transcript or raw se
         },
       ],
       metrics: { rx: { rtt: { count: 1, p50Ms: 138 } }, tx: {} },
-      route: { mode: "meeting", platform: "teams", routeProfile: "voicemeeter" },
+      pacing: {
+        rx: {
+          backlogMs: 1_900,
+          lagWarningCount: 1,
+          transcript: "不得輸出 pacing transcript",
+        },
+        tx: {},
+      },
+      route: {
+        mode: "meeting",
+        platform: "teams",
+        routeProfile: "voicemeeter",
+      },
       sessions: { rx: { threadId: "secret-thread" } },
       transcriptTimestamps: [{ text: "不得輸出" }],
     },
@@ -41,6 +53,9 @@ test("exports only redacted trustworthy diagnostics without transcript or raw se
     { idHash: "deadbeef", kind: "audiooutput", role: "headphonesSink" },
   ]);
   assert.equal(bundle.codex.checksum, "abc123");
+  assert.deepEqual(bundle.pacing, {
+    rx: { backlogMs: 1_900, lagWarningCount: 1 },
+  });
   const serialized = JSON.stringify(bundle);
   assert.doesNotMatch(
     serialized,

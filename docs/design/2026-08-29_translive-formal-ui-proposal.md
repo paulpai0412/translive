@@ -649,13 +649,14 @@ GPT-Live 目前沒有公開的每句 TTS rate 參數；因此第一階段不宣�
 
 所有參數集中在可驗證、可版本化的 policy，不散落 magic numbers：
 
-- 目標延遲區間與最大 backlog；
-- 來源／目標語言的初始預估語速；
-- 第一段與穩態段的目標朗讀時間；
+- 目標延遲區間、coalesce／lag-warning hysteresis、最大 scheduled backlog 與 rolling outstanding segment 數；
+- 繁中文字、拉丁詞與數字 token 的初始自然朗讀時間估算；
+- 第一段、穩態段與 coalesced 段的目標朗讀時間，以及 semantic-boundary tolerance／單段硬 playout 上限；
 - 最短可播能力（由 GPT-Live capability／實測提供，不等同全程固定切段）；
-- backlog hysteresis；
-- 語意壓縮是否允許及最大程度；
+- tail transcript 與 appendSpeech drain 的有界等待時間；
 - 未來可選的 time-scale 修正上下限。
+
+目前實作的 `natural-sync` policy 是 schema version 1。政策值只在 `src/adaptive-pacing-controller.js` 集中定義；測試可傳入完整 policy override，production 不在 Phase controller、renderer 或 adapter 散落切段／語速常數。
 
 預設 preset 為「自然同步」；後續可提供「最低延遲」與「字義完整」，三者都映射到同一 policy schema。
 
@@ -663,12 +664,13 @@ GPT-Live 目前沒有公開的每句 TTS rate 參數；因此第一階段不宣�
 
 控制器是純邏輯公開 seam，輸入：
 
-- source／target transcript delta 與時間戳；
-- 已送出、待送出與播放開始／完成事件；
-- 目前 policy；
-- 由實際輸出逐步校正的語速估計。
+- 目標 transcript delta／final event 與明確時間戳；
+- 已規劃、已 dispatch 與尚未 dispatch 的 segment；
+- 目前 policy。
 
-輸出是可觀察決策：wait、flush、coalesce、request-concise、正常播放或 lag warning。切段以語意／標點邊界及預估朗讀時間為主，不以固定字數為唯一規則。第一個達到可播能力的完整子句立即送出；穩態段較完整，以降低短片段造成的 cadence variance。
+輸出是可觀察決策：`wait`、`flush`、`coalesce`、`lag-warning` 與 `dispatch`。切段以語意／標點邊界及預估朗讀時間為主，不以固定字數為唯一規則；但 punctuation 在未達 GPT-Live 實測最短可播能力前不得 flush。第一個 eligible clause 立即排程，後續段落以穩態目標時間排程；backlog 跨過 enter／exit hysteresis 後，才合併尚未 committed 的短句。已 committed 或已 dispatch 的文字絕不為追趕而刪除或加速。
+
+目前 GPT-Live 沒有公開的 per-segment rate／動態 concise RPC，因此「簡潔等義、自然會話速度」由 TX／RX 系統 prompt 要求；controller 不假裝能在播放中改速。實際輸出時間校正與 WSOLA 仍是 P6 後的實測決策，不在本切片實作。
 
 backlog 以預估毫秒計算：
 
@@ -677,13 +679,15 @@ backlogMs = queuedEstimatedSpeechMs - elapsedPlayoutMs
 errorMs   = backlogMs - targetBacklogMs
 ```
 
-第一階段採有 hysteresis 的比例回授，不直接使用會放大語音抖動的高增益 PID。控制動作只影響尚未送出的分段／精簡提示；已開始播放的語音不突然變速。
+第一階段採有 hysteresis 的有界佇列控制，不直接使用會放大語音抖動的高增益 PID。控制動作只影響尚未送出的分段與 appendSpeech dispatch 時機；已開始播放的語音不突然變速。僅 arm queue head；若 backlog bound 暫存後續文字，會在已規劃播放結束時 wake 再判定，不會遺失或讓後段超車。
+
+`thread/realtime/transcript/*` 的 flat experimental notification 沒有 itemId；雖然 item-level schema 存在 id，現行 flat RX fallback 以「append RPC 已成功後的有序 expectation queue」抑制 echo，並用有界近期歷史處理 duplicate delta/done。不同原始語句剛好與未到達 echo 完全相同時無法由 flat API 完美區分，因此不以猜測重播；itemId 併入 flat notification 後應升級為直接 correlation。
 
 ### 21.4 字幕同步
 
 - 原文字幕可即時顯示；
 - 目標字幕以對應 speech segment 的 dispatch／output-start 為準，不在尚未朗讀時提前顯示；
-- 診斷僅保存聚合 pacing 指標，不保存 transcript：首次語音延遲、backlog p50／p95／max、segment 預估／實際時間、cadence variance 與 lag-warning 次數。
+- 診斷／evidence 僅保存 aggregate pacing 指標，不保存 transcript：policy id/version、目前／最大 projected backlog、scheduled/dispatched/fast-start/steady/coalesced segment 數、wait 與 lag-warning 次數；不保存 segment text 或 endpoint ID。
 
 ### 21.5 TDD 垂直切片與驗收
 
@@ -692,8 +696,14 @@ errorMs   = backlogMs - targetBacklogMs
 | P1 Policy／估算 | `AdaptivePacingController` | 相同輸入在不同語速估計下產生時間型切段，而非固定字數 |
 | P2 Fast start | `AdaptivePacingController` | 第一個完整可播子句先送出，後續回到穩態段 |
 | P3 Bounded backlog | `AdaptivePacingController` | 積壓跨過 hysteresis 才合併／要求精簡，不突然高速或丟內容 |
-| P4 GPT-Live integration | `PhaseOneController` 公開事件與 fake app-server | RX appendSpeech 順序、取消、Stop drain 與 100-chunk circuit breaker 不回歸 |
+| P4 GPT-Live integration | `PhaseOneController` 公開事件與 fake app-server | RX head-only appendSpeech 順序、rolling outstanding cap、ordered echo suppression、Stop tail drain／unsent state 不回歸 |
 | P5 Caption timing | renderer 公開 event contract | 目標字幕跟隨 speech segment dispatch／output，而非僅跟 transcript delta |
 | P6 Windows 實測 | redacted evidence＋耳機觀察 | YouTube 長段落不再明顯忽快忽慢，初始與穩態延遲落在門檻內 |
 
 初始驗收目標沿用 Phase 1：first translated audio P50 ≤ 1.5 秒、P95 ≤ 2.5 秒；穩態 backlog 以 1–3 秒為目標、正常情況不超過 4 秒。語速穩定度以 segment 實際毫秒／字（或詞）分布衡量，不能只靠主觀感受；Windows 真機結果可校正 policy 預設值，但演算法與測試不得綁死單一影片或單一說話者。
+
+### 21.6 P1–P5 implementation status
+
+已實作：versioned `natural-sync` policy、時間型估算、最短可播 guard、fast-start／steady semantic segmentation、policy-capped long-clause split、head-only serialized appendSpeech、rolling outstanding/backlog admission、ordered flat-echo suppression、取消 generation guard、eligible Stop tail drain／sub-minimum unsent state、安全 aggregate pacing evidence、RX target caption defer／dispatch advance。
+
+尚未實作：WSOLA／AudioWorklet、播放中 time-scale modification、動態模型 concise RPC、以真實音訊 output-completion 校正 policy。這些都需要長段 YouTube／會議真機量測後才決定是否值得增加。

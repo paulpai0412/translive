@@ -4,6 +4,8 @@ import {
 } from "./renderer-control.js";
 import { createStartupSession } from "./startup-session.js";
 import {
+  advancePacedTargetCaption,
+  bufferPacedTargetCaption,
   latestTranscriptPersistenceEvent,
   transcriptPersistencePresentation,
 } from "./renderer-state.js";
@@ -157,6 +159,9 @@ const ui = {
   captions: {
     tx: { source: "", target: "" },
     rx: { source: "", target: "" },
+  },
+  pacedTargets: {
+    rx: { pending: "", visible: "" },
   },
   mode: "meeting",
   muted: { tx: false, rx: false },
@@ -645,6 +650,7 @@ function resetLiveDisplay() {
     tx: { source: "", target: "" },
     rx: { source: "", target: "" },
   };
+  ui.pacedTargets = { rx: { pending: "", visible: "" } };
   ui.muted = { tx: false, rx: false };
   for (const direction of ["tx", "rx"]) {
     setChannelState(
@@ -1000,13 +1006,41 @@ function showBlocked(title, detail) {
   setAppState("blocked");
 }
 
-function appendTranscript({ direction, role, text, final = false }) {
+function appendTranscript({
+  deferred = false,
+  direction,
+  role,
+  text,
+  final = false,
+}) {
+  if (deferred) {
+    ui.pacedTargets[direction] = bufferPacedTargetCaption(
+      ui.pacedTargets[direction],
+      text,
+      final,
+    );
+    return;
+  }
   const key = captionKey(role);
   ui.captions[direction][key] = mergeCaption(
     ui.captions[direction][key],
     text,
     final,
   );
+  renderCaptions();
+}
+
+function advanceSpeechFallbackCaption({ direction, characters, state }) {
+  if (direction !== "rx") return;
+  ui.pacedTargets.rx = advancePacedTargetCaption(
+    ui.pacedTargets.rx,
+    characters,
+  );
+  ui.captions.rx.target = ui.pacedTargets.rx.visible;
+  if (state === "unsent") {
+    elements["stopped-copy"].textContent =
+      "部分尾端翻譯未朗讀，字幕與逐字稿已保留。";
+  }
   renderCaptions();
 }
 
@@ -1888,6 +1922,10 @@ window.translive.onEvent(async (event) => {
         "無法套用 GPT‑Live WebRTC 回應。",
       );
     }
+    return;
+  }
+  if (event.type === "speech-fallback") {
+    advanceSpeechFallbackCaption(event);
     return;
   }
   if (event.type === "transcript") {
