@@ -268,12 +268,10 @@ export class PhaseOneController {
       this.#throwIfStartupCanceled();
       this.#assertRuntime(runtime);
       const evidence = this.#evidence(config, runtime);
-      const client = this.#createClient();
       context = {
-        client,
+        clients: new Map(),
         evidence,
         run: undefined,
-        threads: new Map(),
         buffered: [],
         canceled: false,
         config,
@@ -300,25 +298,6 @@ export class PhaseOneController {
         },
       };
       this.#startingContext = context;
-      client.on("notification", (notification) =>
-        this.#receiveNotification(context, notification),
-      );
-      client.on("protocolError", (error) =>
-        this.#recordControllerError(context, error),
-      );
-      client.on("exit", ({ code, signal }) => {
-        if (this.#active?.context === context) {
-          this.#recordControllerError(
-            context,
-            new Error(
-              `Codex app-server exited (${code ?? signal ?? "unknown"})`,
-            ),
-          );
-        }
-      });
-
-      await client.start();
-      this.#throwIfStartupCanceled(context);
       const run = await startDualChannelRun(config, {
         evidence,
         onStateChange: (event) => this.#publish({ type: "state", ...event }),
@@ -328,8 +307,8 @@ export class PhaseOneController {
       this.#throwIfStartupCanceled(context);
       // Install the active run before forwarding buffered SDP notifications to the renderer.
       this.#active = { context, run };
-      for (const notification of context.buffered.splice(0)) {
-        this.#receiveNotification(context, notification);
+      for (const { owner, notification } of context.buffered.splice(0)) {
+        this.#receiveNotification(context, owner, notification);
       }
       if (run.allFailed()) {
         context.evidence.recordBlockedAttempt(
@@ -537,33 +516,76 @@ export class PhaseOneController {
   }
 
   async #openChannel(context, channel) {
-    const thread = await context.client.startEphemeralThread();
-    context.threads.set(thread.id, channel.direction);
-    context.evidence.recordSession(channel.direction, { threadId: thread.id });
-    await context.client.startRealtime({
-      threadId: thread.id,
-      model: MODEL,
-      version: "v3",
-      outputModality: "audio",
-      includeStartupContext: false,
-      clientManagedHandoffs: true,
-      delegationAckFiller: false,
-      prompt: TRANSLATION_PROMPTS[channel.direction],
-      voice: VOICES[channel.direction],
-      transport: { type: "webrtc", sdp: channel.sdp },
-    });
-    return {
-      threadId: thread.id,
-      stop: () => context.client.stopRealtime(thread.id),
+    const client = this.#createClient(channel.direction);
+    const owner = {
+      client,
+      closed: false,
+      direction: channel.direction,
+      threadId: undefined,
     };
+    context.clients.set(channel.direction, owner);
+    client.on("notification", (notification) =>
+      this.#receiveNotification(context, owner, notification),
+    );
+    client.on("protocolError", (error) =>
+      this.#recordControllerError(context, channel.direction, error),
+    );
+    client.on("exit", ({ code, signal }) => {
+      if (!context.finalized) {
+        this.#recordControllerError(
+          context,
+          channel.direction,
+          new Error(
+            `Codex app-server exited (${code ?? signal ?? "unknown"})`,
+          ),
+        );
+      }
+    });
+
+    try {
+      await client.start();
+      this.#throwIfStartupCanceled(context);
+      const thread = await client.startEphemeralThread();
+      owner.threadId = thread.id;
+      context.evidence.recordSession(channel.direction, { threadId: thread.id });
+      await client.startRealtime({
+        threadId: thread.id,
+        model: MODEL,
+        version: "v3",
+        outputModality: "audio",
+        includeStartupContext: false,
+        clientManagedHandoffs: true,
+        delegationAckFiller: false,
+        prompt: TRANSLATION_PROMPTS[channel.direction],
+        voice: VOICES[channel.direction],
+        transport: { type: "webrtc", sdp: channel.sdp },
+      });
+      return {
+        threadId: thread.id,
+        stop: () => client.stopRealtime(thread.id),
+      };
+    } catch (error) {
+      owner.closed = true;
+      try {
+        await client.close();
+      } catch {
+        // The startup error remains the actionable failure.
+      }
+      throw error;
+    }
   }
 
-  #receiveNotification(context, notification) {
+  #receiveNotification(context, owner, notification) {
     const threadId = notification.params?.threadId;
-    const direction = context.threads.get(threadId);
-    if (!direction || context.finalized) return;
+    const direction = owner.direction;
+    if (
+      context.finalized ||
+      (threadId && owner.threadId && threadId !== owner.threadId)
+    ) {
+      return;
+    }
     if (!context.run) {
-      context.buffered.push(notification);
+      context.buffered.push({ owner, notification });
       return;
     }
 
@@ -580,6 +602,7 @@ export class PhaseOneController {
     }
     const transcript = this.#normalizeTranscriptNotification(
       context,
+      owner,
       notification,
     );
     if (transcript) {
@@ -620,7 +643,7 @@ export class PhaseOneController {
     }
   }
 
-  #normalizeTranscriptNotification(context, notification) {
+  #normalizeTranscriptNotification(context, owner, notification) {
     const state = context.speechFallback;
     const threadId = notification.params?.threadId;
     if (
@@ -636,7 +659,7 @@ export class PhaseOneController {
       }
       state.itemModeThreads.add(threadId);
       const expected =
-        context.threads.get(threadId) === "rx" && item.role === "assistant"
+        owner.direction === "rx" && item.role === "assistant"
           ? state.pendingReplayItems.shift()
           : undefined;
       state.items.set(item.id, {
@@ -806,12 +829,12 @@ export class PhaseOneController {
         (text === expected.text ||
           (text === "" && expected.received === expected.text))
       ) {
-        if (!expected.accepted) {
-          expected.completed = true;
-          expected.held.push(notification);
-        } else {
+        if (expected.accepted) {
           state.echoes.shift();
           this.#rememberEcho(state, expected.text, atMs);
+        } else {
+          expected.completed = true;
+          expected.held.push(notification);
         }
         return { suppressed: true };
       }
@@ -931,10 +954,9 @@ export class PhaseOneController {
       return;
     }
     if (decision.type !== "dispatch") return;
-    const threadId = [...context.threads].find(
-      ([, direction]) => direction === "rx",
-    )?.[0];
-    if (!threadId) return;
+    const owner = context.clients.get("rx");
+    const threadId = owner?.threadId;
+    if (!owner || !threadId) return;
 
     // Register before awaiting the RPC. The flat transcript API has no
     // correlation ID, so echo matching is an ordered, bounded heuristic.
@@ -955,7 +977,7 @@ export class PhaseOneController {
     });
     let failure;
     try {
-      await context.client.appendSpeech(threadId, decision.text);
+      await owner.client.appendSpeech(threadId, decision.text);
     } catch (error) {
       failure = error;
     }
@@ -1081,22 +1103,20 @@ export class PhaseOneController {
     }
   }
 
-  #recordControllerError(context, error) {
+  #recordControllerError(context, direction, error) {
     if (context.finalized) return;
-    context.evidence.recordError("system", error, {
+    context.evidence.recordError(direction, error, {
       requestId: requestIdFrom(error),
     });
-    context.run?.handleRealtimeEvent("tx", {
-      method: "thread/realtime/error",
-      params: { message: safeMessage(error) },
-    });
-    context.run?.handleRealtimeEvent("rx", {
+    context.run?.handleRealtimeEvent(direction, {
       method: "thread/realtime/error",
       params: { message: safeMessage(error) },
     });
     this.#publish({
       type: "error",
-      message: "Codex app-server failed. See diagnostics.",
+      direction,
+      message: `${direction.toUpperCase()} Codex app-server failed. See diagnostics.`,
+      aggregate: context.run?.aggregateStatus(),
     });
     if (context.run?.allFailed() && !this.#starting) {
       void this.#finalizeNoGo(context, "Codex app-server exited").catch(
@@ -1143,7 +1163,13 @@ export class PhaseOneController {
       writeError = error;
     } finally {
       context.finalized = true;
-      await context.client.close();
+      const openClients = [...context.clients.values()].filter(
+        (owner) => !owner.closed,
+      );
+      for (const owner of openClients) owner.closed = true;
+      await Promise.allSettled(
+        openClients.map((owner) => owner.client.close()),
+      );
     }
     if (writeError) throw writeError;
   }
