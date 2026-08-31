@@ -65,10 +65,10 @@ test("binds the direction sink before connecting a remote WebRTC stream", async 
   assert.deepEqual(calls, [
     "sink:poly-headphones",
     "gain:create",
-    "resume",
     "source:create",
     "source:connect",
     "gain:connect:destination",
+    "resume",
   ]);
 });
 

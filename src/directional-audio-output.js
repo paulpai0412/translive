@@ -31,7 +31,6 @@ export class DirectionalAudioOutput {
       }
       const gain = context.createGain();
       gain.gain.value = this.#muted ? 0 : 1;
-      await context.resume();
       this.#context = context;
       this.#gain = gain;
     } catch (error) {
@@ -48,6 +47,7 @@ export class DirectionalAudioOutput {
     const source = this.#context.createMediaStreamSource(stream);
     source.connect(this.#gain);
     this.#gain.connect(this.#context.destination);
+    await this.#context.resume();
     this.#source = source;
     this.#stream = stream;
   }
