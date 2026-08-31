@@ -27,8 +27,8 @@ test("Windows private-root provisioning replaces broad ACLs and resets descendan
     "utf8",
   );
 
-  assert.match(script, /SetAccessRuleProtection\(\$true, \$false\)/);
-  assert.match(script, /Set-Acl -LiteralPath \$root/);
+  assert.match(script, /icacls\.exe \$root \/inheritance:r \/grant:r/);
+  assert.match(script, /icacls\.exe \$root \/remove/);
   assert.match(script, /icacls\.exe \$children \/reset \/T/);
   assert.match(script, /S-1-5-18/);
   assert.match(script, /S-1-5-32-544/);

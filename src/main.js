@@ -678,9 +678,12 @@ if (!isPrimaryInstance) {
     const globalAudioStartup = await globalAudioStartupPromise;
     globalAudioState = globalAudioStartup;
     const voiceUserDataRoot = app.getPath("userData");
+    const voiceProfileRoot = join(voiceUserDataRoot, "voice-profiles");
+    voiceTrainingRoot = join(voiceUserDataRoot, "voice-training");
     const runtimeStorageRoot = localRvcRuntimeDirectory();
     voiceStorageReady = Promise.all([
-      ensurePrivateVoiceStorage(voiceUserDataRoot),
+      ensurePrivateVoiceStorage(voiceProfileRoot),
+      ensurePrivateVoiceStorage(voiceTrainingRoot),
       runtimeStorageRoot
         ? ensurePrivateVoiceStorage(runtimeStorageRoot)
         : Promise.resolve(false),
@@ -690,9 +693,8 @@ if (!isPrimaryInstance) {
         throw new Error("VOICE_STORAGE_UNAVAILABLE");
       }
     };
-    voiceTrainingRoot = join(voiceUserDataRoot, "voice-training");
     voiceProfileStore = new VoiceProfileStore({
-      directory: join(app.getPath("userData"), "voice-profiles"),
+      directory: voiceProfileRoot,
       ensureStorage: ensureVoiceStorage,
       trainingDirectory: voiceTrainingRoot,
       verifyTrainingOutput: (request) => {

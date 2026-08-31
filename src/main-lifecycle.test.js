@@ -96,10 +96,8 @@ test("owns one sender-validated local own-voice training boundary", async () => 
 test("provisions private ACLs for both voice data and the executable RVC runtime", async () => {
   const source = await mainSource();
 
-  assert.match(
-    source,
-    /ensurePrivateVoiceStorage\(voiceUserDataRoot\)/,
-  );
+  assert.match(source, /ensurePrivateVoiceStorage\(voiceProfileRoot\)/);
+  assert.match(source, /ensurePrivateVoiceStorage\(voiceTrainingRoot\)/);
   assert.match(
     source,
     /ensurePrivateVoiceStorage\(runtimeStorageRoot\)/,
@@ -112,7 +110,7 @@ test("keeps existing voice profiles under app userData and requires fresh traini
 
   assert.match(
     source,
-    /new VoiceProfileStore\(\{[\s\S]{0,180}directory: join\(app\.getPath\("userData"\), "voice-profiles"\)/,
+    /const voiceProfileRoot = join\(voiceUserDataRoot, "voice-profiles"\)[\s\S]*new VoiceProfileStore\(\{[\s\S]{0,180}directory: voiceProfileRoot/,
   );
   assert.match(
     source,
