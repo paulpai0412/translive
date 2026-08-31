@@ -1,16 +1,16 @@
 const ROLE_FIELDS = ["consoleId", "multimediaId", "communicationsId"];
+const MODES = new Set(["meeting", "media", "microphone"]);
 
 export const GLOBAL_AUDIO_TARGETS = Object.freeze({
   captureName: "Voicemeeter Out B2 (VB-Audio Voicemeeter VAIO)",
   renderName: "Voicemeeter Input (VB-Audio Voicemeeter VAIO)",
 });
 
-function allRolesMatch(snapshot, { captureId, renderId }) {
-  return ROLE_FIELDS.every(
-    (field) =>
-      snapshot?.capture?.[field] === captureId &&
-      snapshot?.render?.[field] === renderId,
-  );
+function cloneSnapshot(value) {
+  return {
+    capture: { ...value.capture },
+    render: { ...value.render },
+  };
 }
 
 function snapshotsMatch(left, right) {
@@ -21,10 +21,35 @@ function snapshotsMatch(left, right) {
   );
 }
 
+export function buildModeAudioTarget({ mode, original, resolved }) {
+  if (!MODES.has(mode)) throw new Error("Unsupported audio routing mode");
+  if (!original?.capture || !original?.render) {
+    throw new Error("Original Windows audio roles are required");
+  }
+  if (!resolved?.captureId || !resolved?.renderId) {
+    throw new Error("VoiceMeeter endpoint IDs are required");
+  }
+  const target = cloneSnapshot(original);
+  if (mode === "meeting" || mode === "microphone") {
+    target.capture.communicationsId = resolved.captureId;
+  }
+  if (mode === "meeting") {
+    target.render.communicationsId = resolved.renderId;
+  }
+  if (mode === "media") {
+    target.render.consoleId = resolved.renderId;
+    target.render.multimediaId = resolved.renderId;
+  }
+  return target;
+}
+
 export class WindowsAudioDefaultsController {
   #adapter;
+  #mode;
   #operation = Promise.resolve();
+  #original;
   #platform;
+  #resolved;
   #state = "unknown";
   #store;
 
@@ -35,69 +60,114 @@ export class WindowsAudioDefaultsController {
   }
 
   status() {
-    return { state: this.#state };
+    return this.#mode
+      ? { mode: this.#mode, state: this.#state }
+      : { state: this.#state };
   }
 
+  prepare() {
+    return this.#enqueue(() => this.#prepare());
+  }
+
+  // Compatibility for callers migrating from the old app-start global route.
   start() {
-    return this.#enqueue(() => this.#start());
+    return this.prepare();
+  }
+
+  applyMode(mode) {
+    return this.#enqueue(() => this.#applyMode(mode));
   }
 
   restore() {
     return this.#enqueue(() => this.#restore());
   }
 
-  async #start() {
+  async #prepare() {
     if (this.#platform !== "win32") return this.#setState("unsupported");
+    if (this.#state === "prepared") return this.status();
     if (this.#state === "active") return this.status();
 
     const recovered = await this.#recoverPending();
     if (recovered) return this.#setState(recovered);
-
-    let target;
     try {
-      target = await this.#adapter.resolve(GLOBAL_AUDIO_TARGETS);
+      this.#resolved = await this.#adapter.resolve(GLOBAL_AUDIO_TARGETS);
     } catch {
+      this.#resolved = undefined;
       return this.#setState("target-unavailable");
     }
-
-    let checkpoint;
     try {
-      checkpoint = {
-        phase: "applying",
-        snapshot: await this.#adapter.snapshotAllRoles(),
-        target,
-      };
-      await this.#store.save(checkpoint);
+      this.#original = await this.#adapter.snapshotAllRoles();
+    } catch {
+      this.#original = undefined;
+      return this.#setState("snapshot-failed");
+    }
+    return this.#setState("prepared");
+  }
+
+  async #applyMode(mode) {
+    if (!MODES.has(mode)) return this.#setState("unsupported-mode");
+    if (this.#state === "active" && this.#mode === mode) return this.status();
+    if (this.#state === "active") {
+      const restored = await this.#restore();
+      if (restored.reason) return this.#setState(restored.reason);
+    }
+    if (this.#state !== "prepared") {
+      const prepared = await this.#prepare();
+      if (prepared.state !== "prepared") return prepared;
+    }
+    try {
+      this.#original = await this.#adapter.snapshotAllRoles();
     } catch {
       return this.#setState("snapshot-failed");
     }
-
+    const target = buildModeAudioTarget({
+      mode,
+      original: this.#original,
+      resolved: this.#resolved,
+    });
+    const checkpoint = {
+      mode,
+      phase: "applying",
+      snapshot: this.#original,
+      target,
+    };
     try {
-      await this.#adapter.applyAllRoles(target);
+      await this.#store.save(checkpoint);
+      await this.#adapter.restoreAllRoles(target);
       const current = await this.#adapter.currentAllRoles();
-      if (!allRolesMatch(current, target)) throw new Error("verify failed");
+      if (!snapshotsMatch(current, target)) throw new Error("verify failed");
       await this.#store.save({ ...checkpoint, phase: "active" });
+      this.#mode = mode;
+      return this.#setState("active");
     } catch {
       const restored = await this.#restoreCheckpoint(checkpoint);
       if (restored.reason) return this.#setState(restored.reason);
       return this.#setState("apply-failed");
     }
-
-    return this.#setState("active");
   }
 
   async #restore() {
     if (this.#platform !== "win32") return { restored: false };
     const checkpoint = await this.#store.load();
-    if (!checkpoint) return { restored: false };
+    if (!checkpoint) {
+      this.#mode = undefined;
+      this.#original = undefined;
+      this.#resolved = undefined;
+      this.#setState("restored");
+      return { restored: false };
+    }
     if (checkpoint.invalid) {
       this.#setState("recovery-needed");
-      return { restored: false, reason: "recovery-needed" };
+      return { reason: "recovery-needed", restored: false };
     }
-
     const result = await this.#reconcileCheckpoint(checkpoint);
     if (result.reason) this.#setState(result.reason);
-    else this.#setState("restored");
+    else {
+      this.#mode = undefined;
+      this.#original = undefined;
+      this.#resolved = undefined;
+      this.#setState("restored");
+    }
     return result;
   }
 
@@ -105,7 +175,6 @@ export class WindowsAudioDefaultsController {
     const checkpoint = await this.#store.load();
     if (!checkpoint) return undefined;
     if (checkpoint.invalid) return "recovery-needed";
-
     const result = await this.#reconcileCheckpoint(checkpoint);
     return result.reason;
   }
@@ -115,23 +184,26 @@ export class WindowsAudioDefaultsController {
     try {
       current = await this.#adapter.currentAllRoles();
     } catch {
-      return { restored: false, reason: "recovery-needed" };
+      return { reason: "recovery-needed", restored: false };
     }
-
-    if (allRolesMatch(current, checkpoint.target)) {
+    if (snapshotsMatch(current, checkpoint.target)) {
       return this.#restoreCheckpoint(checkpoint);
     }
     if (snapshotsMatch(current, checkpoint.snapshot)) {
       return this.#clearCheckpoint();
     }
-    return { restored: false, reason: "recovery-needed" };
+    return { reason: "recovery-needed", restored: false };
   }
 
   async #restoreCheckpoint(checkpoint) {
     try {
       await this.#adapter.restoreAllRoles(checkpoint.snapshot);
+      const current = await this.#adapter.currentAllRoles();
+      if (!snapshotsMatch(current, checkpoint.snapshot)) {
+        return { reason: "restore-failed", restored: false };
+      }
     } catch {
-      return { restored: false, reason: "restore-failed" };
+      return { reason: "restore-failed", restored: false };
     }
     return this.#clearCheckpoint();
   }
@@ -141,7 +213,7 @@ export class WindowsAudioDefaultsController {
       await this.#store.clear();
       return { restored: true };
     } catch {
-      return { restored: true, reason: "checkpoint-clear-failed" };
+      return { reason: "checkpoint-clear-failed", restored: true };
     }
   }
 

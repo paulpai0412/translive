@@ -2,6 +2,7 @@ import { JsonFileStore } from "./json-file-store.js";
 
 const ROLE_FIELDS = ["consoleId", "multimediaId", "communicationsId"];
 const PHASES = new Set(["applying", "active"]);
+const MODES = new Set(["legacy", "meeting", "media", "microphone"]);
 
 function endpointId(value) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
@@ -14,27 +15,36 @@ function endpointRoles(value) {
   return Object.values(roles).every(Boolean) ? roles : undefined;
 }
 
-function target(value) {
+function snapshot(value) {
+  const capture = endpointRoles(value?.capture);
+  const render = endpointRoles(value?.render);
+  return capture && render ? { capture, render } : undefined;
+}
+
+function legacyTarget(value) {
   const captureId = endpointId(value?.captureId);
   const renderId = endpointId(value?.renderId);
-  return captureId && renderId ? { captureId, renderId } : undefined;
+  return captureId && renderId
+    ? {
+        capture: Object.fromEntries(
+          ROLE_FIELDS.map((field) => [field, captureId]),
+        ),
+        render: Object.fromEntries(
+          ROLE_FIELDS.map((field) => [field, renderId]),
+        ),
+      }
+    : undefined;
 }
 
 function normalize(value) {
-  const snapshot = {
-    capture: endpointRoles(value?.snapshot?.capture),
-    render: endpointRoles(value?.snapshot?.render),
-  };
-  const routingTarget = target(value?.target);
-  if (
-    !snapshot.capture ||
-    !snapshot.render ||
-    !routingTarget ||
-    !PHASES.has(value?.phase)
-  ) {
+  const original = snapshot(value?.snapshot);
+  const legacy = legacyTarget(value?.target);
+  const target = snapshot(value?.target) ?? legacy;
+  const mode = value?.mode ?? (legacy ? "legacy" : undefined);
+  if (!original || !target || !PHASES.has(value?.phase) || !MODES.has(mode)) {
     return undefined;
   }
-  return { phase: value.phase, snapshot, target: routingTarget };
+  return { mode, phase: value.phase, snapshot: original, target };
 }
 
 export class WindowsAudioDefaultsStore extends JsonFileStore {
@@ -45,7 +55,7 @@ export class WindowsAudioDefaultsStore extends JsonFileStore {
       invalidResult: { invalid: true },
       normalize,
       validationMessage:
-        "Invalid phase-aware all-role Windows audio checkpoint",
+        "Invalid mode-scoped all-role Windows audio checkpoint",
     });
   }
 }

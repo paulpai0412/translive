@@ -5,336 +5,242 @@ import { MeetingSetupController } from "./meeting-setup-controller.js";
 import {
   GLOBAL_AUDIO_TARGETS,
   WindowsAudioDefaultsController,
+  buildModeAudioTarget,
 } from "./windows-audio-defaults-controller.js";
 
-const physicalSnapshot = {
+const original = {
   capture: {
-    consoleId: "physical-capture-console",
-    multimediaId: "physical-capture-multimedia",
-    communicationsId: "physical-capture-communications",
+    consoleId: "physical-mic-console",
+    multimediaId: "physical-mic-media",
+    communicationsId: "physical-mic-comms",
   },
   render: {
-    consoleId: "physical-render-console",
-    multimediaId: "physical-render-multimedia",
-    communicationsId: "physical-render-communications",
+    consoleId: "physical-speaker-console",
+    multimediaId: "physical-speaker-media",
+    communicationsId: "physical-speaker-comms",
   },
 };
+const resolved = { captureId: "voicemeeter-b2", renderId: "voicemeeter-input" };
 
-const virtualTarget = {
-  captureId: "voicemeeter-b2",
-  renderId: "voicemeeter-input",
-};
-
-const virtualSnapshot = {
-  capture: {
-    consoleId: virtualTarget.captureId,
-    multimediaId: virtualTarget.captureId,
-    communicationsId: virtualTarget.captureId,
-  },
-  render: {
-    consoleId: virtualTarget.renderId,
-    multimediaId: virtualTarget.renderId,
-    communicationsId: virtualTarget.renderId,
-  },
-};
-
-const activeCheckpoint = {
-  phase: "active",
-  snapshot: physicalSnapshot,
-  target: virtualTarget,
-};
-
-function deferred() {
-  let resolve;
-  const promise = new Promise((next) => {
-    resolve = next;
-  });
-  return { promise, resolve };
-}
-
-function memoryStore(value, { clearError } = {}) {
-  const calls = [];
+function memoryStore(value) {
   return {
-    calls,
     value,
     async clear() {
-      calls.push("clear");
-      if (clearError) throw clearError;
       this.value = undefined;
     },
     async load() {
-      calls.push("load");
       return this.value;
     },
     async save(next) {
-      calls.push({ save: next });
-      this.value = next;
+      this.value = structuredClone(next);
     },
   };
 }
 
-function fixture({
-  globalStoreValue,
-  initialCurrent = physicalSnapshot,
-  storeOptions,
-  overrides = {},
-} = {}) {
+function fixture({ checkpoint, current = original, overrides = {} } = {}) {
   const calls = [];
-  const store = memoryStore(globalStoreValue, storeOptions);
-  let current = initialCurrent;
+  let roles = structuredClone(current);
+  const store = memoryStore(checkpoint);
   const adapter = {
     async resolve(names) {
       calls.push({ resolve: names });
-      return virtualTarget;
+      return resolved;
     },
     async snapshotAllRoles() {
-      calls.push("snapshot-all-roles");
-      return current;
+      calls.push("snapshot");
+      return structuredClone(roles);
     },
     async currentAllRoles() {
-      calls.push("current-all-roles");
-      return current;
+      calls.push("current");
+      return structuredClone(roles);
     },
-    async applyAllRoles(endpoints) {
-      calls.push({ applyAllRoles: endpoints });
-      current = virtualSnapshot;
-    },
-    async restoreAllRoles(snapshot) {
-      calls.push({ restoreAllRoles: snapshot });
-      current = snapshot;
+    async restoreAllRoles(next) {
+      calls.push({ setRoles: next });
+      roles = structuredClone(next);
     },
     ...overrides,
   };
   return {
     adapter,
     calls,
-    current: () => current,
+    current: () => roles,
     setCurrent: (next) => {
-      current = next;
+      roles = structuredClone(next);
     },
+    controller: new WindowsAudioDefaultsController({
+      adapter,
+      platform: "win32",
+      store,
+    }),
     store,
   };
 }
 
-function controllerFor({ adapter, store }) {
-  return new WindowsAudioDefaultsController({
-    adapter,
-    platform: "win32",
-    store,
-  });
-}
-
-test("records original roles, virtual target, and active phase before global routing", async () => {
-  const { adapter, calls, store } = fixture();
-  const controller = controllerFor({ adapter, store });
-
-  assert.deepEqual(await controller.start(), { state: "active" });
-  assert.deepEqual(controller.status(), { state: "active" });
-  assert.deepEqual(calls, [
-    { resolve: GLOBAL_AUDIO_TARGETS },
-    "snapshot-all-roles",
-    { applyAllRoles: virtualTarget },
-    "current-all-roles",
-  ]);
-  assert.deepEqual(store.value, activeCheckpoint);
-});
-
-test("serializes exit restoration behind an in-flight global routing start", async () => {
-  const applyStarted = deferred();
-  const releaseApply = deferred();
-  const { adapter, current, setCurrent, store } = fixture();
-  adapter.applyAllRoles = async () => {
-    applyStarted.resolve();
-    await releaseApply.promise;
-    setCurrent(virtualSnapshot);
-  };
-  const controller = controllerFor({ adapter, store });
-
-  const starting = controller.start();
-  await applyStarted.promise;
-  const restoring = controller.restore();
-  releaseApply.resolve();
-
-  assert.deepEqual(await starting, { state: "active" });
-  assert.deepEqual(await restoring, { restored: true });
-  assert.deepEqual(current(), physicalSnapshot);
-  assert.equal(store.value, undefined);
-});
-
-test("clears a completed prior restore without replaying original defaults", async () => {
-  const { adapter, calls, store } = fixture({
-    globalStoreValue: activeCheckpoint,
-  });
-  const controller = controllerFor({ adapter, store });
-
-  assert.deepEqual(await controller.start(), { state: "active" });
-  assert.equal(
-    calls.some((call) => call.restoreAllRoles),
-    false,
-  );
-  assert.deepEqual(store.value, activeCheckpoint);
-});
-
-test("leaves a user-changed or partial stale checkpoint untouched", async () => {
-  const userChanged = {
-    ...physicalSnapshot,
-    render: { ...physicalSnapshot.render, consoleId: "user-render-console" },
-  };
-  const { adapter, calls, current, store } = fixture({
-    globalStoreValue: activeCheckpoint,
-    initialCurrent: userChanged,
-  });
-  const controller = controllerFor({ adapter, store });
-
-  assert.deepEqual(await controller.start(), { state: "recovery-needed" });
-  assert.deepEqual(current(), userChanged);
-  assert.deepEqual(calls, ["current-all-roles"]);
-  assert.deepEqual(store.value, activeCheckpoint);
-});
-
-test("does not overwrite a user device change after OS restore succeeded but checkpoint clear failed", async () => {
-  const { adapter, calls, current, setCurrent, store } = fixture({
-    storeOptions: { clearError: new Error("disk full") },
-  });
-  const controller = controllerFor({ adapter, store });
-
-  await controller.start();
-  assert.deepEqual(await controller.restore(), {
-    restored: true,
-    reason: "checkpoint-clear-failed",
-  });
-  assert.deepEqual(current(), physicalSnapshot);
-  assert.deepEqual(store.value, activeCheckpoint);
-
-  const userChanged = {
-    ...physicalSnapshot,
-    capture: { ...physicalSnapshot.capture, consoleId: "user-mic-console" },
-  };
-  setCurrent(userChanged);
-  assert.deepEqual(await controller.start(), { state: "recovery-needed" });
-  assert.deepEqual(current(), userChanged);
-  assert.equal(calls.filter((call) => call.restoreAllRoles).length, 1);
-});
-
-test("restores an interrupted applying checkpoint before taking a new physical snapshot", async () => {
-  const { adapter, calls, store } = fixture({
-    globalStoreValue: { ...activeCheckpoint, phase: "applying" },
-    initialCurrent: virtualSnapshot,
-  });
-  const controller = controllerFor({ adapter, store });
-
-  assert.deepEqual(await controller.start(), { state: "active" });
-  assert.ok(
-    calls.findIndex((call) => call.restoreAllRoles) <
-      calls.findIndex((call) => call === "snapshot-all-roles"),
+test("builds isolated mode targets without changing unrelated Windows roles", () => {
+  assert.deepEqual(
+    buildModeAudioTarget({ mode: "meeting", original, resolved }),
+    {
+      capture: { ...original.capture, communicationsId: resolved.captureId },
+      render: { ...original.render, communicationsId: resolved.renderId },
+    },
   );
   assert.deepEqual(
-    calls.find((call) => call.restoreAllRoles),
-    { restoreAllRoles: physicalSnapshot },
-  );
-  assert.deepEqual(store.value, activeCheckpoint);
-});
-
-test("leaves Windows unchanged when VoiceMeeter target endpoints are unavailable", async () => {
-  const { adapter, calls, store } = fixture({
-    overrides: {
-      async resolve(names) {
-        calls.push({ resolve: names });
-        throw new Error("endpoint missing");
+    buildModeAudioTarget({ mode: "media", original, resolved }),
+    {
+      capture: original.capture,
+      render: {
+        ...original.render,
+        consoleId: resolved.renderId,
+        multimediaId: resolved.renderId,
       },
     },
-  });
-  const controller = controllerFor({ adapter, store });
+  );
+  assert.deepEqual(
+    buildModeAudioTarget({ mode: "microphone", original, resolved }),
+    {
+      capture: { ...original.capture, communicationsId: resolved.captureId },
+      render: original.render,
+    },
+  );
+});
 
-  assert.deepEqual(await controller.start(), { state: "target-unavailable" });
-  assert.deepEqual(calls, [{ resolve: GLOBAL_AUDIO_TARGETS }]);
+test("app startup prepares a snapshot but leaves Windows roles untouched", async () => {
+  const { calls, controller, current, store } = fixture();
+  assert.deepEqual(await controller.prepare(), { state: "prepared" });
+  assert.deepEqual(calls, [{ resolve: GLOBAL_AUDIO_TARGETS }, "snapshot"]);
+  assert.deepEqual(current(), original);
   assert.equal(store.value, undefined);
 });
 
-test("keeps the startup checkpoint when restoration fails so the next start can retry", async () => {
-  const { adapter, calls, store } = fixture({
-    globalStoreValue: activeCheckpoint,
-    initialCurrent: virtualSnapshot,
-    overrides: {
-      async restoreAllRoles(snapshot) {
-        calls.push({ restoreAllRoles: snapshot });
-        throw new Error("policy rejected restore");
-      },
-    },
-  });
-  const controller = controllerFor({ adapter, store });
+test("preserves a user device change made after app startup", async () => {
+  const { controller, current, setCurrent } = fixture();
+  await controller.prepare();
+  const changed = {
+    ...original,
+    render: { ...original.render, consoleId: "new-user-speaker" },
+  };
+  setCurrent(changed);
+  await controller.applyMode("meeting");
+  assert.equal(current().render.consoleId, "new-user-speaker");
+  await controller.restore();
+  assert.deepEqual(current(), changed);
+});
 
-  assert.deepEqual(await controller.start(), { state: "restore-failed" });
-  assert.deepEqual(store.value, activeCheckpoint);
+test("canceling while only prepared leaves the next mode start usable", async () => {
+  const { controller, current } = fixture();
+  await controller.prepare();
+  assert.deepEqual(await controller.restore(), { restored: false });
+  assert.deepEqual(await controller.applyMode("meeting"), {
+    mode: "meeting",
+    state: "active",
+  });
+  assert.equal(current().capture.communicationsId, resolved.captureId);
+});
+
+test("Meeting changes only Communications and stop restores every original role", async () => {
+  const { controller, current, store } = fixture();
+  await controller.prepare();
+  assert.deepEqual(await controller.applyMode("meeting"), {
+    mode: "meeting",
+    state: "active",
+  });
+  assert.deepEqual(current(), {
+    capture: { ...original.capture, communicationsId: resolved.captureId },
+    render: { ...original.render, communicationsId: resolved.renderId },
+  });
+  assert.equal(store.value.mode, "meeting");
+  assert.deepEqual(await controller.restore(), { restored: true });
+  assert.deepEqual(current(), original);
+  assert.equal(store.value, undefined);
+});
+
+test("Media does not route microphone or Communications into the browser path", async () => {
+  const { controller, current } = fixture();
+  await controller.applyMode("media");
+  assert.deepEqual(current().capture, original.capture);
+  assert.equal(current().render.consoleId, resolved.renderId);
+  assert.equal(current().render.multimediaId, resolved.renderId);
   assert.equal(
-    calls.some((call) => call === "snapshot-all-roles"),
-    false,
+    current().render.communicationsId,
+    original.render.communicationsId,
   );
 });
 
-test("quick setup stop returns to global virtual defaults before full exit restores physical defaults", async () => {
-  const globalStore = memoryStore();
-  const meetingStore = memoryStore();
-  let current = physicalSnapshot;
-  const calls = [];
-  const adapter = {
-    async detect() {
-      return { installed: true, running: true, supported: true };
-    },
-    async resolve() {
-      return virtualTarget;
-    },
-    async snapshotAllRoles() {
-      return current;
-    },
-    async currentAllRoles() {
-      return current;
-    },
-    async applyAllRoles() {
-      calls.push("apply-global");
-      current = virtualSnapshot;
-    },
-    async restoreAllRoles(snapshot) {
-      calls.push({ restoreGlobal: snapshot });
-      current = snapshot;
-    },
-    async snapshot() {
-      return {
-        captureId: current.capture.communicationsId,
-        renderId: current.render.communicationsId,
-      };
-    },
-    async apply({ captureId, renderId }) {
-      calls.push({ applyMeeting: { captureId, renderId } });
-      current = {
-        ...current,
-        capture: { ...current.capture, communicationsId: captureId },
-        render: { ...current.render, communicationsId: renderId },
-      };
-    },
-    async current() {
-      return {
-        captureId: current.capture.communicationsId,
-        renderId: current.render.communicationsId,
-      };
-    },
-    async restore({ captureId, renderId }) {
-      calls.push({ restoreMeeting: { captureId, renderId } });
-      current = {
-        ...current,
-        capture: { ...current.capture, communicationsId: captureId },
-        render: { ...current.render, communicationsId: renderId },
-      };
-    },
+test("Microphone changes only Communications capture", async () => {
+  const { controller, current } = fixture();
+  await controller.applyMode("microphone");
+  assert.equal(current().capture.communicationsId, resolved.captureId);
+  assert.equal(current().capture.consoleId, original.capture.consoleId);
+  assert.deepEqual(current().render, original.render);
+});
+
+test("recovers an interrupted mode target before preparing a new run", async () => {
+  const target = buildModeAudioTarget({ mode: "meeting", original, resolved });
+  const checkpoint = {
+    mode: "meeting",
+    phase: "active",
+    snapshot: original,
+    target,
   };
-  const global = controllerFor({ adapter, store: globalStore });
+  const { controller, current, store } = fixture({
+    checkpoint,
+    current: target,
+  });
+  assert.deepEqual(await controller.prepare(), { state: "prepared" });
+  assert.deepEqual(current(), original);
+  assert.equal(store.value, undefined);
+});
+
+test("does not overwrite Windows roles changed outside TransLive", async () => {
+  const target = buildModeAudioTarget({ mode: "meeting", original, resolved });
+  const changed = {
+    ...target,
+    render: { ...target.render, consoleId: "user-changed-speaker" },
+  };
+  const checkpoint = {
+    mode: "meeting",
+    phase: "active",
+    snapshot: original,
+    target,
+  };
+  const { controller, current, store } = fixture({
+    checkpoint,
+    current: changed,
+  });
+  assert.deepEqual(await controller.prepare(), { state: "recovery-needed" });
+  assert.deepEqual(current(), changed);
+  assert.ok(store.value);
+});
+
+test("Meeting quick setup restores to mode target before mode restore returns physical roles", async () => {
+  const { adapter, controller, current } = fixture();
+  const meetingStore = memoryStore();
+  adapter.detect = async () => ({
+    installed: true,
+    running: true,
+    supported: true,
+  });
+  adapter.snapshot = async () => ({
+    captureId: current().capture.communicationsId,
+    renderId: current().render.communicationsId,
+  });
+  adapter.current = adapter.snapshot;
+  adapter.apply = async ({ captureId, renderId }) => {
+    const roles = current();
+    await adapter.restoreAllRoles({
+      capture: { ...roles.capture, communicationsId: captureId },
+      render: { ...roles.render, communicationsId: renderId },
+    });
+  };
+  adapter.restore = adapter.apply;
   const meeting = new MeetingSetupController({
     adapter,
     platform: "win32",
     store: meetingStore,
   });
 
-  await global.start();
+  await controller.applyMode("meeting");
+  const modeTarget = structuredClone(current());
   await meeting.apply({
     app: "teams",
     endpoints: {
@@ -343,20 +249,26 @@ test("quick setup stop returns to global virtual defaults before full exit resto
     },
   });
   await meeting.restore();
+  assert.deepEqual(current(), modeTarget);
+  await controller.restore();
+  assert.deepEqual(current(), original);
+});
 
-  assert.deepEqual(
-    calls.find((call) => call.restoreMeeting),
-    {
-      restoreMeeting: {
-        captureId: "voicemeeter-b2",
-        renderId: "voicemeeter-input",
-      },
-    },
-  );
-  assert.equal(current.capture.communicationsId, "voicemeeter-b2");
-  assert.equal(current.render.communicationsId, "voicemeeter-input");
-
-  await global.restore();
-  assert.deepEqual(calls.at(-1), { restoreGlobal: physicalSnapshot });
-  assert.deepEqual(current, physicalSnapshot);
+test("serializes restore behind in-flight mode application", async () => {
+  let release;
+  const waiting = new Promise((resolve) => (release = resolve));
+  const { adapter, controller, current, store } = fixture();
+  const setRoles = adapter.restoreAllRoles;
+  adapter.restoreAllRoles = async (roles) => {
+    if (roles.capture.communicationsId === resolved.captureId) await waiting;
+    return setRoles(roles);
+  };
+  const applying = controller.applyMode("meeting");
+  await new Promise((resolve) => setImmediate(resolve));
+  const restoring = controller.restore();
+  release();
+  await applying;
+  assert.deepEqual(await restoring, { restored: true });
+  assert.deepEqual(current(), original);
+  assert.equal(store.value, undefined);
 });

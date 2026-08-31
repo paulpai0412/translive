@@ -1,3 +1,4 @@
+import { attachAudioToSink } from "./audio-output.js";
 import {
   emptyDevicePreferences,
   isVirtualDevice,
@@ -12,6 +13,7 @@ import {
 } from "./renderer-control.js";
 import { createStartupSession } from "./startup-session.js";
 import { VOICE_TRAINING_POLICY } from "./voice-training-policy.js";
+import { verifyVoiceMeeterRoute } from "./voicemeeter-route-health.js";
 import {
   advancePacedTargetCaption,
   bufferPacedTargetCaption,
@@ -963,7 +965,7 @@ async function createRealtimePeer({ direction, source, sink }) {
     }
     eventChannel = peerConnection.createDataChannel("oai-events");
     audio = document.createElement("audio");
-    audio.autoplay = true;
+    audio.autoplay = false;
     audio.playsInline = true;
     audio.hidden = true;
     document.body.append(audio);
@@ -978,11 +980,8 @@ async function createRealtimePeer({ direction, source, sink }) {
     });
     peerConnection.addEventListener("track", async (event) => {
       try {
-        audio.srcObject = event.streams[0] || new MediaStream([event.track]);
-        if (typeof audio.setSinkId !== "function") {
-          throw new Error("此 Electron 版本不支援指定音訊輸出裝置");
-        }
-        await audio.setSinkId(sink.id);
+        const remoteStream =
+          event.streams[0] || new MediaStream([event.track]);
         event.track.addEventListener(
           "unmute",
           () => recordMetric(direction, "output-audio", {}),
@@ -993,7 +992,11 @@ async function createRealtimePeer({ direction, source, sink }) {
           () => recordMetric(direction, "output-audio", {}),
           { once: true },
         );
-        await audio.play();
+        await attachAudioToSink({
+          audio,
+          sinkId: sink.id,
+          stream: remoteStream,
+        });
       } catch (error) {
         window.translive.rendererError(
           direction,
@@ -1090,6 +1093,21 @@ async function startTranslation() {
 
     const preflight = await window.translive.preflight(config);
     if (!preflight.ok) throw new Error(preflight.error);
+    if (startup.isCanceled()) return;
+    if (config.routeProfile === "voicemeeter") {
+      setConnectionStep(
+        "connect-route-step",
+        "active",
+        "正在測試 VoiceMeeter B1／B2 隔離",
+      );
+      const routeHealth = await verifyVoiceMeeterRoute({
+        devices: ui.devices,
+        mode: ui.mode,
+      });
+      if (!routeHealth.ok) {
+        throw new Error("VoiceMeeter 音訊 Bus 隔離驗證失敗");
+      }
+    }
     if (startup.isCanceled()) return;
 
     ui.runtime = preflight.codexVersion;
@@ -1244,8 +1262,11 @@ function updateDiagnostics(event) {
 function applyGlobalAudioStatus({ state } = {}) {
   elements["global-audio-status"].textContent =
     {
+      prepared:
+        "Windows 原始音訊設定已保存；開始翻譯時只套用目前模式需要的路由。",
       active:
-        "Windows 預設音訊已暫時導向 VoiceMeeter；完全結束 TransLive 後會還原。",
+        "目前模式的 Windows 音訊路由已套用；停止翻譯後會自動還原。",
+      restored: "Windows 原始音訊設定已還原。",
       "target-unavailable":
         "找不到 VoiceMeeter 虛擬裝置。Windows 音訊設定未變更；請啟動 VoiceMeeter Banana 後重新開啟 TransLive。",
       "snapshot-failed":

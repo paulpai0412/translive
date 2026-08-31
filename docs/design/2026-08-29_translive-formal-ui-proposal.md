@@ -618,19 +618,30 @@ Tray tooltip 必須顯示目前模式與通道狀態；斷線時送出 Windows n
 
 第一個 tracer bullet 是 Mode runtime；它必須在不要求多餘裝置的情況下，只建立目前模式需要的 GPT‑Live session。
 
-## 20. 2026-08-30 修訂：Windows 全域音訊生命週期
+## 20. 2026-08-31 修訂：依模式隔離 Windows 音訊生命週期
 
-使用者確認不做瀏覽器座標自動化或未文件化的 per-app 路由。TransLive 採用較可預測的 Windows 全域預設裝置切換：
+實機會議顯示「App 啟動即切換所有 Windows 音訊角色」會把 Edge／YouTube／系統聲音一併混入 Meeting RX。故取消不分模式的全域切換；仍不使用瀏覽器座標自動化或未文件化 per-app routing。
 
-- 主實例啟動時，保存 Console、Multimedia、Communications 三種角色的 capture／render 原始端點；
-- 預設輸出切到 `Voicemeeter Input (VB-Audio Voicemeeter VAIO)`；
-- 預設輸入切到 `Voicemeeter Out B2 (VB-Audio Voicemeeter VAIO)`；
-- 停止單次翻譯不還原；完全退出 TransLive 才還原全部原始角色；
-- 第二個 Electron 實例不得碰觸共用還原 checkpoint；
-- checkpoint 保存原始角色、虛擬目標與 applying／active phase；異常退出後只在目前端點仍等於虛擬目標時自動還原；若使用者已變更裝置則停止自動操作並提示人工確認；
-- 任一目標缺失、snapshot／apply／verify／restore 失敗時，不得覆蓋原始 checkpoint，也不得向 renderer 傳送原始 endpoint ID。
+主實例啟動時只做 recovery 與 snapshot，按「開始翻譯」時才依模式套用：
 
-公開 TDD seam 為 `WindowsAudioDefaultsController.start()/restore()/status()`、Windows adapter 的 all-role snapshot/apply/restore，以及 Electron 單一實例／退出 orchestration。Teams／Zoom Quick Setup 只暫時改 Communications；停止翻譯回到 TransLive 開啟期間的全域虛擬值，完整退出才回到實體原值。
+| Mode | Capture 變更 | Render 變更 |
+| --- | --- | --- |
+| Meeting | 只把 Communications 設為 `Voicemeeter Out B2` | 只把 Communications 設為 `Voicemeeter Input` |
+| Media | 不變更 | 只把 Console／Multimedia 設為 `Voicemeeter Input` |
+| Microphone | 只把 Communications 設為 `Voicemeeter Out B2` | 不變更 |
+
+- Console／Multimedia／Communications 未列出的角色保持原端點；Meeting 不再捕獲 YouTube 或一般系統聲音；
+- 單次翻譯停止、取消或 start failure 後立即還原原始 Windows 角色；完整退出再做 idempotent safety restore；
+- Teams／Zoom Quick Setup 僅在 Meeting target 套用後設定 Communications，停止時先還原 meeting-app snapshot，再還原 mode target；
+- 第二個 Electron 實例不得碰觸 checkpoint；checkpoint 保存 original、mode target 與 prepared／applying／active phase；
+- 異常退出只在目前端點等於已保存 target 時自動還原；若使用者已另行改動則 fail closed 並要求人工確認；
+- endpoint ID 不進 renderer、log 或 evidence。
+
+GPT remote track 播放順序必須為 `autoplay=false → setSinkId(target) → srcObject → play()`；禁止在 sink 綁定前把第一個 frame 送到 Windows default。
+
+開始前執行可測的 VoiceMeeter route health seam：TX test tone 只能出現在 B2、RX test tone 只能出現在 B1，且反向 bus 必須低於 leakage threshold；任何 getUserMedia／setSinkId／level gate 失敗都阻止開始，不以靜默 fallback 取代。
+
+公開 TDD seam 為 `WindowsAudioDefaultsController.prepare()/applyMode()/restore()/status()`、all-role adapter、純 mode-target builder、renderer sink-binding helper、bus-level assessment，以及 Electron start/stop/exit orchestration。
 
 ## 21. 2026-08-30 修訂：自適應同步翻譯節奏
 

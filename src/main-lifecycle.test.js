@@ -13,13 +13,30 @@ test("only the primary Electron instance can initialize shared Windows audio rou
     source,
     /const isPrimaryInstance = app\.requestSingleInstanceLock\(\);/,
   );
-  assert.match(source, /if \(!isPrimaryInstance\) \{\s+app\.quit\(\);/);
+  assert.match(source, /if \(isPrimaryInstance\) \{/);
+  assert.match(source, /\} else \{\s+app\.quit\(\);/);
   assert.match(source, /app\.on\("second-instance", \(\) => \{/);
   assert.match(source, /trayController\?\.showWindow\(\)/);
   assert.match(source, /globalAudioRoutingStarted = !startupRestore\.reason;/);
   assert.match(
     source,
-    /globalAudioStartupPromise = globalAudioRoutingStarted\s+\? windowsAudioDefaultsController\.start\(\)\s+: Promise\.resolve\(\{ state: "legacy-recovery-needed" \}\)/,
+    /globalAudioStartupPromise = globalAudioRoutingStarted\s+\? windowsAudioDefaultsController\.prepare\(\)\s+: Promise\.resolve\(\{ state: "legacy-recovery-needed" \}\)/,
+  );
+});
+
+test("applies mode routing at Start and restores quick setup before mode roles", async () => {
+  const source = await mainSource();
+  assert.match(
+    source,
+    /translive:start"[\s\S]{0,320}await applyTranslationAudioRouting\(activeMode\)/,
+  );
+  assert.match(
+    source,
+    /restoreTranslationAudioRouting[\s\S]{0,750}restoreMeetingDevices\(\)[\s\S]{0,450}windowsAudioDefaultsController\.restore\(\)/,
+  );
+  assert.match(
+    source,
+    /restoreMeetingDevices: restoreTranslationAudioRouting/,
   );
 });
 
@@ -165,9 +182,7 @@ test("translation waits for automatic VoiceMeeter routing and exit restores it f
   const voiceMeeterRestore = source.indexOf(
     "voiceMeeterRoutingController?.restore()",
   );
-  const windowsRestore = source.indexOf(
-    "windowsAudioDefaultsController?.restore()",
-  );
+  const windowsRestore = source.indexOf("return restoreTranslationAudioRouting();");
   assert.ok(voiceMeeterRestore >= 0);
   assert.ok(windowsRestore > voiceMeeterRestore);
 });
@@ -175,12 +190,15 @@ test("translation waits for automatic VoiceMeeter routing and exit restores it f
 test("early quit awaits global-audio startup and uses optional cleanup before restore", async () => {
   const source = await mainSource();
 
-  assert.match(source, /translationLifecycle\?\.stop\("app-quit"/);
+  assert.match(
+    source,
+    /translationLifecycle\?\.stop\("app-quit", \{[\s\S]{0,100}restoreDevices: false/,
+  );
   assert.match(source, /trayController\?\.dispose\(\)/);
   assert.match(
     source,
     /await globalAudioStartupPromise\?\.catch\(\(\) => \{\}\);/,
   );
   assert.match(source, /if \(!globalAudioRoutingStarted\) return undefined;/);
-  assert.match(source, /windowsAudioDefaultsController\?\.restore\(\)/);
+  assert.match(source, /return restoreTranslationAudioRouting\(\);/);
 });

@@ -36,6 +36,7 @@ export class TranslationLifecycle {
       controlAction = "stop",
       forceRendererControl = false,
       rendererControl = true,
+      restoreDevices = true,
     } = {},
   ) {
     const status = this.#controller.status();
@@ -57,7 +58,9 @@ export class TranslationLifecycle {
     } catch (error) {
       stopError = error;
     }
-    const meetingRestore = await this.#restoreMeetingDevices();
+    const meetingRestore = restoreDevices
+      ? await this.#restoreMeetingDevices()
+      : { restored: false };
     if (stopError) throw stopError;
     return { ...result, meetingRestore };
   }

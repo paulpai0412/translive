@@ -140,12 +140,47 @@ async function restoreMeetingDevices() {
   return result;
 }
 
+async function restoreTranslationAudioRouting() {
+  let meeting;
+  let mode;
+  try {
+    meeting = await restoreMeetingDevices();
+  } catch {
+    meeting = { reason: "restore-failed", restored: false };
+  }
+  try {
+    mode = await windowsAudioDefaultsController.restore();
+  } catch {
+    mode = { reason: "restore-failed", restored: false };
+  }
+  const state =
+    meeting.reason ?? mode.reason ?? (mode.restored ? "restored" : "prepared");
+  globalAudioState = { state };
+  publish({ type: "global-audio", state });
+  return {
+    meeting,
+    mode,
+    reason: meeting.reason ?? mode.reason,
+    restored: Boolean(meeting.restored || mode.restored),
+  };
+}
+
 async function requireVoiceMeeterRouting() {
   const status = await voiceMeeterRoutingStartupPromise?.catch(() => ({
     state: "unavailable",
   }));
   if (status?.state !== "active") {
     throw new Error("VOICEMEETER_ROUTING_NOT_READY");
+  }
+  return status;
+}
+
+async function applyTranslationAudioRouting(mode) {
+  const status = await windowsAudioDefaultsController.applyMode(mode);
+  globalAudioState = status;
+  publish({ type: "global-audio", ...status });
+  if (status.state !== "active") {
+    throw new Error("WINDOWS_MODE_AUDIO_ROUTING_NOT_READY");
   }
   return status;
 }
@@ -473,7 +508,14 @@ function registerIpc() {
   ipcMain.handle("translive:start", async (_event, config) => {
     await requireVoiceMeeterRouting();
     activeMode = config.mode ?? "meeting";
-    const result = await controller.start(config);
+    await applyTranslationAudioRouting(activeMode);
+    let result;
+    try {
+      result = await controller.start(config);
+    } catch (error) {
+      await restoreTranslationAudioRouting();
+      throw error;
+    }
     trayState = result.aggregate;
     trayController?.update({
       appState: trayState,
@@ -497,13 +539,18 @@ function registerIpc() {
     });
     return result;
   });
-  ipcMain.handle("translive:cancel-start", async () =>
-    controller.cancelStart(),
-  );
+  ipcMain.handle("translive:cancel-start", async () => {
+    try {
+      return await controller.cancelStart();
+    } finally {
+      await restoreTranslationAudioRouting();
+    }
+  });
   ipcMain.handle("translive:set-muted", (_event, direction, muted) =>
     controller.setMuted(direction, Boolean(muted)),
   );
   ipcMain.handle("translive:meeting-setup-apply", async (_event, setup) => {
+    await applyTranslationAudioRouting("meeting");
     const result = await meetingSetupController.apply(
       sanitizeMeetingSetupRequest(setup),
     );
@@ -637,10 +684,8 @@ function registerIpc() {
   );
 }
 
-// The primary process owns the shared Windows and local-voice lifecycle.
-if (!isPrimaryInstance) {
-  app.quit();
-} else {
+// The primary Electron process owns the shared Windows and local-voice lifecycle.
+if (isPrimaryInstance) {
   app.on("second-instance", () => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     if (mainWindow.isMinimized()) mainWindow.restore();
@@ -709,7 +754,7 @@ if (!isPrimaryInstance) {
     });
     globalAudioRoutingStarted = !startupRestore.reason;
     globalAudioStartupPromise = globalAudioRoutingStarted
-      ? windowsAudioDefaultsController.start()
+      ? windowsAudioDefaultsController.prepare()
       : Promise.resolve({ state: "legacy-recovery-needed" });
     const globalAudioStartup = await globalAudioStartupPromise;
     globalAudioState = globalAudioStartup;
@@ -811,7 +856,7 @@ if (!isPrimaryInstance) {
       controller,
       disposeSummaries: () => summaryController.dispose(),
       rendererControls,
-      restoreMeetingDevices,
+      restoreMeetingDevices: restoreTranslationAudioRouting,
       publish,
     });
     trayController = new TrayController({
@@ -893,7 +938,10 @@ if (!isPrimaryInstance) {
     quitting = true;
     event.preventDefault();
     Promise.allSettled([
-      translationLifecycle?.stop("app-quit", { rendererControl: false }),
+      translationLifecycle?.stop("app-quit", {
+        rendererControl: false,
+        restoreDevices: false,
+      }),
       accountController?.dispose(),
       summaryController?.dispose(),
       trayController?.dispose(),
@@ -909,13 +957,7 @@ if (!isPrimaryInstance) {
         }
         await globalAudioStartupPromise?.catch(() => {});
         if (!globalAudioRoutingStarted) return undefined;
-        return windowsAudioDefaultsController?.restore();
-      })
-      .then((result) => {
-        if (result?.reason) {
-          globalAudioState = { state: result.reason };
-          publish({ type: "global-audio", state: result.reason });
-        }
+        return restoreTranslationAudioRouting();
       })
       .finally(() => {
         miniCaptionWindowController?.dispose();
@@ -923,4 +965,6 @@ if (!isPrimaryInstance) {
         app.quit();
       });
   });
+} else {
+  app.quit();
 }

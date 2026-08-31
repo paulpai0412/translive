@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { WindowsAudioDefaultsStore } from "./windows-audio-defaults-store.js";
 
-const snapshot = {
+const original = {
   capture: {
     consoleId: "physical-capture-console",
     multimediaId: "physical-capture-multimedia",
@@ -18,22 +18,21 @@ const snapshot = {
     communicationsId: "physical-render-communications",
   },
 };
-
+const target = {
+  capture: { ...original.capture, communicationsId: "voicemeeter-b2" },
+  render: { ...original.render, communicationsId: "voicemeeter-input" },
+};
 const checkpoint = {
+  mode: "meeting",
   phase: "active",
-  snapshot,
-  target: {
-    captureId: "voicemeeter-b2",
-    renderId: "voicemeeter-input",
-  },
+  snapshot: original,
+  target,
 };
 
-test("durably persists only a complete phase-aware all-role Windows audio checkpoint", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "translive-global-audio-"));
+test("persists only a complete mode-scoped all-role checkpoint", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "translive-mode-audio-"));
   const store = new WindowsAudioDefaultsStore({ directory });
-
   await store.save(checkpoint);
-
   assert.deepEqual(await store.load(), checkpoint);
   assert.deepEqual(
     JSON.parse(
@@ -48,16 +47,49 @@ test("durably persists only a complete phase-aware all-role Windows audio checkp
   assert.equal(await store.load(), undefined);
 });
 
-test("marks incomplete or legacy persisted checkpoints unsafe instead of silently using them", async () => {
+test("loads a complete legacy all-role target so upgrades can restore it", async () => {
+  const legacy = {
+    phase: "active",
+    snapshot: original,
+    target: { captureId: "legacy-b2", renderId: "legacy-vaio" },
+  };
   const store = new WindowsAudioDefaultsStore({
     directory: "/not-used",
-    readFile: async () =>
-      '{"snapshot":{"capture":{"consoleId":"mic"},"render":{}}}',
+    readFile: async () => JSON.stringify(legacy),
   });
+  assert.deepEqual(await store.load(), {
+    mode: "legacy",
+    phase: "active",
+    snapshot: original,
+    target: {
+      capture: {
+        consoleId: "legacy-b2",
+        multimediaId: "legacy-b2",
+        communicationsId: "legacy-b2",
+      },
+      render: {
+        consoleId: "legacy-vaio",
+        multimediaId: "legacy-vaio",
+        communicationsId: "legacy-vaio",
+      },
+    },
+  });
+});
 
+test("rejects incomplete and unsupported-mode checkpoints", async () => {
+  const store = new WindowsAudioDefaultsStore({
+    directory: "/not-used",
+    readFile: async () => '{"target":{"captureId":"legacy"}}',
+  });
   assert.deepEqual(await store.load(), { invalid: true });
-  await assert.rejects(
-    store.save({ snapshot }),
-    /phase-aware all-role Windows audio checkpoint/i,
-  );
+  for (const value of [
+    { ...checkpoint, mode: "unknown" },
+    { ...checkpoint, target: { capture: {}, render: {} } },
+    { snapshot: original },
+  ]) {
+    await assert.rejects(
+      store.save(value),
+      /mode-scoped all-role Windows audio checkpoint/i,
+    );
+  }
 });

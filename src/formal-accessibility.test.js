@@ -83,14 +83,11 @@ test("shows a safe global Windows audio-routing status", async () => {
   ]);
 
   assert.match(html, /id="global-audio-status"[^>]*role="status"/);
-  assert.match(
-    html,
-    /TransLive 開啟時會將 Windows 預設輸入與輸出暫時導向 VoiceMeeter/,
-  );
+  assert.match(html, /開始翻譯時只切換目前模式需要的 Windows 音訊角色/);
   assert.match(preload, /audioDefaultsStatus/);
   assert.match(renderer, /audioDefaultsStatus\(\)/);
   assert.match(renderer, /event\.type === "global-audio"/);
-  assert.match(renderer, /Windows 預設音訊已暫時導向 VoiceMeeter/);
+  assert.match(renderer, /只套用目前模式需要的路由/);
   assert.match(renderer, /Windows 音訊設定未變更/);
   assert.match(renderer, /legacy-recovery-needed/);
   assert.match(renderer, /recovery-needed/);

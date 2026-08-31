@@ -59,6 +59,29 @@ test("tray stop tears down renderer peers, main session, and meeting devices in 
   assert.deepEqual(result.meetingRestore, { restored: true });
 });
 
+test("app quit may defer device restore until VoiceMeeter buses are restored", async () => {
+  const calls = [];
+  const lifecycle = new TranslationLifecycle({
+    controller: {
+      status: () => ({ tx: "live", rx: "live" }),
+      async stop(reason) {
+        calls.push(`main:stop:${reason}`);
+        return { status: { tx: "stopped", rx: "stopped" } };
+      },
+    },
+    rendererControls: {
+      async request(control) { calls.push(`renderer:${control.action}`); },
+    },
+    restoreMeetingDevices: async () => {
+      calls.push("devices:restore");
+      return { restored: true };
+    },
+  });
+
+  await lifecycle.stop("app-quit", { restoreDevices: false });
+  assert.deepEqual(calls, ["renderer:stop", "main:stop:app-quit"]);
+});
+
 test("still stops main translation and restores devices when a renderer is already destroyed", async () => {
   const calls = [];
   const lifecycle = new TranslationLifecycle({
