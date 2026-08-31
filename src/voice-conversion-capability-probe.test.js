@@ -10,6 +10,10 @@ test("Windows RVC capability probe is read-only and emits redacted JSON", async 
 
   assert.match(script, /Get-CimInstance Win32_Processor/);
   assert.match(script, /Get-CimInstance Win32_VideoController/);
+  assert.match(script, /rvc-runtime-trust\.json/);
+  assert.match(script, /verify-rvc-python\.ps1/);
+  assert.doesNotMatch(script, /runtime-manifest\.json/);
+  assert.match(script, /TransLive\\rvc-runtime/);
   assert.match(script, /python/);
   assert.match(script, /ffmpeg/);
   assert.match(script, /torch_directml/);
@@ -20,8 +24,9 @@ test("Windows RVC capability probe is read-only and emits redacted JSON", async 
   );
   assert.doesNotMatch(
     script,
-    /Copy-Item|Move-Item|Remove-Item|Set-Content|Out-File/i,
+    /Copy-Item|Move-Item|Remove-Item|Set-Content|Out-File|Get-Command/i,
   );
+  assert.match(script, /Has-ReparsePoint/);
   assert.match(script, /weightsOnlyLoader/);
   assert.match(
     script,

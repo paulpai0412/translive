@@ -536,6 +536,87 @@
               </button>
             </div>
           </div>
+
+          <section
+            class="voice-training-settings"
+            aria-labelledby="voice-training-title"
+          >
+            <div>
+              <p class="section-kicker">本人資料</p>
+              <h3 id="voice-training-title">錄製與訓練本人音色</h3>
+              <p>
+                錄音只在這台電腦處理，不會送往 ChatGPT、逐字稿或診斷包。目標約 10 分鐘的單人、低噪音語音。
+              </p>
+              <p class="voice-training-warning">
+                CPU 訓練可能需要較長時間。DirectML 目前僅作推論候選，除非已驗證的本機訓練器另行證實。
+              </p>
+            </div>
+            <div class="voice-training-controls">
+              <label>
+                <span>錄音麥克風</span>
+                <select id="voice-training-microphone" aria-describedby="voice-training-status">
+                  <option value="">正在檢查實體麥克風…</option>
+                </select>
+              </label>
+              <label class="checkbox-row">
+                <input id="voice-training-consent" type="checkbox" />
+                <span>我確認這是我本人聲音，並同意僅用於本機即時翻譯輸出。</span>
+              </label>
+            </div>
+            <div class="voice-training-readout" aria-live="polite">
+              <div>
+                <span>錄製進度</span>
+                <strong id="voice-training-elapsed">00:00 / 10:00</strong>
+              </div>
+              <progress
+                id="voice-training-progress"
+                aria-label="本人音色錄製與訓練進度"
+                value="0"
+                max="100"
+              >0%</progress>
+              <div class="voice-training-levels">
+                <span id="voice-training-level">輸入電平：—</span>
+                <span id="voice-training-clip">削波：—</span>
+                <span id="voice-training-silence">靜音：—</span>
+              </div>
+            </div>
+            <p id="voice-training-status" class="mode-help" role="status">
+              正在檢查固定本機 RVC runtime…
+            </p>
+            <div class="voice-training-actions">
+              <button class="primary-button" id="voice-training-start" type="button" disabled>
+                開始錄製本人音色
+              </button>
+              <button class="secondary-button" id="voice-training-pause" type="button" disabled>
+                暫停
+              </button>
+              <button class="secondary-button" id="voice-training-resume" type="button" disabled>
+                繼續
+              </button>
+              <button class="secondary-button" id="voice-training-stop" type="button" disabled>
+                停止並檢查錄音
+              </button>
+              <label class="checkbox-row voice-training-final-consent">
+                <input id="voice-training-final-consent" type="checkbox" />
+                <span>我再次確認以本人聲音開始本機訓練與建立可用音色模型。</span>
+              </label>
+              <button class="secondary-button" id="voice-training-train" type="button" disabled>
+                開始本機 CPU 訓練
+              </button>
+              <button class="text-button" id="voice-training-cancel" type="button" disabled>
+                取消工作
+              </button>
+            </div>
+            <div class="voice-training-delete">
+              <label class="checkbox-row">
+                <input id="voice-training-delete-confirm" type="checkbox" />
+                <span>我確認永久刪除此錄音、正規化音訊、訓練工作與未完成輸出。</span>
+              </label>
+              <button class="danger-button" id="voice-training-delete" type="button" disabled>
+                刪除本次本人音色工作
+              </button>
+            </div>
+          </section>
         </section>
       </section>
     </main>

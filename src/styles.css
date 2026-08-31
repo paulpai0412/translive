@@ -1076,6 +1076,92 @@ body[data-mode="microphone"] #single-target-label::before {
 .voice-profile-delete .checkbox-row {
   flex: 1 1 300px;
 }
+.voice-training-settings {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+  padding-top: 22px;
+}
+.voice-training-settings h3 {
+  font-size: 18px;
+  margin: 0;
+}
+.voice-training-settings > div > p:not(.section-kicker),
+.voice-training-warning {
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 8px 0 0;
+  max-width: 620px;
+}
+.voice-training-warning {
+  color: var(--warning);
+}
+.voice-training-controls {
+  align-items: end;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+}
+.voice-training-controls > label:first-child {
+  display: grid;
+  gap: 7px;
+}
+.voice-training-controls > label:first-child > span {
+  color: var(--muted);
+  font-size: 13px;
+}
+.voice-training-controls select {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  min-height: 42px;
+  padding: 0 11px;
+}
+.voice-training-readout {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+.voice-training-readout > div:first-child,
+.voice-training-levels {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+.voice-training-readout span {
+  color: var(--muted);
+  font-size: 13px;
+}
+.voice-training-readout progress {
+  accent-color: var(--primary-solid);
+  inline-size: 100%;
+}
+.voice-training-levels {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.voice-training-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.voice-training-delete {
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  padding-top: 16px;
+}
+.voice-training-delete .checkbox-row {
+  margin: 0;
+}
 
 .quick-setup-modal.is-open {
   display: block;

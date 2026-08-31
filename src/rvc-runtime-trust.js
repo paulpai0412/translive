@@ -1,0 +1,1748 @@
+// Generated from the pinned RVC checkout and approved local runtime receipt.
+// This file is the app-packaged trust anchor; do not derive it from the writable runtime manifest.
+export const RVC_RUNTIME_TRUST = Object.freeze({
+  "assets": {
+    "files": [
+      {
+        "path": "source/assets/hubert_base/config.json",
+        "sha256": "0346950779dfb7f9316fa74ed846e2b8a22a08eedfdc5387b73f327cb1a4a7cf"
+      },
+      {
+        "path": "source/assets/hubert_base/preprocessor_config.json",
+        "sha256": "7c1976a680fb7acc757cd36fb08eef878fa36c70b4c9d2d595df9c608bbbbf0e"
+      },
+      {
+        "path": "source/assets/hubert_base/pytorch_model.bin",
+        "sha256": "cc8c20f4b90a520757260197a3ff2505705a7adbd20ad9eeaa4e1a9b38442ef5"
+      },
+      {
+        "path": "source/assets/rmvpe/rmvpe.pt",
+        "sha256": "6d62215f4306e3ca278246188607209f09af3dc77ed4232efdd069798c4ec193"
+      },
+      {
+        "path": "source/assets/rmvpe/rmvpe.onnx",
+        "sha256": "5370e71ac80af8b4b7c793d27efd51fd8bf962de3a7ede0766dac0befa3660fd"
+      },
+      {
+        "path": "source/assets/pretrained_v2/f0G40k.pth",
+        "sha256": "3b2c44035e782c4b14ddc0bede9e2f4a724d025cd073f736d4f43708453adfcb"
+      },
+      {
+        "path": "source/assets/pretrained_v2/f0D40k.pth",
+        "sha256": "6b6ab091e70801b28e3f41f335f2fc5f3f35c75b39ae2628d419644ec2b0fa09"
+      },
+      {
+        "path": "source/logs/mute/0_gt_wavs/mute32k.spec.pt",
+        "sha256": "1258c9378d409404dcd7e734ddc53c319f9a2b8aa30e1889e2e5d1ed8bcf04d8"
+      },
+      {
+        "path": "source/logs/mute/0_gt_wavs/mute32k.wav",
+        "sha256": "9edcf85ec77e88bd01edf3d887bdc418d3596d573f7ad2694da546f41dae6baf"
+      },
+      {
+        "path": "source/logs/mute/0_gt_wavs/mute40k.spec.pt",
+        "sha256": "a3f99cfc68517538fc93b1e16a890e7d1e0ff1bfd384a39e7aac7c10de123e35"
+      },
+      {
+        "path": "source/logs/mute/0_gt_wavs/mute40k.wav",
+        "sha256": "67a816e77b50cb9f016e49e5c01f07e080c4e3b82b7a8ac3e64bcb143f90f31b"
+      },
+      {
+        "path": "source/logs/mute/0_gt_wavs/mute48k.spec.pt",
+        "sha256": "cf8422f62cd6dc079ec5dc727a7eb89e88cde5ebd2c5f73d4958edad1c7ac7d0"
+      },
+      {
+        "path": "source/logs/mute/0_gt_wavs/mute48k.wav",
+        "sha256": "2f2bb4daaa106e351aebb001e5a25de985c0b472f22e8d60676bc924a79056ee"
+      },
+      {
+        "path": "source/logs/mute/1_16k_wavs/mute.wav",
+        "sha256": "9e233e86ba1be365e1133f157d56b61110086b89650ecfbdfc013c759e466250"
+      },
+      {
+        "path": "source/logs/mute/2a_f0/mute.wav.npy",
+        "sha256": "9b9acf9ab7facdb032e1d687fe35182670b0b94566c4b209ae48c239d19956a6"
+      },
+      {
+        "path": "source/logs/mute/2b-f0nsf/mute.wav.npy",
+        "sha256": "30792849c8e72d67e6691754077f2888b101cb741e9c7f193c91dd9692870c87"
+      },
+      {
+        "path": "source/logs/mute/3_feature256/mute.npy",
+        "sha256": "64d5abbac078e19a3f649c0d78a02cb33a71407ded3ddf2db78e6b803d0c0126"
+      },
+      {
+        "path": "source/logs/mute/3_feature768/mute.npy",
+        "sha256": "16ef62b957887ac9f0913aa5158f18983afff1ef5a3e4c5fd067ac20fc380d54"
+      }
+    ],
+    "hfRevision": "e6d0c1a17da07c33557852f9dfa2bd44cc75737d"
+  },
+  "directmlVersion": "0.2.5.dev240914",
+  "ffmpeg": {
+    "path": "tools/ffmpeg.exe",
+    "sha256": "57c56e369d5b4873b4d93fc1a1d833cb7cd8bc9325c14b05c34ce60b22842d8a",
+    "version": "9.0.1"
+  },
+  "ffprobe": {
+    "path": "tools/ffprobe.exe",
+    "sha256": "afe05347caaabe479b3c4eae71992b6ec1e11c57266a1d665deb0f9fe9847208",
+    "version": "9.0.1"
+  },
+  "python": {
+    "path": ".venv/Scripts/python.exe",
+    "sha256": "0b471133e110cfb53a061cad528ce8e517d7b9ac41a0a396c39ad795a487fc14",
+    "version": "3.12"
+  },
+  "rvcCommit": "81eed5e8f68b6bed1789f682fe78cdd324495afc",
+  "runner": {
+    "path": "tools/rvc-training-runtime.py",
+    "sha256": "b3b03e9318b4a801f0e17cab24bc00c2f14726ee0855caabaaa16aae8241f0ef"
+  },
+  "source": {
+    "files": [
+      {
+        "path": "source/.gitmodules",
+        "sha256": "345caca58c01b79bdbeb0ca322c636128092edcccd1c61c46ed2a4b9a015f02e"
+      },
+      {
+        "path": "source/LICENSE",
+        "sha256": "bec61ed1eb9a3748644ddbc50303aa6978e14eeaba46822e59a006c722b52585"
+      },
+      {
+        "path": "source/README.md",
+        "sha256": "6ae347c0cc60836f1e7fd2b73ee73327746e66c32a5dd4270d02a096810bca8b"
+      },
+      {
+        "path": "source/RVCRealtimeVST/.gitignore",
+        "sha256": "2260d8a360c9ffcfa9b726b33d41d7c625bdbfea3204aa48ca9bcfeeaf186959"
+      },
+      {
+        "path": "source/RVCRealtimeVST/CMakeLists.txt",
+        "sha256": "e86ab880dd08704352a4a99b4a80122cea16d2a712da6911442eccbd254bdd4e"
+      },
+      {
+        "path": "source/RVCRealtimeVST/LICENSE.txt",
+        "sha256": "5707154d5ef4829958b8cdbeef298695773a6a75001c66c1aa78098595ed30a9"
+      },
+      {
+        "path": "source/RVCRealtimeVST/README.en.md",
+        "sha256": "1cfaa8c88ce78c6f11269bd65649f4a72c8e49eb8bd511d099f3a69e58f0cef6"
+      },
+      {
+        "path": "source/RVCRealtimeVST/README.md",
+        "sha256": "60ee6e0140a4a02e369e7d560c601a5a1ed6b7150d02bc9f6fe1cad9ce25a414"
+      },
+      {
+        "path": "source/RVCRealtimeVST/THIRD_PARTY_NOTICES.md",
+        "sha256": "1cc12a11d91585dbb767fb60edb4cc9272d3aecff5290cc0363b16ea490e7426"
+      },
+      {
+        "path": "source/RVCRealtimeVST/config.h",
+        "sha256": "5ea8762543d6ce422b422bb84c3343bb8cbc4edb1140ba33cafba8124ca3ed17"
+      },
+      {
+        "path": "source/RVCRealtimeVST/resources/README.txt",
+        "sha256": "2287f67a3daf49ad2657acc614d6b627d509be9a549745e0e610c28da585d5ae"
+      },
+      {
+        "path": "source/RVCRealtimeVST/resources/fonts/Roboto-Regular.ttf",
+        "sha256": "b2efabca5ea4bc56eea829713706b5cd0788b82aca153bd4adde9b1573933b4f"
+      },
+      {
+        "path": "source/RVCRealtimeVST/resources/main.rc",
+        "sha256": "d50da8fafcf8629178a2b14f9825a3f8fb1e74b805a655b8f2be419133337fa5"
+      },
+      {
+        "path": "source/RVCRealtimeVST/resources/resource.h",
+        "sha256": "3916bf4ae382c3e5a648b6a5732ac4e23f619245a6d01153f6c122e2d0bf3253"
+      },
+      {
+        "path": "source/RVCRealtimeVST/scripts/build.ps1",
+        "sha256": "b07a55900190e5033c672d472dc62126eee1216e27c8cbbcb2660e7859effbbb"
+      },
+      {
+        "path": "source/RVCRealtimeVST/scripts/prepare-dependencies.ps1",
+        "sha256": "ca5bebd9bb69223330b4f30160cb8ef32d893df2121fe6090ccf7a9753b9763f"
+      },
+      {
+        "path": "source/RVCRealtimeVST/scripts/test-all.ps1",
+        "sha256": "8bf45ddca16a6072afad0907cfe5d16ff482ba7ffe6a0cc167acf67d2b17620b"
+      },
+      {
+        "path": "source/RVCRealtimeVST/scripts/test-worker.ps1",
+        "sha256": "06166d702d1a33cf37153a902564f4be90b7d03a7dca845efeee21b35369ae0c"
+      },
+      {
+        "path": "source/RVCRealtimeVST/src/RVCRealtime.cpp",
+        "sha256": "0f09dfc9c8d251ea038715466073986ffe59d6253a8e37f8b892329d655b6286"
+      },
+      {
+        "path": "source/RVCRealtimeVST/src/RVCRealtime.h",
+        "sha256": "b61c67d1ea6af651d7adc2640e88b4138c4250cd9c3dbc98a75c6403e575809a"
+      },
+      {
+        "path": "source/RVCRealtimeVST/src/RvcParameters.hpp",
+        "sha256": "1c8f277bc52c0cfa347895b76ba8e2777b03f0d15a8249bd7d6cc800e8a0a0a3"
+      },
+      {
+        "path": "source/RVCRealtimeVST/src/SpscRing.hpp",
+        "sha256": "b1f1f98e7ed80d8cc85a798c1ecef09e68808c757953d74d4c115abf63a91ec1"
+      },
+      {
+        "path": "source/RVCRealtimeVST/src/WorkerClient.cpp",
+        "sha256": "5a7038258e1e0044ee3c62a75f3176bd34110128055fdca564bbf47be99b05c6"
+      },
+      {
+        "path": "source/RVCRealtimeVST/src/WorkerClient.hpp",
+        "sha256": "2840dd94081f7e7892993558438e2499ad8228c5f13a844d2fde8c4f03e2f305"
+      },
+      {
+        "path": "source/RVCRealtimeVST/third_party/licenses/Roboto-Apache-2.0.txt",
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      },
+      {
+        "path": "source/RVCRealtimeVST/third_party/vst2-compat/aeffectx.h",
+        "sha256": "ad99ad9a8eef6550d2aba9c663cf61783c1dfd06f2102184fb8fe26f401dffdf"
+      },
+      {
+        "path": "source/RVCRealtimeVST/tools/vst2_smoke.cpp",
+        "sha256": "34b36fd0985e2843f08fa091800412b1e39e040c869c493c11e0359853d25d7b"
+      },
+      {
+        "path": "source/RVCRealtimeVST/tools/worker_smoke.cpp",
+        "sha256": "9fce91efca2f5bbbe4f0f5bedbbdf5125533f9a9dabd1f5857df5fd8c6572a5c"
+      },
+      {
+        "path": "source/RVCRealtimeVST/worker/rvc_worker.py",
+        "sha256": "3c4647ab42c005b9804a5a8be448da8c43e52731dc8bfd44717fa7cbbf49db98"
+      },
+      {
+        "path": "source/assets/pymss_weights/config_mel_band_roformer_karaoke.yaml",
+        "sha256": "1ad4ebd15653108e9c7d9dc3b989a1a42929a240b78447dffe384067b11de10a"
+      },
+      {
+        "path": "source/assets/pymss_weights/dereverb_mel_band_roformer_anvuew.yaml",
+        "sha256": "66963a9d60756076506a230b4e503c553a3beb7b4e9a10e6bcc73dee9dbd4866"
+      },
+      {
+        "path": "source/assets/pymss_weights/model_bs_roformer_ep_317_sdr_12.9755.yaml",
+        "sha256": "d10fb22c68f6b5a92180b41faac58ad4626eb7f826e2e2a66d9bf0bd8407715b"
+      },
+      {
+        "path": "source/assets/pymss_weights/model_bs_roformer_ep_368_sdr_12.9628.yaml",
+        "sha256": "105fd8e6a1ef1b038db2aa657a9f9696283d506dbc815bd7134a57aa80ec9f10"
+      },
+      {
+        "path": "source/configs/config.json",
+        "sha256": "fb622a8ecb6415ccbe8f96604fd611d826640b7035bc20cc6cb4d75f24d6d9cb"
+      },
+      {
+        "path": "source/configs/config.py",
+        "sha256": "f304463184b55898aa256fadeafd50d640ed0f880dbae6f89ad54db358240043"
+      },
+      {
+        "path": "source/configs/v1/32k.json",
+        "sha256": "9083cc6cb3f04038f2393296c131e12b3b08776eb3211768ca627db53b8dbc02"
+      },
+      {
+        "path": "source/configs/v1/40k.json",
+        "sha256": "da8c508eef404263cedfe6a85fd5a0b7d631a0a29766b392df145e8ea0412fb8"
+      },
+      {
+        "path": "source/configs/v1/48k.json",
+        "sha256": "4d10ba967f0e5f64ec2b25ee59b5fc8656beb2b4f261a10b6a94130f36f83dec"
+      },
+      {
+        "path": "source/configs/v2/32k.json",
+        "sha256": "2fd8ba5753090847fc50667cf54fdee02ac21f56e5ebd4f3cd2f2ec67e2b4f18"
+      },
+      {
+        "path": "source/configs/v2/48k.json",
+        "sha256": "09462f2a021bb30d130ad977c87dae977393e542e220b3cca7084c08ca8107a7"
+      },
+      {
+        "path": "source/docs/cn/Changelog_CN.md",
+        "sha256": "a22ac0df1f25a74ee807c0276c4cd5898625e5171e25c4bb1211d45b5f19ef65"
+      },
+      {
+        "path": "source/docs/cn/cli.md",
+        "sha256": "75dda32000ff4b33605cc9c811b46754ad4dfccd9d270c61e0b9fd6959d8c1f6"
+      },
+      {
+        "path": "source/docs/cn/faq.md",
+        "sha256": "a080d0531cbc42ac2c09d8b6a87fe8fc42a95516198f0095f6dda2acd076e589"
+      },
+      {
+        "path": "source/docs/en/Changelog_EN.md",
+        "sha256": "9f017fb271962ad196a32c3caf5eeafd0fbe35d651b4472d9f47fe3a76f9ecbc"
+      },
+      {
+        "path": "source/docs/en/README.en.md",
+        "sha256": "9918cecc0d4b52b9fcceeaa667b745c1d54c1e40a7c0a13e89b5897181b3d55d"
+      },
+      {
+        "path": "source/docs/en/cli.md",
+        "sha256": "88eee78e2ab86caa380687657159212d4f7b0d6c7df8cc9359c3dbb67ee6be5d"
+      },
+      {
+        "path": "source/docs/en/faiss_tips_en.md",
+        "sha256": "db0ee2d62fc3e0f8c2ae82d0b5f7cc5764259918c666229ab02a7e172e32bded"
+      },
+      {
+        "path": "source/docs/en/faq_en.md",
+        "sha256": "0fa26e2a253f1cb61287394ec7e3a621b6db6e70eb97aba38be456109550aeda"
+      },
+      {
+        "path": "source/docs/en/training_tips_en.md",
+        "sha256": "7b1975c5f918f821019b79641e810021ba490a69c688e11810eecd341380e00e"
+      },
+      {
+        "path": "source/docs/fr/Changelog_FR.md",
+        "sha256": "f54aa36aa77054938a88dbf717c12db968798487160813ca3cac68cc2c7b808e"
+      },
+      {
+        "path": "source/docs/fr/README.fr.md",
+        "sha256": "03dd9d60bf15476427fca0eab7bf6977978c2737e71193d7be710df1800cf9a8"
+      },
+      {
+        "path": "source/docs/fr/faiss_tips_fr.md",
+        "sha256": "7f89ac7aa633f62e8739d4902b256627c262f7c5826a7b2461d4305c6dceed64"
+      },
+      {
+        "path": "source/docs/fr/faq_fr.md",
+        "sha256": "46520c1922a23aa72465d4d42018f185d1eeb72f253514ee3de49152a79e4c17"
+      },
+      {
+        "path": "source/docs/fr/training_tips_fr.md",
+        "sha256": "18b25ee334f58177b1b7fb0eadafc6d43be03a464aefaf6335a6174cbe55f2be"
+      },
+      {
+        "path": "source/docs/jp/Changelog_JA.md",
+        "sha256": "c2cf7461f7df57fc6311a6cd5740f8782558355582a3ea050fdcd63d6f73f12f"
+      },
+      {
+        "path": "source/docs/jp/README.ja.md",
+        "sha256": "aa47f5223d801a46b259db5cba81efaad64c720e85affb8b3e8de90b8d04e7ca"
+      },
+      {
+        "path": "source/docs/jp/faiss_tips_ja.md",
+        "sha256": "4441eb245cb5c697f845fc0003e61538a4447626936ba723aaa4a44162c58df7"
+      },
+      {
+        "path": "source/docs/jp/faq_ja.md",
+        "sha256": "61b64f2f9e30bd4033d3a6c01f1d824550a88c6cd762b111765889def3a7101c"
+      },
+      {
+        "path": "source/docs/jp/training_tips_ja.md",
+        "sha256": "c92bb356b23dfbfc0d3cd6cadf02b73db9fa0e4fae0098131f6e36afdc0b35cc"
+      },
+      {
+        "path": "source/docs/kr/Changelog_KO.md",
+        "sha256": "f6bfebcc0750c590c9cb3a9c6776109b2ce3a3c9d250639ee84bd50356eeccdd"
+      },
+      {
+        "path": "source/docs/kr/README.ko.han.md",
+        "sha256": "5ef37a78d5b38bcec02854cb2a0ddf3625efb77aeb5409e5f1c6edf5c5a28246"
+      },
+      {
+        "path": "source/docs/kr/README.ko.md",
+        "sha256": "7e9a42fbf4a162c7b03c9383b666e0308a701aef0b560d965bc6582f2b3339b5"
+      },
+      {
+        "path": "source/docs/kr/faiss_tips_ko.md",
+        "sha256": "0ef4938936e56d7bd058703ea3e8d1ea8068b98383386e7e1ab86cda40df8eb8"
+      },
+      {
+        "path": "source/docs/kr/faq_ko.md",
+        "sha256": "962491b8587570cbb50a877aa25f4ceada765ecb5d9646f78abb17ad8554ac20"
+      },
+      {
+        "path": "source/docs/kr/training_tips_ko.md",
+        "sha256": "4de404b1eea5c11e3e2d4c71be8fc733acd43de281bafda6416e6c15137c1010"
+      },
+      {
+        "path": "source/docs/pt/Changelog_pt.md",
+        "sha256": "f560a64e5990de92d220dd14db148627e4d85298a723c8840e5d3d5a6d6c6f90"
+      },
+      {
+        "path": "source/docs/pt/README.pt.md",
+        "sha256": "dffff17b83e7c86da9d9e5a80239a2bbd0ea731cded1f67b2af0b93a75ce6139"
+      },
+      {
+        "path": "source/docs/pt/faiss_tips_pt.md",
+        "sha256": "a1e2b2cbe3147d233f73e0dd14383f3ca3f21705d06027108c765662ba11e80c"
+      },
+      {
+        "path": "source/docs/pt/faq_pt.md",
+        "sha256": "c6296d1da36ab66834c0e8f8ea6f91fef7ef7cd18f2c5d4b8fc3bd5fd6855026"
+      },
+      {
+        "path": "source/docs/pt/training_tips_pt.md",
+        "sha256": "08834936a2c28f62cb668f66fb7526f21580857d487351e89b5e24f759c80506"
+      },
+      {
+        "path": "source/docs/tr/Changelog_TR.md",
+        "sha256": "29bc30465de95a5c81830163adf117a6a5b325fdfd6f68dcbc5dae5861d230e8"
+      },
+      {
+        "path": "source/docs/tr/README.tr.md",
+        "sha256": "354d006e982223d9cbc8551c10c7631dc72c87e587ba30dabaf9c77d06498154"
+      },
+      {
+        "path": "source/docs/tr/faiss_tips_tr.md",
+        "sha256": "94988abb9248891c028ec660f0a29af9b3d687025dd2e2eeffdc20d051b41b62"
+      },
+      {
+        "path": "source/docs/tr/faq_tr.md",
+        "sha256": "026c76d34a25821d03c5e2bb79334ac3f371b4ac891699236524b301bbeff7d5"
+      },
+      {
+        "path": "source/docs/tr/training_tips_tr.md",
+        "sha256": "5695c9a3902aa900a98af5247294f1d36449833ac2e072488ea748f570883443"
+      },
+      {
+        "path": "source/go-realtime_gui.bat",
+        "sha256": "a9891509c4d95fad9b7180dc3724cd8ef66f7dc9e1616b31fb6953f08fea8bc5"
+      },
+      {
+        "path": "source/go-webui.bat",
+        "sha256": "5e2867ee6fb7572f2d0f0f6769b05b272d03579d9580f307ec89b27a808df3b4"
+      },
+      {
+        "path": "source/i18n/i18n.py",
+        "sha256": "cc0cc76a6c139b46b525d02362d8a33261d08abbcde6594ebe51e73573b9d324"
+      },
+      {
+        "path": "source/i18n/locale/en_US.json",
+        "sha256": "7caed6d5898a13834f9a1a0c6471a609dc687f37e745b2f8eda3e274b6e84a30"
+      },
+      {
+        "path": "source/i18n/locale/es_ES.json",
+        "sha256": "79da1e5b47469038df28565aaf81bc2850c5885948680a1ab6a846ca7a8a1871"
+      },
+      {
+        "path": "source/i18n/locale/fr_FR.json",
+        "sha256": "6927f84723291b9c39622a0a7d4e55b7e8a034b090022a64af667bc8b307d8c2"
+      },
+      {
+        "path": "source/i18n/locale/it_IT.json",
+        "sha256": "2499e4946816660c1c9a3f8eb59f64d7b578bef463f8afccc956d60efd540328"
+      },
+      {
+        "path": "source/i18n/locale/ja_JP.json",
+        "sha256": "a2a6280f35f9ac6bbeb6bc2ef6a725ea1937af98bfa3c2ea70263dab63274142"
+      },
+      {
+        "path": "source/i18n/locale/ko_KR.json",
+        "sha256": "0baeca1d124ee1375570f2481af4509bcbcae8152171adc414758b95199e8e47"
+      },
+      {
+        "path": "source/i18n/locale/pt_BR.json",
+        "sha256": "5119ffa193b3a7537062d11816e10efb592c0b0f1570bf8cb209f747014fae21"
+      },
+      {
+        "path": "source/i18n/locale/ru_RU.json",
+        "sha256": "98e1d37bbc826358a148aded2dd08db15e2234bea8a061e2f3b36ed8fda27298"
+      },
+      {
+        "path": "source/i18n/locale/tr_TR.json",
+        "sha256": "2bd225550f25a7b836deb4c2f1d45130e629f6a54b068c2641d686d18a3fbd87"
+      },
+      {
+        "path": "source/i18n/locale/zh_CN.json",
+        "sha256": "7a9b212b53c517d729c06e1c324c657c5f5e7dfcb906c0c58a63308f35d9c2dc"
+      },
+      {
+        "path": "source/i18n/locale/zh_HK.json",
+        "sha256": "3db94ea74b06a59b4a1dd5125b4247ae25c7530ba62caaef0f3d2dcf5b7d70d2"
+      },
+      {
+        "path": "source/i18n/locale/zh_SG.json",
+        "sha256": "42c8d885575926bce16d2cd9db3e84819558f8e0b31b67923018c695b3b40e0d"
+      },
+      {
+        "path": "source/i18n/locale/zh_TW.json",
+        "sha256": "6300d31f95e62ff36876f153417e246ff8e8a8b14163797bd9afde5ecd5ea047"
+      },
+      {
+        "path": "source/infer/audio.py",
+        "sha256": "f9a0ae8b29dc4f13b921230fe39ee5149d3bd4af4412126ccface4078eae48a4"
+      },
+      {
+        "path": "source/infer/cli.py",
+        "sha256": "8e321cd606bfa1f4756685db897e90df2278e77d3e58869bc83d4735ff7b7387"
+      },
+      {
+        "path": "source/infer/fcpe.py",
+        "sha256": "55e85e7809ba9258774972990a006710fec68005c62407070a209003964af6bc"
+      },
+      {
+        "path": "source/infer/hubert.py",
+        "sha256": "bbfba54d1d83eae3fb634b2909f8f6bf41e6ffe436200ec246867c5c93ebba26"
+      },
+      {
+        "path": "source/infer/module/attentions.py",
+        "sha256": "8820e6047353d99344fc73fbb6c69d85e4f61066fc498982cc895e9577d4519f"
+      },
+      {
+        "path": "source/infer/module/commons.py",
+        "sha256": "132a907eff444907861e63684c04c88ae631d03707470858f7c53f857b0cc5c8"
+      },
+      {
+        "path": "source/infer/module/models.py",
+        "sha256": "769615b8dbed4775c8083881663a79c0e5ec0b662dd5f0c0a1bc3ccdd9827e99"
+      },
+      {
+        "path": "source/infer/module/modules.py",
+        "sha256": "b1aa77b0921468a61492fa89ed1f1212cd22fee3caa551befe44d8ab359fd2f1"
+      },
+      {
+        "path": "source/infer/module/transforms.py",
+        "sha256": "fb0d3320adf32ca0eaa44dd56e8922927f77ec3dd45c775e10c3da1704072c6a"
+      },
+      {
+        "path": "source/infer/rmvpe.py",
+        "sha256": "074171aec63e4b68f04d8691c62af50a1d99b9bc6dc56c4d6749fad4ba64853a"
+      },
+      {
+        "path": "source/infer/rtrvc.py",
+        "sha256": "c04d2f2d38ed67ca5c1846f4b392befdf0cf7a6172cffe679a81c039dc1642bc"
+      },
+      {
+        "path": "source/infer/vc/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "source/infer/vc/modules.py",
+        "sha256": "7b2e12f56c2b2462d7944d8eda470796ffd4aec50f784c3f6f5169133eaae89b"
+      },
+      {
+        "path": "source/infer/vc/pipeline.py",
+        "sha256": "df8ccd98ca7f81e38934a0af93cc63b4f79764dc47d932f05914c566e876522a"
+      },
+      {
+        "path": "source/infer/vc/utils.py",
+        "sha256": "6c8900146c0b00752cc54eabd69f0e1683e3045f6eb64ce76fc34b3500ec2620"
+      },
+      {
+        "path": "source/realtime_gui.py",
+        "sha256": "0d6577249e9eed7577c28f99ffd5fde7b553d492480b16a8edbbf696f70a3dc0"
+      },
+      {
+        "path": "source/requirments_cpu_py312.txt",
+        "sha256": "902338f1c8ef6c38186a34c19dec95e8df56030863b7a584b703a443127ea541"
+      },
+      {
+        "path": "source/requirments_cu118_py312.txt",
+        "sha256": "2cd130fdadc168608882f6c83cad49198e6a27b384853fade363c7aa0f672e33"
+      },
+      {
+        "path": "source/requirments_cu128_py312.txt",
+        "sha256": "a91b0df33baeb49566446a15c745d8708916962c8e1fb2b9fdeba163df1d2494"
+      },
+      {
+        "path": "source/tools/cuda_graph.py",
+        "sha256": "e3b4ce4fc8a33a3a921e70f78ce6965440c770d79d3ce71fb9f215db3a2db1a2"
+      },
+      {
+        "path": "source/tools/file_io.py",
+        "sha256": "5d62654c16fd3df3e5fdeee8b61d981a861db14b0485b82258d483a572f0be60"
+      },
+      {
+        "path": "source/tools/multispeaker.py",
+        "sha256": "b7e1f858c8691cf3953f401b173220159bcc78b1de1e5e2d76c54e5ede62bf2d"
+      },
+      {
+        "path": "source/tools/process_utils.py",
+        "sha256": "955bb766ce93a31982a7efa3b6f65b35b30373cf028e6f9cf5845fc61a537227"
+      },
+      {
+        "path": "source/tools/progress.py",
+        "sha256": "2b511f70f9d1ec0f1c00dbfaadca5462fef5157be99e091eb8326b61a62fa99c"
+      },
+      {
+        "path": "source/tools/pymss/LICENSE",
+        "sha256": "9d847a024c8ac7c8183232dfb6b0c71d68648062915bd661481cc36ddde10b67"
+      },
+      {
+        "path": "source/tools/pymss/__init__.py",
+        "sha256": "886d5e3e7bf15b575170ec136ee8546d381b4b14ca0de5e830b8ce3241ec3a4e"
+      },
+      {
+        "path": "source/tools/pymss/audio_io.py",
+        "sha256": "3740b9c248ee27dc06e20e7ab80504dffa680a3639034d92137dbcd2077a96c7"
+      },
+      {
+        "path": "source/tools/pymss/cli.py",
+        "sha256": "4d412c4fab9f6bba534f77c66113a8b634bdbe9d697225801f2a5e61c94ac56f"
+      },
+      {
+        "path": "source/tools/pymss/config.py",
+        "sha256": "70d7199154768a25fcf44227d6a56675675c0875c4623bb0b7ca4e8264a81789"
+      },
+      {
+        "path": "source/tools/pymss/ensemble.py",
+        "sha256": "22b8dba7e8eb647bdbbc48131539e25b6b7bfb27585472421732e1b9fa7dbf32"
+      },
+      {
+        "path": "source/tools/pymss/logger.py",
+        "sha256": "a67dd6284b9e9bd8a7cab2875895f7188ed3f5e8cd5d76ba263530dfb39f8077"
+      },
+      {
+        "path": "source/tools/pymss/model_download.py",
+        "sha256": "e3e357fedb935900915b5414bf824c181d7df7a66079668e83e350d53b032de6"
+      },
+      {
+        "path": "source/tools/pymss/model_registry.py",
+        "sha256": "0c953bf31e89d3ab4774ea362ba84b49342a20731f59d12753ac6f3550239b0c"
+      },
+      {
+        "path": "source/tools/pymss/modules/__init__.py",
+        "sha256": "df810c7c64668989662864b468a0fbd15c5633704e87a1658d6b2b658766bcc2"
+      },
+      {
+        "path": "source/tools/pymss/modules/_core_shims.py",
+        "sha256": "2605520040fe00ac77a1ffa19e532df720db02059c4f6d2d065251eb5d375f6c"
+      },
+      {
+        "path": "source/tools/pymss/modules/vocal_remover/__init__.py",
+        "sha256": "a72e6d18a5b6b1d69b191215c1c009d6446009864a9af08cacedab3d6e28eb63"
+      },
+      {
+        "path": "source/tools/pymss/modules/vocal_remover/common_separator.py",
+        "sha256": "bd21a5182091dc3ba02ce3d99a7dce3415850a676a508e13944b1d02cd07a2f5"
+      },
+      {
+        "path": "source/tools/pymss/modules/vocal_remover/uvr_lib_v5/__init__.py",
+        "sha256": "82fe68ca42ddee63119d5672cabd9b67fe0992e79d7773c58acadfd5aa18885b"
+      },
+      {
+        "path": "source/tools/pymss/modules/vocal_remover/uvr_lib_v5/spec_utils.py",
+        "sha256": "f31f87a22d561298947114be08c6b5e1c0ffa94196ecbda886924c347cc78075"
+      },
+      {
+        "path": "source/tools/pymss/modules/vocal_remover/vr_mlx.py",
+        "sha256": "25e06e5d17ae05498d08cc566b5ed179e393e7b4fa65d6bdc7d6ee1b5d35fe22"
+      },
+      {
+        "path": "source/tools/pymss/modules/vocal_remover/vr_models.py",
+        "sha256": "5a3c3fce602d0e6c72c5c85c983c727a143a868964bd45945175c93afabe9e0e"
+      },
+      {
+        "path": "source/tools/pymss/modules/vocal_remover/vr_separator.py",
+        "sha256": "00136b973b5dddbd24de0175e6f7271c6bfac9f1848c45f19808670bc42278e1"
+      },
+      {
+        "path": "source/tools/pymss/progress.py",
+        "sha256": "136b2b61157c5dc4c5250511c5605ac31bf4ed7d492911423ce0eb895637f313"
+      },
+      {
+        "path": "source/tools/pymss/resources/model_catalog.json",
+        "sha256": "ed9af68abd53f92926616a547c3909d42b8bc04c246e4f15ced005e6d6b9ab66"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/1band_sr16000_hl512.json",
+        "sha256": "1fde1c89e2ec54e61761ffdba0c687f5a2418a8698e517ad3236efd368441898"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/1band_sr32000_hl512.json",
+        "sha256": "5b6a908307939020c3f812c30989ebc5b25fdca22c4d26e0f6342e42fa1587dd"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/1band_sr33075_hl384.json",
+        "sha256": "7f3973f353ff0e6ba63b1f90ff1cdf20da6d098c9a300f670a0baf8f9e067283"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/1band_sr44100_hl1024.json",
+        "sha256": "e62861bfbb3f37e6e09df79a3a7be612b8b33f0135c4017a86ef69976c7c9f72"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/1band_sr44100_hl256.json",
+        "sha256": "7faee01fcb6a188ae886a170f74f4be06ee501b4fcaa717cd1cd103df74d2dc2"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/1band_sr44100_hl512.json",
+        "sha256": "b48cb661955d374d28530b6c39dfe8ccd2003c09d47e561ea2fa9ef83d575a59"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/1band_sr44100_hl512_cut.json",
+        "sha256": "4e51e68aca2e041ebc7e7a5813032ac4a1a3b9578c5f74665fab9f80648f837f"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/1band_sr44100_hl512_nf1024.json",
+        "sha256": "99309e5c1210f87776b4ff8782c88d7597ddb9ddc1ebb437006a7b3911a85f4f"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/2band_32000.json",
+        "sha256": "ab5bc2b4f315b062aea0e720b84bb141cb402a693ee8712e01c7aa12535f2e92"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/2band_44100_lofi.json",
+        "sha256": "6381f2abacee047b121538ec3a0672351c4fcceb8849d945cbed53af29ab467b"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/2band_48000.json",
+        "sha256": "1d18841b4f32cda6a2ce45e5a31de88e29b72355c022a38575a36b488171c67b"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/3band_44100.json",
+        "sha256": "ab4254cb5c01ac96f5e865224115d7c28282f6ff65d35a73d6a07c378e513fcb"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/3band_44100_mid.json",
+        "sha256": "5d9c3dd4f80c92b880388861ed12755e36f6da384bc3d42a5e8a928e487bf7f2"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/3band_44100_msb2.json",
+        "sha256": "ae8be5c731b6ac7e9a5f550ab63ca7f99d4f6180daf9fbe1e540a910beb03487"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/4band_44100.json",
+        "sha256": "a7b7661dee0ac0040abc6faea5c8548e6a04bb8195cc7462967f0301303bcad3"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/4band_44100_mid.json",
+        "sha256": "9699431a98224d552234c9baa832c848c3500c0d342943a39c2c617eced08492"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/4band_44100_msb.json",
+        "sha256": "f339dc478c75ddbdc74d748acb4fd367a5f640d95b64e38494df0843c1f728fa"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/4band_44100_msb2.json",
+        "sha256": "f339dc478c75ddbdc74d748acb4fd367a5f640d95b64e38494df0843c1f728fa"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/4band_44100_reverse.json",
+        "sha256": "f9a4c7a04d02f724daab0df1d9e981f1f2d72f7131c0a6d9a5aea3542e8a1837"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/4band_44100_sw.json",
+        "sha256": "a492bdf87c7fc59a8fa721af5d4f93b849e6723143c6a8ed2cfa76620fca2175"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/4band_v2.json",
+        "sha256": "9ba09fe1b8d621665ec49db29cab8cb5c047516f16d2aa8e0aca58f785440035"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/4band_v2_sn.json",
+        "sha256": "552aa07a84b8c9f17b6197402887a116d7cd54bdae3998024c1f38cf00afa785"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/4band_v3.json",
+        "sha256": "cac176839e801479bacd60baaf13a3448c40bf40791e6ba69e07b33f6a892705"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/4band_v3_sn.json",
+        "sha256": "ea0e9c37e2b0a980ba3f2d937d96e46735e4ac88282fe00d4d71dbce436f70c8"
+      },
+      {
+        "path": "source/tools/pymss/resources/vr_modelparams/4band_v4_ms_fullband.json",
+        "sha256": "a55f0c083e3be9184bfa1776a1679548c3630728c47b233c7d2d4be98958d494"
+      },
+      {
+        "path": "source/tools/pymss/separator.py",
+        "sha256": "1c56c5c67dcad6e88e83252a9f81f531f128d64eb93886d75546d87c21f8af73"
+      },
+      {
+        "path": "source/tools/pymss/server/__init__.py",
+        "sha256": "fb4be46dea5774b21d0e8761905e91f25edf6cff9fdf3e075e821f37453f0c09"
+      },
+      {
+        "path": "source/tools/pymss/server/app.py",
+        "sha256": "bed2b99435ef47cd8cc6df2d89c38138821e30932bdc30fa45654cc7faa38418"
+      },
+      {
+        "path": "source/tools/pymss/server/audio.py",
+        "sha256": "8b181fbce0499494607a61f870eb4846b9f6725aeac0125fbe25c17f26e2f29b"
+      },
+      {
+        "path": "source/tools/pymss/server/config.py",
+        "sha256": "2a19b66fa42f824a04c6df2d41c34d01f5ea7a155601595710cdbbff566e3f86"
+      },
+      {
+        "path": "source/tools/pymss/server/errors.py",
+        "sha256": "671c947e6551e5280e215700c8d9dde8ad71e60e3e250584c16592c1ee197914"
+      },
+      {
+        "path": "source/tools/pymss/server/models.py",
+        "sha256": "d04194200061a6dbb1513e0b9c4063d505a09e15558baa36de1ee63016664a81"
+      },
+      {
+        "path": "source/tools/pymss/server/state.py",
+        "sha256": "bd09a9cb0b6add50cf098a7d3c1091755b73e1710c20e4512a5719a2723b9bfa"
+      },
+      {
+        "path": "source/tools/pymss/server/webui.py",
+        "sha256": "da8118775431c6004cd9883c20c1defaa4be4dc284c6500e4075cfabc16f576e"
+      },
+      {
+        "path": "source/tools/pymss/server/webui_static/index.html",
+        "sha256": "f8dcaa6d65b5d974791b9fa17202a2578debbc11cb078b2d7ef17291f261b1e6"
+      },
+      {
+        "path": "source/tools/pymss/utils.py",
+        "sha256": "12b9bdc0a6f8cc0fd5ea8c0566bddccaafb512543edad2a7795f55eab7ea7349"
+      },
+      {
+        "path": "source/tools/pymss/workflow.py",
+        "sha256": "f69b70799197b5e24991de536f3985dbd38c81a06aa09b31c861ddce06a21413"
+      },
+      {
+        "path": "source/tools/pymss_core/LICENSE",
+        "sha256": "9d847a024c8ac7c8183232dfb6b0c71d68648062915bd661481cc36ddde10b67"
+      },
+      {
+        "path": "source/tools/pymss_core/__init__.py",
+        "sha256": "2721a1272394e7c0da42ba756e19d6a2b7481e59c3b2f8030c3a5d606cdeb996"
+      },
+      {
+        "path": "source/tools/pymss_core/checkpoint.py",
+        "sha256": "1181d5492a396f789470b80e39fea6579a94c8bd1539c330740f0bf482b1dce2"
+      },
+      {
+        "path": "source/tools/pymss_core/config.py",
+        "sha256": "26af9162e9352abb8638d20b6726731b202d88b166e4ef2c10041286310ed3be"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/_dsp.py",
+        "sha256": "8bb1829da683a8c6d2cea826ccc08606c989897cebd3bbad9bd924834abf601f"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/apollo_mlx.py",
+        "sha256": "7724bc86c3cb5893825ac6563821db13eb0470177bbc026f7c1777c686eedc28"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit/bandsplit.py",
+        "sha256": "7edbc9b51266ddbb149a5d12892ec11fb68244e6f81b7408013998ab4605871a"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit/core/__init__.py",
+        "sha256": "8353aecd6cce0fbda8a02add304db0874479ed9a3caffbd7a1aac8acfd308ade"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit/core/model/__init__.py",
+        "sha256": "b4bf99f269a437d1ecb884d230245a9384b6d5e4000aadf3ca3fe992dead35f8"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit/core/model/_spectral.py",
+        "sha256": "26cf793e0641d38b82d92605542a4fadb6ef7ad35c45fbbfd630e35db6689fa6"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit/core/model/bsrnn/__init__.py",
+        "sha256": "59c2323395de767fa6aa62ca81da8b15fbf05344db97b5b406f459d526c58d77"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit/core/model/bsrnn/bandsplit.py",
+        "sha256": "58a52aa5b1b84657538e727f806f8430b3a1766cd31f08f70e11380aa64f5d05"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit/core/model/bsrnn/core.py",
+        "sha256": "a11b7dbe759ba44b2f443712833e0521cae9fa302c03e5101ae41222997234e3"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit/core/model/bsrnn/maskestim.py",
+        "sha256": "e91dd525620898a3337e0e0366c876a002a6a9a5da0d919b3dfb7f2341930e32"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit/core/model/bsrnn/tfmodel.py",
+        "sha256": "57d284bb0a03f4747254cfc283383a90528f30c535a31d3a5e8c89065e4cd92f"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit/core/model/bsrnn/utils.py",
+        "sha256": "826f8c110fa19eef95c18e664fdfec3b1e9c2ff09736feda4e5bc34944414640"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit/core/model/bsrnn/wrapper.py",
+        "sha256": "333efe7f036fc0dee0b95b6dbb7ba93b4a083c093afde2e70f3b441fa9358055"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit/maskestim.py",
+        "sha256": "21fb4f2d47e202958282a5509885653d9569c7991fd31dbc62d67ddeb818b16b"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit/tfmodel.py",
+        "sha256": "718050c8648b1fb9d9bc41768d74277a5c5adc2720ca825f002e8434fee602a3"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit_mlx.py",
+        "sha256": "35f241ee88eda917b600f9cf39139dedf7bf84b95ced050db899ea4e41e7c6de"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit_v2/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit_v2/bandit.py",
+        "sha256": "1a558a881613d1a7692159b331aeab23dd1b39abc55381e71b46ec526387dff5"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit_v2/bandsplit.py",
+        "sha256": "4e4c4034216f2bb1801142f3fe4911e9ba82019ff04c2f7dcec06416f07e8049"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit_v2/maskestim.py",
+        "sha256": "eff59cd012c0df80f284142c1904ac5fc1e97ae6424ffd963286f66376f596fc"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit_v2/tfmodel.py",
+        "sha256": "a41fc5e1250afeb0a701fd79a4956f07cf3bf7aa3866272d98cd9d53542712b9"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bandit_v2/utils.py",
+        "sha256": "03a20207dcab777c5d491310c06fde1947b9bb78d57bfaae7d59ba702b294748"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bs_roformer/__init__.py",
+        "sha256": "614fb486c6866a0a775e68eb5d0691de3e0e9ddcc88af71f209f2f835835d590"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bs_roformer/attend.py",
+        "sha256": "79bd7e1c4a14794d7f24c82ff66f7a67a145ff669eb1a62a3d80d31c713b956c"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bs_roformer/bands.py",
+        "sha256": "cccd51fffb474a11cefd6bdbe52faf2324b4608de8a1634f0e2db20e1f762fb8"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bs_roformer/bs_roformer.py",
+        "sha256": "531f4f4713c06d3372a6a799e37af103d02736cbf474dc2762a5f6ac715a2849"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bs_roformer/bs_roformer_hyperace.py",
+        "sha256": "7b2c3fbb099854eef8e4797658b23865763a0ee7f33c62e00086bf4817d4e52a"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bs_roformer/common.py",
+        "sha256": "d57c0fd5548f8b2d5c985fe5ce8449f146f55f165dff0f83c07c27ebb5e04cf3"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bs_roformer/hyperace_segm.py",
+        "sha256": "a54a6aba17ed54c8c307c27a1a3623eed346b2d814e216f02c4086c9cef1c690"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bs_roformer/mel_band_roformer.py",
+        "sha256": "31c776983b1e1037763222d59f246a0e5852482bc2b553ee671cecfd4d13327a"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bs_roformer/mlx_attention.py",
+        "sha256": "f8cc3c24e67acdaa5510cf3c9edb70af9736a292771cebdf77738bd07bd5b77d"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bs_roformer/mlx_roformer.py",
+        "sha256": "493f0779a4e4ccdd58976a5fa62a0728232281de60a862e32bca739636a9ccd2"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/bs_roformer/transformer.py",
+        "sha256": "4d0acd092900b6e88193e34a4227fce01842858cf7f026d785908364040b44f1"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/demucs4ht.py",
+        "sha256": "6fd6b9d009dc1845d2fbc2fdc75c3affa9a65e1e7e3e4555514eedc370ad0e3c"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/demucs_local.py",
+        "sha256": "3e2c4b62c532c7c521bca1cd50177bebe348174754302d6646a986507b91c83d"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/demucs_mlx.py",
+        "sha256": "8b0970b2df2803da3afa70a3e211166fe18541f8729c950eafe304725c45a895"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/legacy_demucs.py",
+        "sha256": "f6479707aa816cb0bfa3629c8518213f477f7e660441842e5167644641440354"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/look2hear/__init__.py",
+        "sha256": "a9b9663099b79d57ab337f18f57ff53df3148f43f1d672eaf81c87bd809636d4"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/look2hear/apollo.py",
+        "sha256": "24f71f8d0b676f3d4c36d6bcaa97173e66fcd41023b25972212e83ce70f39559"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/mdx23c_mlx.py",
+        "sha256": "9242562b50a06d9fcc3c0026956b5af51ddf06270406fa384c2047f79622bef7"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/mdx23c_tfc_tdf_v3.py",
+        "sha256": "5d7c251adbdd3983e5dbc5a877029869e4cfd3d7533ea4eb00a151eea23ced1c"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/mlx_utils.py",
+        "sha256": "9229e3d7c5d8bf851d48c7b8d17b1a6ae639f835a522691fbf5640a2f430c109"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/scnet/__init__.py",
+        "sha256": "744e785d70035cefda4d57afb7ee6c5452dbd68c4286753bb5d28f46724a089b"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/scnet/scnet.py",
+        "sha256": "33e38510cb09d5cee76ae6f9978d5edaa28f5757161bde1a59fe8093785e20bb"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/scnet/separation.py",
+        "sha256": "322d5861249df504c1863a99210567652314f119b5a43e95ef2b5b05302d3447"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/scnet_mlx.py",
+        "sha256": "f843337a6c280e5861fd722335944032ed88c740f6cd4295fd964e8a29a8ad5c"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/spectrogram.py",
+        "sha256": "1e8c0608f7e567b69b7da38caec62f723ce4ccbbc49f7360360803ffdf4097e7"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/vocal_remover/__init__.py",
+        "sha256": "8ba31e2550fba4f1c8374a2d961f0014a49615debbc8a6217303e1e96b9b889d"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/vocal_remover/uvr_lib_v5/__init__.py",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/vocal_remover/uvr_lib_v5/vr_network/__init__.py",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/vocal_remover/uvr_lib_v5/vr_network/layers.py",
+        "sha256": "681f6ee9e9d65011eb4c48b074e0ea413c0bcfa61dc2a4804c63c56f16454770"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/vocal_remover/uvr_lib_v5/vr_network/layers_new.py",
+        "sha256": "73b064ede1b0c8071030bb6aa147b7981a78368e2b77ca8eca5ffe3f1dd49fa4"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/vocal_remover/uvr_lib_v5/vr_network/model_param_init.py",
+        "sha256": "f0492192ccb13b6d10f00a021df088b07d8fc460b54cd3d878e85bbbc4ec04cc"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/vocal_remover/uvr_lib_v5/vr_network/nets.py",
+        "sha256": "7eb440f68ae4ebcc4ba1eba7312ff8dd30a3dff0283efaf983fdf9c4aebf044b"
+      },
+      {
+        "path": "source/tools/pymss_core/modules/vocal_remover/uvr_lib_v5/vr_network/nets_new.py",
+        "sha256": "6c8d9033037afbbbb897f04f71d22f3a9ed6a3ed6771cd457dd4294fb5f34ac4"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/1band_sr16000_hl512.json",
+        "sha256": "1fde1c89e2ec54e61761ffdba0c687f5a2418a8698e517ad3236efd368441898"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/1band_sr32000_hl512.json",
+        "sha256": "5b6a908307939020c3f812c30989ebc5b25fdca22c4d26e0f6342e42fa1587dd"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/1band_sr33075_hl384.json",
+        "sha256": "7f3973f353ff0e6ba63b1f90ff1cdf20da6d098c9a300f670a0baf8f9e067283"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/1band_sr44100_hl1024.json",
+        "sha256": "e62861bfbb3f37e6e09df79a3a7be612b8b33f0135c4017a86ef69976c7c9f72"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/1band_sr44100_hl256.json",
+        "sha256": "7faee01fcb6a188ae886a170f74f4be06ee501b4fcaa717cd1cd103df74d2dc2"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/1band_sr44100_hl512.json",
+        "sha256": "b48cb661955d374d28530b6c39dfe8ccd2003c09d47e561ea2fa9ef83d575a59"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/1band_sr44100_hl512_cut.json",
+        "sha256": "4e51e68aca2e041ebc7e7a5813032ac4a1a3b9578c5f74665fab9f80648f837f"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/1band_sr44100_hl512_nf1024.json",
+        "sha256": "99309e5c1210f87776b4ff8782c88d7597ddb9ddc1ebb437006a7b3911a85f4f"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/2band_32000.json",
+        "sha256": "ab5bc2b4f315b062aea0e720b84bb141cb402a693ee8712e01c7aa12535f2e92"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/2band_44100_lofi.json",
+        "sha256": "6381f2abacee047b121538ec3a0672351c4fcceb8849d945cbed53af29ab467b"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/2band_48000.json",
+        "sha256": "1d18841b4f32cda6a2ce45e5a31de88e29b72355c022a38575a36b488171c67b"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/3band_44100.json",
+        "sha256": "ab4254cb5c01ac96f5e865224115d7c28282f6ff65d35a73d6a07c378e513fcb"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/3band_44100_mid.json",
+        "sha256": "5d9c3dd4f80c92b880388861ed12755e36f6da384bc3d42a5e8a928e487bf7f2"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/3band_44100_msb2.json",
+        "sha256": "ae8be5c731b6ac7e9a5f550ab63ca7f99d4f6180daf9fbe1e540a910beb03487"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/4band_44100.json",
+        "sha256": "a7b7661dee0ac0040abc6faea5c8548e6a04bb8195cc7462967f0301303bcad3"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/4band_44100_mid.json",
+        "sha256": "9699431a98224d552234c9baa832c848c3500c0d342943a39c2c617eced08492"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/4band_44100_msb.json",
+        "sha256": "f339dc478c75ddbdc74d748acb4fd367a5f640d95b64e38494df0843c1f728fa"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/4band_44100_msb2.json",
+        "sha256": "f339dc478c75ddbdc74d748acb4fd367a5f640d95b64e38494df0843c1f728fa"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/4band_44100_reverse.json",
+        "sha256": "f9a4c7a04d02f724daab0df1d9e981f1f2d72f7131c0a6d9a5aea3542e8a1837"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/4band_44100_sw.json",
+        "sha256": "a492bdf87c7fc59a8fa721af5d4f93b849e6723143c6a8ed2cfa76620fca2175"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/4band_v2.json",
+        "sha256": "9ba09fe1b8d621665ec49db29cab8cb5c047516f16d2aa8e0aca58f785440035"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/4band_v2_sn.json",
+        "sha256": "552aa07a84b8c9f17b6197402887a116d7cd54bdae3998024c1f38cf00afa785"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/4band_v3.json",
+        "sha256": "cac176839e801479bacd60baaf13a3448c40bf40791e6ba69e07b33f6a892705"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/4band_v3_sn.json",
+        "sha256": "ea0e9c37e2b0a980ba3f2d937d96e46735e4ac88282fe00d4d71dbce436f70c8"
+      },
+      {
+        "path": "source/tools/pymss_core/resources/vr_modelparams/4band_v4_ms_fullband.json",
+        "sha256": "a55f0c083e3be9184bfa1776a1679548c3630728c47b233c7d2d4be98958d494"
+      },
+      {
+        "path": "source/tools/pymss_core/utils.py",
+        "sha256": "1e5dc8217f1b1ada2b83024a5b38b323c335fa592347d99e90265d58dfdc6854"
+      },
+      {
+        "path": "source/tools/pymss_webui.py",
+        "sha256": "5bfcacbbc8cc46b6648e9e94efcc8cb0002a7bb35b77cb85a43bcc31c0feea80"
+      },
+      {
+        "path": "source/tools/torchgate/__init__.py",
+        "sha256": "cacd76ab411de13b81edcfb06f4cbab24aa058d29d89ec540b6dbc6db9a932b9"
+      },
+      {
+        "path": "source/tools/torchgate/torchgate.py",
+        "sha256": "a86eb8ee2c6da29f4a37de1f56b09262d682214d6860477cea62c1c98f29473d"
+      },
+      {
+        "path": "source/tools/torchgate/utils.py",
+        "sha256": "68837bb31df163635c27345752ea7cf402c8ab07cffac8ef78f7c87312e3c7c5"
+      },
+      {
+        "path": "source/train/data_utils.py",
+        "sha256": "161f193b74522d915dae439849b777fc50634548300b8d3e3608bbaed377bce3"
+      },
+      {
+        "path": "source/train/dataset/extract_f0.py",
+        "sha256": "0fc4e35b8dba10b722b145ba0566632f35248c85bfae1341dbb95f8016733147"
+      },
+      {
+        "path": "source/train/dataset/extract_hubert_feature.py",
+        "sha256": "20b6aed536d1348f3620eeaefd0b54875b8c722dfbc47d5b41462b4e3bbd02a6"
+      },
+      {
+        "path": "source/train/dataset/slicer2.py",
+        "sha256": "bbf4f77126cf5cf9891fc9382b8e48f7fdbff1cfe6ad09ac190cdec64f216fa8"
+      },
+      {
+        "path": "source/train/losses.py",
+        "sha256": "6eb912eb073b44cf624bac90cced3ff8fa21a3ed1eb5022d0c7d8fefbe1cd075"
+      },
+      {
+        "path": "source/train/mel_processing.py",
+        "sha256": "de0d14c7ddd111334e152363e584c66538de881bf9164d9551e6198f9a3575f9"
+      },
+      {
+        "path": "source/train/preprocess.py",
+        "sha256": "f8405e93dc1ed2f08d895cf09daf14df210ffc50520d3a84358af6edc8e68c97"
+      },
+      {
+        "path": "source/train/process_ckpt.py",
+        "sha256": "b19785cf715b0ce1c39726d2b559ed54beb53ae5e41f3f75c41592ead2092d5c"
+      },
+      {
+        "path": "source/train/train.py",
+        "sha256": "5e7d316962943935422ff225468ab22ac8dee30668131ba53728ed2e4efe78fd"
+      },
+      {
+        "path": "source/train/train_index.py",
+        "sha256": "9377e10716ce2ba63d4fb346fe36792b1543803b01a18a782563f6f47713e5a1"
+      },
+      {
+        "path": "source/train/utils.py",
+        "sha256": "43093d5c394ecd9938a565a981450fa388d9ee826a1ae0bd7d38e8f265c4a69d"
+      },
+      {
+        "path": "source/webui.py",
+        "sha256": "3c6ebf133db4a4b1cebb671f1077bf3f0fa4b570d478c1247a3209b4e3a7167f"
+      }
+    ],
+    "hfRevision": "e6d0c1a17da07c33557852f9dfa2bd44cc75737d",
+    "treeSha256": "45c259d65fb890275d919faf3f26ced8e8faa96bb1123fd9c752ef1693ddf018"
+  },
+  "torchVersion": "2.4.1+cpu",
+  "pythonEnvironment": {
+    "records": [
+      {
+        "path": ".venv/Lib/site-packages/FreeSimpleGUI-5.1.1.dist-info/RECORD",
+        "sha256": "7c9e9448827dc88ea26062694063508162858e3c66306eacef7ae0af1902beb4"
+      },
+      {
+        "path": ".venv/Lib/site-packages/absl_py-2.5.0.dist-info/RECORD",
+        "sha256": "db5da097557d8c7a5b11c64c02add98559b37544e20f2615657562af936bb2d1"
+      },
+      {
+        "path": ".venv/Lib/site-packages/aiohappyeyeballs-2.7.1.dist-info/RECORD",
+        "sha256": "0939cbd125f0904d6ae35ca9fd47c8aba9e9e9b91e850278ef953b375727cdfb"
+      },
+      {
+        "path": ".venv/Lib/site-packages/aiohttp-3.14.3.dist-info/RECORD",
+        "sha256": "8ade860d132ed7b71c0308a7621f5b494f96c17f9b6e57d7e33b412f00b5f70c"
+      },
+      {
+        "path": ".venv/Lib/site-packages/aiosignal-1.4.0.dist-info/RECORD",
+        "sha256": "0f47f05db68c527ed1fe2f23c79ef1e846e1009ec04e7ef47f300db855ed9c74"
+      },
+      {
+        "path": ".venv/Lib/site-packages/altair-4.2.2.dist-info/RECORD",
+        "sha256": "36732930e3e75dbb32f096418e77daa2b80a69a952475ed5e33cbc93195a93d4"
+      },
+      {
+        "path": ".venv/Lib/site-packages/anyio-3.7.1.dist-info/RECORD",
+        "sha256": "44f968e1e096bf52237c59b19429a08da8f4e75534e61c9ad7ffedcbdb2a56ae"
+      },
+      {
+        "path": ".venv/Lib/site-packages/attrs-26.1.0.dist-info/RECORD",
+        "sha256": "a5151f0461f45abf44fdc57c2ccdb73151bb54a0abfd22133f7ea7ad48f8dc23"
+      },
+      {
+        "path": ".venv/Lib/site-packages/audioread-3.1.0.dist-info/RECORD",
+        "sha256": "9bd803f823e60fa40bcc40aa7e0d7e3f6025d2e08328f69f06bd0a8b7854c6e0"
+      },
+      {
+        "path": ".venv/Lib/site-packages/av-15.1.0.dist-info/RECORD",
+        "sha256": "cfec06417f21a80c8de5fd6d7459ad4ab8ab0327f11e90492741cd5c26c9db6e"
+      },
+      {
+        "path": ".venv/Lib/site-packages/certifi-2026.7.22.dist-info/RECORD",
+        "sha256": "54fa8ebe7e5d1cd4a48064f94e706e5f7a6cdcccef364379692ed7657bfed982"
+      },
+      {
+        "path": ".venv/Lib/site-packages/cffi-2.1.1.dist-info/RECORD",
+        "sha256": "c421c5f0b3de1e60f7e6a09b44cc0ed007e65f133df31e45fd42f88cd1e73c70"
+      },
+      {
+        "path": ".venv/Lib/site-packages/charset_normalizer-3.5.1.dist-info/RECORD",
+        "sha256": "a52cc1ae0e1cfde3cf0a7c3672eb66755a36be3a9da32ea6bc7427ffb5c5513c"
+      },
+      {
+        "path": ".venv/Lib/site-packages/click-8.5.0.dist-info/RECORD",
+        "sha256": "43d8bb1ce44dea5d9423b7eae1d6ba911974425b96acc170b036e1655a901e10"
+      },
+      {
+        "path": ".venv/Lib/site-packages/colorama-0.4.6.dist-info/RECORD",
+        "sha256": "24ecf55e9e177d90edaf7e688cc0d1944d32d35027e53f2c51d076cb9f4e103d"
+      },
+      {
+        "path": ".venv/Lib/site-packages/coloredlogs-15.0.1.dist-info/RECORD",
+        "sha256": "781306dc2d46409fcda14dfa54993bcf8b5977008f239a984bff3431a428c808"
+      },
+      {
+        "path": ".venv/Lib/site-packages/contourpy-1.3.3.dist-info/RECORD",
+        "sha256": "f6fc0af94aeab1a14a2058bedd0e713821ab99d682b084149698ce414c924574"
+      },
+      {
+        "path": ".venv/Lib/site-packages/cycler-0.12.1.dist-info/RECORD",
+        "sha256": "0dd0246dcaff5aaa3e9bbb1d8fb35134b6d04659180f94e77491162f0e1f2ab3"
+      },
+      {
+        "path": ".venv/Lib/site-packages/decorator-5.3.1.dist-info/RECORD",
+        "sha256": "01897326e2ccc7b1bbb9ea2727663e6fc591679b279bf44d56e39e3598bccb11"
+      },
+      {
+        "path": ".venv/Lib/site-packages/einops-0.8.2.dist-info/RECORD",
+        "sha256": "8cb88dd6206e7c8a051ece61dc86ff76ce0f47b3ea20ed8db52d8c72062f76fb"
+      },
+      {
+        "path": ".venv/Lib/site-packages/entrypoints-0.4.dist-info/RECORD",
+        "sha256": "3dfcee91763b6de84bdb6ab8d01eaf67c87cac4e0e70e626489fd39279cebe8f"
+      },
+      {
+        "path": ".venv/Lib/site-packages/faiss_cpu-1.15.0.dist-info/RECORD",
+        "sha256": "4666c3f5527db386f5353120470449e311cb6a5d7732d2920937e42813aeefad"
+      },
+      {
+        "path": ".venv/Lib/site-packages/fastapi-0.99.1.dist-info/RECORD",
+        "sha256": "7862f31403dfe9e5af34fd220b290704d0222a9153c9ad95b9825992e11a80c1"
+      },
+      {
+        "path": ".venv/Lib/site-packages/ffmpeg_python-0.2.0.dist-info/RECORD",
+        "sha256": "16e9b57e7b2e1c35263f25b91a16c34da6a710aef61ca9b7b18ce7c2079ce3c0"
+      },
+      {
+        "path": ".venv/Lib/site-packages/ffmpy-1.0.0.dist-info/RECORD",
+        "sha256": "82374a938e16ca4bebad7ed4ae5b9ba3dc581a436c020096331ece154fc54c6b"
+      },
+      {
+        "path": ".venv/Lib/site-packages/filelock-3.32.4.dist-info/RECORD",
+        "sha256": "3fad802e025f120bd1b35d40d4e66beb61a2f4494a85b1ead6b479c01d263619"
+      },
+      {
+        "path": ".venv/Lib/site-packages/flatbuffers-25.12.19.dist-info/RECORD",
+        "sha256": "9eb183aaa357181128b0e937b2d2e7e4e34483faaa26959caf09d7b27f3d677e"
+      },
+      {
+        "path": ".venv/Lib/site-packages/fonttools-4.63.0.dist-info/RECORD",
+        "sha256": "07396a4a12514d8a17ab3df2f4f7c33b4136cb56d61e11cedb5c1a458cd76d37"
+      },
+      {
+        "path": ".venv/Lib/site-packages/frozenlist-1.8.0.dist-info/RECORD",
+        "sha256": "15c3d8e70b1eb1253440a3ad7113065129563459d36e31ff72e75bdfd98d1c20"
+      },
+      {
+        "path": ".venv/Lib/site-packages/fsspec-2026.7.0.dist-info/RECORD",
+        "sha256": "4801db90e1425026baa5d1164ce1ea97a882a7d71f27081a77e7e3154ab8d958"
+      },
+      {
+        "path": ".venv/Lib/site-packages/future-1.0.0.dist-info/RECORD",
+        "sha256": "aaba7d8c38804af597c3d1b1580279bc8080b1bb3745272c81b119425277c755"
+      },
+      {
+        "path": ".venv/Lib/site-packages/gradio-3.14.0.dist-info/RECORD",
+        "sha256": "b81791546f3380c11a897c64f834f511aa4d9d265df626048fdcca576b85f66d"
+      },
+      {
+        "path": ".venv/Lib/site-packages/grpcio-1.83.1.dist-info/RECORD",
+        "sha256": "966a5ffa2d41d68f1ffe39ae55aaab5a33f5d0962dcd6f08b14cb392cb115ac3"
+      },
+      {
+        "path": ".venv/Lib/site-packages/h11-0.14.0.dist-info/RECORD",
+        "sha256": "dd5c173b228b02270ded26d8bf14382824c08114576e9eb3cac80c79644925a9"
+      },
+      {
+        "path": ".venv/Lib/site-packages/httpcore-0.16.3.dist-info/RECORD",
+        "sha256": "751516c3e6d2f4d64e4c2223aa7f7975c4b22fcc0b35dabb57889300a800cc1e"
+      },
+      {
+        "path": ".venv/Lib/site-packages/httpx-0.23.3.dist-info/RECORD",
+        "sha256": "050939ea2797b123164b36799d477cbdd9e7b427eca020fd1fb33e244f7ff5e7"
+      },
+      {
+        "path": ".venv/Lib/site-packages/huggingface_hub-0.36.2.dist-info/RECORD",
+        "sha256": "b104d001bfcc8cb95ffa31f5928f66a956854dd264641a47f79c4bdba1cfa5b1"
+      },
+      {
+        "path": ".venv/Lib/site-packages/humanfriendly-10.0.dist-info/RECORD",
+        "sha256": "7dd1848168d2415d272727e71e11742a73a7ab402f4ba098be27ac75f383f0be"
+      },
+      {
+        "path": ".venv/Lib/site-packages/hyper_connections-0.4.2.dist-info/RECORD",
+        "sha256": "9e3f4835e3e544cc14fa81637a7709f4a3cd6365a5d809b9570720dbd05af560"
+      },
+      {
+        "path": ".venv/Lib/site-packages/idna-3.19.dist-info/RECORD",
+        "sha256": "0d2a25cefb933ccbc69206c07eb05412a7299fcc441f5f11a6f0d2532de120ac"
+      },
+      {
+        "path": ".venv/Lib/site-packages/jinja2-3.1.6.dist-info/RECORD",
+        "sha256": "1bb3b46d00f55f63d24c3a34a7f955ef6692d4691217a53b15261769607f9f7c"
+      },
+      {
+        "path": ".venv/Lib/site-packages/joblib-1.5.3.dist-info/RECORD",
+        "sha256": "3253fe822c351ee7aa770651779037cd3e6a079bf241a94e549c3304ea383ee9"
+      },
+      {
+        "path": ".venv/Lib/site-packages/jsonschema-4.26.0.dist-info/RECORD",
+        "sha256": "5a695c37ed4171f8249ab10e9e61d60c4ad10a18a45c7d4ca20c71f120907ad0"
+      },
+      {
+        "path": ".venv/Lib/site-packages/jsonschema_specifications-2025.9.1.dist-info/RECORD",
+        "sha256": "9cc3b56b6becdd45482310d7d2ff9d98dbf8a5775e36f7ccde49a09146e389da"
+      },
+      {
+        "path": ".venv/Lib/site-packages/kiwisolver-1.5.1.dist-info/RECORD",
+        "sha256": "9b3e4dd524f43008c60b856abbfc2774cc06667e76a089ff425423fe078f1a93"
+      },
+      {
+        "path": ".venv/Lib/site-packages/lazy_loader-0.5.dist-info/RECORD",
+        "sha256": "b7e8aa76dae6f329b542b210edeb82a65cda36d29579851fbf101bbb17c19cd5"
+      },
+      {
+        "path": ".venv/Lib/site-packages/librosa-0.10.2.post1.dist-info/RECORD",
+        "sha256": "029c031f6bc6dc9c16da1ce8af4db29437b43824a38774137dcc10097dc5b4e4"
+      },
+      {
+        "path": ".venv/Lib/site-packages/linkify_it_py-2.2.0.dist-info/RECORD",
+        "sha256": "ae7dc7f9fa405137ee1e3d465641b94ffc84b43dbc15199edf968fff26b41159"
+      },
+      {
+        "path": ".venv/Lib/site-packages/llvmlite-0.49.0.dist-info/RECORD",
+        "sha256": "4777a45ccb112c033ef4918472912f48a9c04debd40365f34a1b80264bb994dd"
+      },
+      {
+        "path": ".venv/Lib/site-packages/local_attention-1.11.2.dist-info/RECORD",
+        "sha256": "f58b2806d435586223e2da76b0c35ee319e96e1303eae92d9e6f65da40b0227a"
+      },
+      {
+        "path": ".venv/Lib/site-packages/markdown-3.10.3.dist-info/RECORD",
+        "sha256": "5cfcb7120652fd101a0779b887bb03bf70557d2dc9341f6eda79066181b7bf7b"
+      },
+      {
+        "path": ".venv/Lib/site-packages/markdown_it_py-2.2.0.dist-info/RECORD",
+        "sha256": "484750f68530f0fb90d817836b964763317cde691b678e376c53564bd98a7234"
+      },
+      {
+        "path": ".venv/Lib/site-packages/markupsafe-3.0.3.dist-info/RECORD",
+        "sha256": "d2b82cc3750bb0cd40c0f6e13f388c346bff58aaaf2791f289411ec92e04bd81"
+      },
+      {
+        "path": ".venv/Lib/site-packages/matplotlib-3.11.1.dist-info/RECORD",
+        "sha256": "b3075c9a069650c6c655ce9a1d831e0e6ce4c73f6ab363379d872ca8cd2f1e6b"
+      },
+      {
+        "path": ".venv/Lib/site-packages/mdit_py_plugins-0.3.5.dist-info/RECORD",
+        "sha256": "809faaaa130a2319d75be8a40d1d52ffb0536a246d163d233919b0b27903f744"
+      },
+      {
+        "path": ".venv/Lib/site-packages/mdurl-0.1.2.dist-info/RECORD",
+        "sha256": "a3797f66c73175d124fc5a6bee5088b8da9437dc3a71d54d407cf8812bac0de1"
+      },
+      {
+        "path": ".venv/Lib/site-packages/mpmath-1.3.0.dist-info/RECORD",
+        "sha256": "89869bb99d259b6078aa20ebadb44d921aa20595ffa58ab929e3082d7f3f5529"
+      },
+      {
+        "path": ".venv/Lib/site-packages/msgpack-1.2.2.dist-info/RECORD",
+        "sha256": "389a4641422d989f8891563dc3825184c40c295d0789f4e82da5fb136664b89e"
+      },
+      {
+        "path": ".venv/Lib/site-packages/multidict-6.7.1.dist-info/RECORD",
+        "sha256": "ac949f18fb9dbe3aa3044fad2a3cc649ca8a00aaef36d1742aa9940563d28715"
+      },
+      {
+        "path": ".venv/Lib/site-packages/narwhals-2.25.0.dist-info/RECORD",
+        "sha256": "64327c4ecf703a345e2fec3121f98d973bacc5b8ad2192ba261398c2360e62ca"
+      },
+      {
+        "path": ".venv/Lib/site-packages/networkx-3.6.1.dist-info/RECORD",
+        "sha256": "fb9159ff8300a6d92fede24ad43a6d9fd001bc0d0dfe1fee6dd4c94db6214869"
+      },
+      {
+        "path": ".venv/Lib/site-packages/numba-0.67.0.dist-info/RECORD",
+        "sha256": "8a6a921df9f800aa828502f82c33eb1adf75d82e89e2849dd09ba2cfe9176e19"
+      },
+      {
+        "path": ".venv/Lib/site-packages/numpy-1.26.4.dist-info/RECORD",
+        "sha256": "dd3b00c9a7ca9460bb493b866f8ed19c01f13dfe2ac40af34e8128eabd1194a7"
+      },
+      {
+        "path": ".venv/Lib/site-packages/onnxruntime_directml-1.24.4.dist-info/RECORD",
+        "sha256": "83bcd93d4204e1be38ea90fd01883486311029a493bc26e60b62753d852b7ead"
+      },
+      {
+        "path": ".venv/Lib/site-packages/opencv_python_headless-4.11.0.86.dist-info/RECORD",
+        "sha256": "1f89ac0741cbd75dad29fedb86a0e6727707195ff48efb26ebae5e0856fe1778"
+      },
+      {
+        "path": ".venv/Lib/site-packages/orjson-3.12.0.dist-info/RECORD",
+        "sha256": "7b733e330a4eb575a4cc45c04e77298edf412903fff03827a40c30942b16baf6"
+      },
+      {
+        "path": ".venv/Lib/site-packages/packaging-26.3.dist-info/RECORD",
+        "sha256": "fd59b791119d91d0602060c81541e41118992995c6a0070e411a5ea3c6b1ebb2"
+      },
+      {
+        "path": ".venv/Lib/site-packages/pandas-3.0.5.dist-info/RECORD",
+        "sha256": "257df55039036cb3b62104a808eb7ec17ab81f24d849266b019927f1e3c1bac8"
+      },
+      {
+        "path": ".venv/Lib/site-packages/pillow-12.3.0.dist-info/RECORD",
+        "sha256": "541a3487a26b0b07fa1c1f0bfe90490676b0d76bb4a2687e9f794854b288705f"
+      },
+      {
+        "path": ".venv/Lib/site-packages/pip-26.2.1.dist-info/RECORD",
+        "sha256": "53d18959d497688cf2bc40ecf236e7002e7db4694840549c10e054d2247f3636"
+      },
+      {
+        "path": ".venv/Lib/site-packages/platformdirs-4.11.5.dist-info/RECORD",
+        "sha256": "4e7e2e37e36860f52a8e0f40a9c029d77593166377a1404583253ddc71c5fe45"
+      },
+      {
+        "path": ".venv/Lib/site-packages/pooch-1.9.0.dist-info/RECORD",
+        "sha256": "ee1ed796a8a9144d53c79df9b5cba7e13ea325b956bf5a267f7c2719ca2adbb9"
+      },
+      {
+        "path": ".venv/Lib/site-packages/praat_parselmouth-0.4.7.dist-info/RECORD",
+        "sha256": "68d5f8e68b8cb4bc12855ac71b02e44e3b950b23a6a2566a82460881aedb857c"
+      },
+      {
+        "path": ".venv/Lib/site-packages/propcache-0.5.2.dist-info/RECORD",
+        "sha256": "ababec08f29182be0612f8414958898695eacb273ca76bcb5e9afbe107a233bd"
+      },
+      {
+        "path": ".venv/Lib/site-packages/protobuf-7.36.0.dist-info/RECORD",
+        "sha256": "8d46a74cc052a55c05eb289c79d24881acceeb82dadc5d4fbf682b15e4dcfc62"
+      },
+      {
+        "path": ".venv/Lib/site-packages/pycparser-3.0.dist-info/RECORD",
+        "sha256": "2cfa55ddc9e41745c714874107384803e14799e60143250d5ef37f7c0e25adfa"
+      },
+      {
+        "path": ".venv/Lib/site-packages/pycryptodome-3.23.0.dist-info/RECORD",
+        "sha256": "2dcb6441184a711221efb9f953fef337fd2a0c0e56971833a36b17c58603a3c3"
+      },
+      {
+        "path": ".venv/Lib/site-packages/pydantic-1.10.26.dist-info/RECORD",
+        "sha256": "b509ec118cc88e292c60b78d0ee8f92bc816d0784386bd9bdb5a51afbd808391"
+      },
+      {
+        "path": ".venv/Lib/site-packages/pydub-0.25.1.dist-info/RECORD",
+        "sha256": "c6a7b8b1e483adda9f2c4e421027ae7e5eeeec3c4aee4855c2f416e9f4116a34"
+      },
+      {
+        "path": ".venv/Lib/site-packages/pyparsing-3.0.9.dist-info/RECORD",
+        "sha256": "fa44c875e9d3821827f49fca8574ed264a6f74b5bdd1091d2c0f497cb743f3fb"
+      },
+      {
+        "path": ".venv/Lib/site-packages/pyreadline3-3.5.6.dist-info/RECORD",
+        "sha256": "dcc9834411a07ef21599b5a4b76c1be9a26888ea0ac2aca052c4ba235f82b396"
+      },
+      {
+        "path": ".venv/Lib/site-packages/python_dateutil-2.9.0.post0.dist-info/RECORD",
+        "sha256": "0c26b4b1542dbd1ebd8d2babdd501aed583d6ada9595517f936f00fe4ff9d254"
+      },
+      {
+        "path": ".venv/Lib/site-packages/python_multipart-0.0.32.dist-info/RECORD",
+        "sha256": "9fdadb95f80c48cbd2fde15ba5c79436a6d3667dabc8867f71f7c774d0062a63"
+      },
+      {
+        "path": ".venv/Lib/site-packages/pyyaml-6.0.3.dist-info/RECORD",
+        "sha256": "a4f5e3c4f889e126b1ee7e19286e708aa20cc70e6ea8cccb1d1c574573852313"
+      },
+      {
+        "path": ".venv/Lib/site-packages/referencing-0.37.0.dist-info/RECORD",
+        "sha256": "6bb85471519901d877804e8dc05f032e6fa362b72c8a73b21b7486517e36c90e"
+      },
+      {
+        "path": ".venv/Lib/site-packages/regex-2026.7.19.dist-info/RECORD",
+        "sha256": "48ee1572c24ea2cca01c42d5debae1e5af3448241707fbc0e5aacf767678c97a"
+      },
+      {
+        "path": ".venv/Lib/site-packages/requests-2.34.2.dist-info/RECORD",
+        "sha256": "9fe8a6fba6bb2091ccd8e5c3d279392ba36c03fc42e7854c792c74c98d5b3e91"
+      },
+      {
+        "path": ".venv/Lib/site-packages/rfc3986-1.5.0.dist-info/RECORD",
+        "sha256": "69e15203f339e5eaef6ea8bffcf89889571c27ad422ec782a745f38db11c009f"
+      },
+      {
+        "path": ".venv/Lib/site-packages/rpds_py-2026.6.3.dist-info/RECORD",
+        "sha256": "f4adf0068983d8da13687bcabedccbedf3fd8ae3d3089541bbdbab6770685897"
+      },
+      {
+        "path": ".venv/Lib/site-packages/safetensors-0.8.0.dist-info/RECORD",
+        "sha256": "8086ad128977617a43215a30c0d096b60f689a34e29221bd07c2a011488c8596"
+      },
+      {
+        "path": ".venv/Lib/site-packages/scikit_learn-1.9.0.dist-info/RECORD",
+        "sha256": "641dc828354fda88576c8c34bc13c7991bf66a13fa9be1a8496f0dd2a687c0f9"
+      },
+      {
+        "path": ".venv/Lib/site-packages/scipy-1.17.1.dist-info/RECORD",
+        "sha256": "a4588355c1ecf772a22ead16dace1597dc24996192388c4eff106c0618704540"
+      },
+      {
+        "path": ".venv/Lib/site-packages/setuptools/_vendor/autocommand-2.2.2.dist-info/RECORD",
+        "sha256": "2bee6072cbcec6390c57107c8dfcb0422918a98ecdb5a2cc362187f13d42e96f"
+      },
+      {
+        "path": ".venv/Lib/site-packages/setuptools/_vendor/backports.tarfile-1.2.0.dist-info/RECORD",
+        "sha256": "0f69db719b54220d6a4adff8bfb04ac98affea3dc8b54054a1a787a17567f4d1"
+      },
+      {
+        "path": ".venv/Lib/site-packages/setuptools/_vendor/importlib_metadata-8.7.1.dist-info/RECORD",
+        "sha256": "52a6b8ee0de15cf7fd99625f43b97cd2e3942ac86f16054ea90de48e66f29355"
+      },
+      {
+        "path": ".venv/Lib/site-packages/setuptools/_vendor/jaraco.text-4.0.0.dist-info/RECORD",
+        "sha256": "63b936c308d0fcbe1390e824567cc007536c32a849adb02278e95f1d4c736c31"
+      },
+      {
+        "path": ".venv/Lib/site-packages/setuptools/_vendor/jaraco_context-6.1.0.dist-info/RECORD",
+        "sha256": "4599d876ceb42b7eef03aa39e235c4ebeab6aea2409dbe634496852393d1f837"
+      },
+      {
+        "path": ".venv/Lib/site-packages/setuptools/_vendor/jaraco_functools-4.4.0.dist-info/RECORD",
+        "sha256": "baafd2d6d94c1bde453e4c805ac05511dc53986e0a63b02f674ef0f788bec146"
+      },
+      {
+        "path": ".venv/Lib/site-packages/setuptools/_vendor/more_itertools-10.8.0.dist-info/RECORD",
+        "sha256": "9ed1b134c0aa83722f36e99f3918aa9610ce3a0a514d793bbb74a368d441a01d"
+      },
+      {
+        "path": ".venv/Lib/site-packages/setuptools/_vendor/packaging-26.0.dist-info/RECORD",
+        "sha256": "f50503333aae9517807d2fb4d81fc27cb60aa644666f50176812626d6224ce5d"
+      },
+      {
+        "path": ".venv/Lib/site-packages/setuptools/_vendor/platformdirs-4.4.0.dist-info/RECORD",
+        "sha256": "3d0d2f1cc018593c4d8baa2395baf0b1c1c645bbd8c18cd064f49cb4e4c95ea0"
+      },
+      {
+        "path": ".venv/Lib/site-packages/setuptools/_vendor/tomli-2.4.0.dist-info/RECORD",
+        "sha256": "225430ce95640e8d4fcdb93cdae2fc38d685aec016d0e293d5fb99a695886fed"
+      },
+      {
+        "path": ".venv/Lib/site-packages/setuptools/_vendor/wheel-0.46.3.dist-info/RECORD",
+        "sha256": "b0297c3ada17b8727e15ddd6d1e38c8a90a997f779fcf978996f6fec62ecb702"
+      },
+      {
+        "path": ".venv/Lib/site-packages/setuptools/_vendor/zipp-3.23.0.dist-info/RECORD",
+        "sha256": "3bfab660a24704f84228e4bb1ce1f0e3fa9ff80e5c806352a626b2f460ead836"
+      },
+      {
+        "path": ".venv/Lib/site-packages/setuptools-80.10.2.dist-info/RECORD",
+        "sha256": "4903c67d808b7850c28d2f53207c9ca8a057351491c0f8a41c1856c2eedc681a"
+      },
+      {
+        "path": ".venv/Lib/site-packages/six-1.17.0.dist-info/RECORD",
+        "sha256": "d834e846ba51c0e7371968d0b5a0cdebdaa2f9ea2f0447a40b594fa96ca5d89f"
+      },
+      {
+        "path": ".venv/Lib/site-packages/sniffio-1.3.1.dist-info/RECORD",
+        "sha256": "47b1f08125b75fc6504a3ca37e9a2d9a268fd115fcf0bcf082a1e8df1befbb9b"
+      },
+      {
+        "path": ".venv/Lib/site-packages/sounddevice-0.5.6.dist-info/RECORD",
+        "sha256": "92123593d6c71fe458584dc2f4172c781a2da985b3e118634e923c03b7d7f537"
+      },
+      {
+        "path": ".venv/Lib/site-packages/soundfile-0.14.0.dist-info/RECORD",
+        "sha256": "bdbb479235c4c371d07f7babe8195b370f1267b69359bf0a3e4e5271d422a69e"
+      },
+      {
+        "path": ".venv/Lib/site-packages/soxr-1.1.0.dist-info/RECORD",
+        "sha256": "e4e0bad2d86f35f3a4258a532c836386ce5835d46344f98d7437583c3b2e137a"
+      },
+      {
+        "path": ".venv/Lib/site-packages/starlette-0.27.0.dist-info/RECORD",
+        "sha256": "773cccf32501839a52e01917323d78067a30ac096fc5a36a95f5905a6c4b0a0c"
+      },
+      {
+        "path": ".venv/Lib/site-packages/sympy-1.14.0.dist-info/RECORD",
+        "sha256": "062644baeb64b79d6b8d71e7fba4566f7a5551516d21fdb95e248f2672181848"
+      },
+      {
+        "path": ".venv/Lib/site-packages/tensorboard-2.21.0.dist-info/RECORD",
+        "sha256": "7594ecf3bbacb7157ae3bb51ff0feaaab4b466082fc01e16409689b7702c9188"
+      },
+      {
+        "path": ".venv/Lib/site-packages/tensorboard_data_server-0.7.2.dist-info/RECORD",
+        "sha256": "d1ea5566c681bd5f42d92b7a4a513b617cc77de6b374638d83b5b3dae52b4dd9"
+      },
+      {
+        "path": ".venv/Lib/site-packages/threadpoolctl-3.6.0.dist-info/RECORD",
+        "sha256": "a11fd1efc57e45a797ec0a092f745c4a3e54c40a7b1badd55c82f10327d04a29"
+      },
+      {
+        "path": ".venv/Lib/site-packages/tokenizers-0.21.4.dist-info/RECORD",
+        "sha256": "8334334f9879e427348f4c6f5b06745f14a932d88bc072095a77feddab66aa92"
+      },
+      {
+        "path": ".venv/Lib/site-packages/toolz-1.1.0.dist-info/RECORD",
+        "sha256": "5006bc6a414f04b56e5f37b2820e6ffb508c88dd38d88b05d26325281dd2875e"
+      },
+      {
+        "path": ".venv/Lib/site-packages/torch-2.4.1+cpu.dist-info/RECORD",
+        "sha256": "214a7414cfc8b6c8ca29041c35c4cea0aee67ff701dc2a6a24ebcbb4e17b0aca"
+      },
+      {
+        "path": ".venv/Lib/site-packages/torch_directml-0.2.5.dev240914.dist-info/RECORD",
+        "sha256": "b4369ceff2a7e5c7ad473f294edc7b705d6368660c155a93c542a9127f640aa8"
+      },
+      {
+        "path": ".venv/Lib/site-packages/torchaudio-2.4.1+cpu.dist-info/RECORD",
+        "sha256": "348e7609189bd3985e8f3428d7ac1725ef6c3582b001a151db7d2923c7c483eb"
+      },
+      {
+        "path": ".venv/Lib/site-packages/torchfcpe-0.0.4.dist-info/RECORD",
+        "sha256": "c73d856ea7dba268a25e850740723fe0a5563824802da53f5a5f3480e07879ca"
+      },
+      {
+        "path": ".venv/Lib/site-packages/torchvision-0.19.1+cpu.dist-info/RECORD",
+        "sha256": "1feb704058146466445fa93768e0fe70e597e3ad90d9c0c1ec036bebcb423e1f"
+      },
+      {
+        "path": ".venv/Lib/site-packages/tqdm-4.70.0.dist-info/RECORD",
+        "sha256": "63fedec9e1db856f76f0bdfd93acaced8d50d85d8415accb0cadae00d5145bbb"
+      },
+      {
+        "path": ".venv/Lib/site-packages/transformers-4.49.0.dist-info/RECORD",
+        "sha256": "32c61923671022969ce5ac0583aa08cfded74e371b75850197673503115bea6a"
+      },
+      {
+        "path": ".venv/Lib/site-packages/typing_extensions-4.16.0.dist-info/RECORD",
+        "sha256": "78f74ed46a377d6e1debed78b3e994ff9cfe02a529d393d7c8ab80989bd25079"
+      },
+      {
+        "path": ".venv/Lib/site-packages/tzdata-2026.3.dist-info/RECORD",
+        "sha256": "4e88bcacd1b80a7aff99638129717f504c6225c887a28f4ba0e193783f03c30e"
+      },
+      {
+        "path": ".venv/Lib/site-packages/urllib3-2.7.0.dist-info/RECORD",
+        "sha256": "f1d2914c0a48b1523ced71ce642e16967862b6e6a754e0f1c2652b4ffd44cf72"
+      },
+      {
+        "path": ".venv/Lib/site-packages/uvicorn-0.22.0.dist-info/RECORD",
+        "sha256": "9ede93b2a0e9658a84c128e174e47c7d51dd786d33d1feb81113c370db40b490"
+      },
+      {
+        "path": ".venv/Lib/site-packages/websockets-10.4.dist-info/RECORD",
+        "sha256": "da41951792f59db0e09480e475be365ac0f4b817f58955f068db19b2b5d23a69"
+      },
+      {
+        "path": ".venv/Lib/site-packages/werkzeug-3.1.8.dist-info/RECORD",
+        "sha256": "d2570e287d523046d4f15a7164012350f9a543368c3d270fdf739125a2af6c3c"
+      },
+      {
+        "path": ".venv/Lib/site-packages/wheel-0.48.0.dist-info/RECORD",
+        "sha256": "e18c2083f1ccec3aa22a8ac03d9cfb931391aeaaa69a43b7e1bdba3a954a7e6b"
+      },
+      {
+        "path": ".venv/Lib/site-packages/yarl-1.24.5.dist-info/RECORD",
+        "sha256": "00877d6101e14bfe4361ed434c7c7267a716887f506c7a5c841ef92bc7265316"
+      }
+    ],
+    "sitePackages": ".venv/Lib/site-packages",
+    "treeSha256": "be9428be134a6456f83ce5deca07fafbcbe0e30936b0c72c9994d2888039daa3",
+    "importTree": {
+      "root": ".venv/Lib/site-packages",
+      "fileCount": 28476,
+      "sha256": "6356a79e0a5f1d5c4ccdc13c2f21cc9241f201c8490fb5a084703599955dfee1"
+    }
+  }
+});

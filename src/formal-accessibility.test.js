@@ -190,6 +190,59 @@ test("RVC settings require opt-in consent and expose only safe status/profile fi
   assert.doesNotMatch(main, /FakeVoiceConversionSidecar/);
 });
 
+test("own-voice training settings keep recording local and expose accessible lifecycle controls", async () => {
+  const [html, main, preload, renderer] = await Promise.all([
+    readFile(new URL("./index.html", import.meta.url), "utf8"),
+    readFile(new URL("./main.js", import.meta.url), "utf8"),
+    readFile(new URL("./preload.cjs", import.meta.url), "utf8"),
+    readFile(new URL("./renderer-entry.js", import.meta.url), "utf8"),
+  ]);
+
+  for (const id of [
+    "voice-training-microphone",
+    "voice-training-consent",
+    "voice-training-final-consent",
+    "voice-training-start",
+    "voice-training-pause",
+    "voice-training-resume",
+    "voice-training-stop",
+    "voice-training-cancel",
+    "voice-training-delete",
+    "voice-training-status",
+    "voice-training-progress",
+    "voice-training-level",
+  ]) {
+    assert.match(html, new RegExp(`id="${id}"`), id);
+  }
+  assert.match(
+    html,
+    /id="voice-training-progress"[\s\S]{0,120}aria-label="本人音色錄製與訓練進度"/,
+  );
+  assert.match(html, /CPU 訓練可能需要較長時間/);
+  assert.match(html, /DirectML 目前僅作推論候選/);
+  for (const method of [
+    "voiceTrainingStatus",
+    "voiceTrainingStartRecording",
+    "voiceTrainingPauseRecording",
+    "voiceTrainingResumeRecording",
+    "voiceTrainingStopRecording",
+    "voiceTrainingStart",
+    "voiceTrainingCancel",
+    "voiceTrainingDelete",
+  ]) {
+    assert.match(preload, new RegExp(method), method);
+  }
+  assert.match(main, /"translive:voice-training-stop-recording"/);
+  assert.match(main, /requireMainRenderer\(event\)/);
+  assert.match(renderer, /navigator\.mediaDevices\.getUserMedia/);
+  assert.match(renderer, /new MediaRecorder/);
+  assert.match(renderer, /audio\/webm;codecs=opus/);
+  assert.match(renderer, /voiceTrainingStopRecording/);
+  assert.match(renderer, /voice-training-final-consent/);
+  assert.match(renderer, /consentVersion: VOICE_TRAINING_POLICY\.version/);
+  assert.doesNotMatch(renderer, /fetch\(|WebSocket|OpenAI|recording\.webm|normalized\.wav|output\.pth/);
+});
+
 test("applies route-valid device recommendations while preserving manual physical choices", async () => {
   const renderer = await readFile(
     new URL("./renderer-entry.js", import.meta.url),

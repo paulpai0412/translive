@@ -36,10 +36,27 @@ export async function smokePackage({ appDirectory, platform }) {
     "mini-caption-preload.cjs",
     "mini-caption-renderer.js",
     "mini-caption-window.js",
+    "private-local-storage.js",
+    "rvc-runtime-trust.js",
+    "voice-training-ipc.cjs",
+    "voice-training-policy.js",
+    "voice-training-runtime.js",
+    "voice-training-session-controller.js",
+    "voice-training-store.js",
   ]) {
     await stat(join(appDirectory, "src", asset));
   }
   await stat(join(appDirectory, "scripts", "windows-meeting-devices.ps1"));
+  for (const asset of [
+    "create-rvc-runtime-manifest.mjs",
+    "ensure-rvc-private-root.ps1",
+    "probe-rvc-capability.ps1",
+    "rvc-runtime-trust.json",
+    "rvc-training-runtime.py",
+    "verify-rvc-python.ps1",
+  ]) {
+    await stat(join(appDirectory, "scripts", asset));
+  }
   await stat(
     join(appDirectory, "assets", "translive-brand", "translive-mark.svg"),
   );

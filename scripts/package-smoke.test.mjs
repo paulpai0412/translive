@@ -44,6 +44,19 @@ async function writeStagedWindowsApp(appDirectory) {
       join(appDirectory, "src", "mini-caption-window.js"),
       "export {};\n",
     ),
+    writeFile(join(appDirectory, "src", "private-local-storage.js"), "export {};\n"),
+    writeFile(join(appDirectory, "src", "rvc-runtime-trust.js"), "export {};\n"),
+    writeFile(join(appDirectory, "src", "voice-training-ipc.cjs"), "module.exports = {};\n"),
+    writeFile(join(appDirectory, "src", "voice-training-policy.js"), "export {};\n"),
+    writeFile(join(appDirectory, "src", "voice-training-runtime.js"), "export {};\n"),
+    writeFile(join(appDirectory, "src", "voice-training-session-controller.js"), "export {};\n"),
+    writeFile(join(appDirectory, "src", "voice-training-store.js"), "export {};\n"),
+    writeFile(join(appDirectory, "scripts", "create-rvc-runtime-manifest.mjs"), ""),
+    writeFile(join(appDirectory, "scripts", "ensure-rvc-private-root.ps1"), ""),
+    writeFile(join(appDirectory, "scripts", "probe-rvc-capability.ps1"), ""),
+    writeFile(join(appDirectory, "scripts", "rvc-runtime-trust.json"), "{}\n"),
+    writeFile(join(appDirectory, "scripts", "rvc-training-runtime.py"), ""),
+    writeFile(join(appDirectory, "scripts", "verify-rvc-python.ps1"), ""),
     writeFile(join(appDirectory, "scripts", "windows-meeting-devices.ps1"), ""),
     writeFile(
       join(appDirectory, "assets", "translive-brand", "translive-mark.svg"),
@@ -94,6 +107,17 @@ test("package smoke requires all separate mini-caption runtime assets", async ()
   await assert.rejects(
     smokePackage({ appDirectory, arch: "x64", platform: "win32" }),
     /mini-caption-preload/i,
+  );
+});
+
+test("package smoke requires local own-voice training runtime assets", async () => {
+  const appDirectory = await mkdtemp(join(tmpdir(), "translive-packaged-app-"));
+  await writeStagedWindowsApp(appDirectory);
+  await rm(join(appDirectory, "scripts", "rvc-training-runtime.py"));
+
+  await assert.rejects(
+    smokePackage({ appDirectory, arch: "x64", platform: "win32" }),
+    /rvc-training-runtime/i,
   );
 });
 

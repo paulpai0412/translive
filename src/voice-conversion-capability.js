@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 
 const execFile = promisify(defaultExecFile);
 
-const VOICE_CONVERSION_CAPABILITY_TIMEOUT_MS = 5_000;
+const VOICE_CONVERSION_CAPABILITY_TIMEOUT_MS = 60_000;
 
 function boundedText(value, maxLength = 160) {
   if (typeof value !== "string") return undefined;

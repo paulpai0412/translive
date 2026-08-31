@@ -1,5 +1,6 @@
 import {
   emptyDevicePreferences,
+  isVirtualDevice,
   loadDevicePreferences,
   recommendModeDevices,
   rememberDeviceLabel,
@@ -10,6 +11,7 @@ import {
   releaseRendererResources as releaseResources,
 } from "./renderer-control.js";
 import { createStartupSession } from "./startup-session.js";
+import { VOICE_TRAINING_POLICY } from "./voice-training-policy.js";
 import {
   advancePacedTargetCaption,
   bufferPacedTargetCaption,
@@ -130,6 +132,23 @@ const elements = Object.fromEntries(
     "voice-profile-select",
     "voice-profile-delete-confirm",
     "voice-profile-delete",
+    "voice-training-microphone",
+    "voice-training-consent",
+    "voice-training-start",
+    "voice-training-pause",
+    "voice-training-resume",
+    "voice-training-stop",
+    "voice-training-final-consent",
+    "voice-training-train",
+    "voice-training-cancel",
+    "voice-training-delete-confirm",
+    "voice-training-delete",
+    "voice-training-status",
+    "voice-training-elapsed",
+    "voice-training-progress",
+    "voice-training-level",
+    "voice-training-clip",
+    "voice-training-silence",
     "rx-source",
     "rx-source-caption",
     "rx-target-language",
@@ -194,6 +213,13 @@ const ui = {
     profiles: [],
     provider: "unavailable",
     state: "checking",
+  },
+  voiceTraining: {
+    generation: 0,
+    media: undefined,
+    microphoneId: "",
+    runtime: { available: false, provider: "unavailable" },
+    status: { state: "idle" },
   },
   runtime: "尚未檢查",
 };
@@ -620,6 +646,36 @@ function applyModeDeviceRecommendations() {
   }
 }
 
+function populateVoiceTrainingMicrophone(inputs) {
+  const select = elements["voice-training-microphone"];
+  const physical = inputs.filter(
+    (device) =>
+      !isVirtualDevice(device) &&
+      !/^(?:default|communications)\s*-/i.test(String(device.label ?? "")),
+  );
+  const previous = select.value || elements["physical-mic"].value;
+  populateSelect(select, physical, previous);
+  const recommendation = recommendModeDevices({
+    devices: { inputs, outputs: ui.devices.outputs },
+    mode: "microphone",
+    preferences: ui.devicePreferences,
+    routeProfile: elements["route-profile"].value,
+  });
+  const recommended = recommendation.selections.physicalMic;
+  if (
+    recommended?.deviceId &&
+    [...select.options].some((option) => option.value === recommended.deviceId)
+  ) {
+    select.value = previous && [...select.options].some(
+      (option) => option.value === previous,
+    )
+      ? previous
+      : recommended.deviceId;
+  }
+  ui.voiceTraining.microphoneId = select.value;
+  updateVoiceTrainingControls();
+}
+
 function rememberManualPhysicalDevice(slot) {
   const select = elements[DEVICE_SELECTS[slot]];
   const option = select?.selectedOptions[0];
@@ -663,6 +719,7 @@ async function refreshDevices() {
       elements["headphones"].value,
     );
     applyModeDeviceRecommendations();
+    populateVoiceTrainingMicrophone(inputs);
     elements["health-devices"].className = "ok";
     updateReadyMessage();
   } catch {
@@ -1301,6 +1358,344 @@ function voiceConversionFailureMessage(reason) {
       "unsafe-model": "模型尚未通過安全載入驗證，已維持原 GPT 音色。",
     }[reason] ?? "無法啟用本機自訂音色，已維持原 GPT 音色。"
   );
+}
+
+function formatVoiceTrainingDuration(durationMs) {
+  const totalSeconds = Math.max(0, Math.floor(Number(durationMs) / 1_000));
+  return `${String(Math.floor(totalSeconds / 60)).padStart(2, "0")}:${String(
+    totalSeconds % 60,
+  ).padStart(2, "0")}`;
+}
+
+function voiceTrainingPresentation(status = {}) {
+  const state = status.state ?? "idle";
+  const detail =
+    {
+      idle: "選擇實體麥克風並確認本人聲音後，即可開始本機錄製。",
+      recording: "正在本機錄製。請以自然語速朗讀，避免背景音樂與他人說話。",
+      paused: "錄製已暫停；可繼續或取消並刪除本機工作。",
+      inspecting: "正在以固定本機工具檢查錄音格式、時長與訊號品質…",
+      normalizing: "正在本機正規化單聲道訓練音訊…",
+      "ready-to-train": "錄音已檢查完成。CPU 訓練可能需要較長時間。",
+      training: "正在本機 CPU 訓練。可以取消；取消會刪除未完成音訊與輸出。",
+      verified: "本人音色模型已通過本機 weights-only 驗證，可在 RVC 設定檔中啟用。",
+      failed: "本機錄製或訓練未完成；未建立可用音色模型。",
+      canceled: "本機錄製或訓練已取消，敏感工作檔已刪除。",
+    }[state] ?? "本機本人音色狀態尚未確認。";
+  return { detail, state };
+}
+
+function currentVoiceTrainingDuration() {
+  const media = ui.voiceTraining.media;
+  if (!media) return ui.voiceTraining.status.elapsedDurationMs ?? 0;
+  return Math.min(
+    VOICE_TRAINING_POLICY.maximumDurationMs,
+    media.elapsedBeforePause +
+      (media.paused ? 0 : Math.max(0, Date.now() - media.segmentStartedAt)),
+  );
+}
+
+function updateVoiceTrainingReadout() {
+  const media = ui.voiceTraining.media;
+  const durationMs = currentVoiceTrainingDuration();
+  const targetDurationMs =
+    ui.voiceTraining.status.targetDurationMs ??
+    VOICE_TRAINING_POLICY.targetDurationMs;
+  const progress =
+    ui.voiceTraining.status.state === "training"
+      ? ui.voiceTraining.status.progress ?? 0
+      : Math.min(100, Math.round((durationMs / targetDurationMs) * 100));
+  elements["voice-training-elapsed"].textContent = `${formatVoiceTrainingDuration(
+    durationMs,
+  )} / ${formatVoiceTrainingDuration(targetDurationMs)}`;
+  elements["voice-training-progress"].value = progress;
+  if (!media) return;
+  const sampled = Math.max(1, media.level.sampledFrames);
+  elements["voice-training-level"].textContent = `輸入電平：${Math.round(
+    media.level.peak * 100,
+  )}%`;
+  elements["voice-training-clip"].textContent = `削波：${media.level.clippedFrames}`;
+  elements["voice-training-silence"].textContent = `靜音：${Math.round(
+    (media.level.silentFrames / sampled) * 100,
+  )}%`;
+}
+
+function updateVoiceTrainingControls() {
+  const status = ui.voiceTraining.status;
+  const state = status.state ?? "idle";
+  const runtimeAvailable = ui.voiceTraining.runtime?.available === true;
+  const hasMic = Boolean(elements["voice-training-microphone"].value);
+  const consent = elements["voice-training-consent"].checked;
+  const name = elements["voice-profile-name"].value.trim();
+  const recording = ui.voiceTraining.media;
+  const finalConsent = elements["voice-training-final-consent"].checked;
+  elements["voice-training-start"].disabled = !(
+    ["idle", "canceled", "failed"].includes(state) &&
+    runtimeAvailable &&
+    hasMic &&
+    consent &&
+    name
+  );
+  elements["voice-training-pause"].disabled = !(state === "recording" && recording);
+  elements["voice-training-resume"].disabled = !(state === "paused" && recording);
+  elements["voice-training-stop"].disabled = !(
+    ["recording", "paused"].includes(state) && recording
+  );
+  elements["voice-training-train"].disabled = !(
+    state === "ready-to-train" && runtimeAvailable && finalConsent
+  );
+  elements["voice-training-cancel"].disabled = !(
+    ["recording", "paused", "inspecting", "normalizing", "training"].includes(
+      state,
+    )
+  );
+  elements["voice-training-delete"].disabled = !(
+    Boolean(status.id) && elements["voice-training-delete-confirm"].checked
+  );
+}
+
+function renderVoiceTraining(status = {}) {
+  const runtime = status.runtime ?? ui.voiceTraining.runtime;
+  ui.voiceTraining.runtime = {
+    available: runtime?.available === true,
+    provider: runtime?.provider ?? "unavailable",
+  };
+  ui.voiceTraining.status = {
+    ...ui.voiceTraining.status,
+    ...status,
+  };
+  const presentation = voiceTrainingPresentation(ui.voiceTraining.status);
+  const provider = ui.voiceTraining.runtime.provider;
+  elements["voice-training-status"].textContent =
+    provider === "unavailable"
+      ? "需要固定且驗證通過的本機 RVC runtime；不會保留本人錄音。"
+      : `${presentation.detail} 訓練提供者：CPU；DirectML：推論候選。`;
+  elements["voice-training-status"].dataset.state = presentation.state;
+  updateVoiceTrainingReadout();
+  updateVoiceTrainingControls();
+}
+
+function updateVoiceTrainingLevel() {
+  const media = ui.voiceTraining.media;
+  if (!media || media.paused) return;
+  media.analyser.getByteTimeDomainData(media.samples);
+  let peak = 0;
+  for (const sample of media.samples) {
+    peak = Math.max(peak, Math.abs(sample - 128) / 128);
+  }
+  media.level.sampledFrames += 1;
+  media.level.peak = Math.max(media.level.peak, peak);
+  if (peak >= 0.98) media.level.clippedFrames += 1;
+  if (peak <= 0.015) media.level.silentFrames += 1;
+  updateVoiceTrainingReadout();
+}
+
+function releaseVoiceTrainingMedia({ discard = false, media } = {}) {
+  const active = media ?? ui.voiceTraining.media;
+  if (!active) return;
+  active.discard ||= discard;
+  window.clearInterval(active.levelTimer);
+  window.clearInterval(active.elapsedTimer);
+  active.audioContext.close().catch(() => {});
+  for (const track of active.stream.getTracks()) track.stop();
+  if (ui.voiceTraining.media === active) ui.voiceTraining.media = undefined;
+}
+
+async function uploadVoiceTrainingRecording(media) {
+  if (media.generation !== ui.voiceTraining.generation || media.discard) return;
+  const blob = new Blob(media.chunks, { type: media.mimeType });
+  if (blob.size === 0 || blob.size > VOICE_TRAINING_POLICY.maxRecordingBytes) {
+    throw new Error("VOICE_TRAINING_RECORDING_BYTES_INVALID");
+  }
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const status = await window.translive.voiceTrainingStopRecording({
+    id: media.id,
+    recording: { bytes },
+  });
+  if (media.generation !== ui.voiceTraining.generation || media.discard) return;
+  releaseVoiceTrainingMedia();
+  renderVoiceTraining(status);
+}
+
+async function startVoiceTrainingRecording() {
+  const microphone = elements["voice-training-microphone"];
+  const option = microphone.selectedOptions[0];
+  try {
+    const status = await window.translive.voiceTrainingStartRecording({
+      confirmedOwnAuthorizedVoice:
+        elements["voice-training-consent"].checked === true,
+      displayName: elements["voice-profile-name"].value,
+      microphoneLabel: option?.textContent ?? "",
+    });
+    renderVoiceTraining(status);
+    if (
+      window.MediaRecorder === undefined ||
+      !MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+    ) {
+      throw new Error("VOICE_TRAINING_RECORDER_UNAVAILABLE");
+    }
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        autoGainControl: false,
+        deviceId: { exact: microphone.value },
+        echoCancellation: false,
+        noiseSuppression: false,
+      },
+      video: false,
+    });
+    const audioContext = new AudioContext();
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    audioContext.createMediaStreamSource(stream).connect(analyser);
+    const recorder = new MediaRecorder(stream, {
+      mimeType: "audio/webm;codecs=opus",
+    });
+    const media = {
+      analyser,
+      audioContext,
+      chunks: [],
+      discard: false,
+      elapsedBeforePause: 0,
+      generation: ++ui.voiceTraining.generation,
+      id: status.id,
+      level: { clippedFrames: 0, peak: 0, sampledFrames: 0, silentFrames: 0 },
+      levelTimer: undefined,
+      mimeType: recorder.mimeType.toLowerCase(),
+      paused: false,
+      recorder,
+      samples: new Uint8Array(analyser.fftSize),
+      segmentStartedAt: Date.now(),
+      stream,
+      elapsedTimer: undefined,
+    };
+    recorder.addEventListener("dataavailable", (event) => {
+      if (event.data.size > 0) media.chunks.push(event.data);
+    });
+    recorder.addEventListener("stop", () => {
+      if (media.discard || media.generation !== ui.voiceTraining.generation) {
+        releaseVoiceTrainingMedia({ discard: true, media });
+        return;
+      }
+      void uploadVoiceTrainingRecording(media).catch(async () => {
+        releaseVoiceTrainingMedia({ discard: true, media });
+        if (media.generation !== ui.voiceTraining.generation) return;
+        await window.translive.voiceTrainingCancel();
+        renderVoiceTraining({ state: "failed" });
+        showAssertiveError("無法保存本機本人音色錄音，敏感工作檔已取消。");
+      });
+    });
+    recorder.start(1_000);
+    media.levelTimer = window.setInterval(updateVoiceTrainingLevel, 100);
+    media.elapsedTimer = window.setInterval(() => {
+      if (currentVoiceTrainingDuration() >= VOICE_TRAINING_POLICY.maximumDurationMs) {
+        void stopVoiceTrainingRecording();
+        return;
+      }
+      updateVoiceTrainingReadout();
+    }, 250);
+    ui.voiceTraining.media = media;
+    renderVoiceTraining({ ...status, state: "recording" });
+  } catch {
+    releaseVoiceTrainingMedia({ discard: true });
+    await window.translive.voiceTrainingCancel().catch(() => {});
+    renderVoiceTraining({ state: "idle" });
+    showAssertiveError(
+      "無法開始本人音色錄製。請確認實體麥克風、同意與固定本機 RVC runtime。",
+    );
+  }
+}
+
+async function pauseVoiceTrainingRecording() {
+  const media = ui.voiceTraining.media;
+  if (!media || media.recorder.state !== "recording") return;
+  try {
+    const status = await window.translive.voiceTrainingPauseRecording(media.id);
+    media.elapsedBeforePause += Math.max(0, Date.now() - media.segmentStartedAt);
+    media.paused = true;
+    media.recorder.pause();
+    renderVoiceTraining(status);
+  } catch {
+    showAssertiveError("無法暫停本人音色錄製。");
+  }
+}
+
+async function resumeVoiceTrainingRecording() {
+  const media = ui.voiceTraining.media;
+  if (!media || media.recorder.state !== "paused") return;
+  try {
+    const status = await window.translive.voiceTrainingResumeRecording(media.id);
+    media.segmentStartedAt = Date.now();
+    media.paused = false;
+    media.recorder.resume();
+    renderVoiceTraining(status);
+  } catch {
+    showAssertiveError("無法繼續本人音色錄製。");
+  }
+}
+
+async function stopVoiceTrainingRecording() {
+  const media = ui.voiceTraining.media;
+  if (!media || media.recorder.state === "inactive") return;
+  if (!media.paused) {
+    media.elapsedBeforePause += Math.max(0, Date.now() - media.segmentStartedAt);
+    media.paused = true;
+  }
+  media.recorder.stop();
+  updateVoiceTrainingControls();
+}
+
+async function cancelVoiceTraining() {
+  ui.voiceTraining.generation += 1;
+  const media = ui.voiceTraining.media;
+  if (media) {
+    media.discard = true;
+    if (media.recorder.state !== "inactive") media.recorder.stop();
+    releaseVoiceTrainingMedia({ discard: true });
+  }
+  try {
+    renderVoiceTraining(await window.translive.voiceTrainingCancel());
+  } catch {
+    showAssertiveError("無法取消本人音色工作，請完全退出 TransLive 後再試。");
+  }
+}
+
+async function startVoiceTraining() {
+  try {
+    renderVoiceTraining(
+      await window.translive.voiceTrainingStart({
+        confirmedOwnAuthorizedVoice:
+          elements["voice-training-final-consent"].checked === true,
+        consentVersion: VOICE_TRAINING_POLICY.version,
+        id: ui.voiceTraining.status.id,
+      }),
+    );
+    elements["voice-training-final-consent"].checked = false;
+  } catch {
+    showAssertiveError("無法開始本機 CPU 訓練，已保留可刪除的本機錄音工作。");
+  }
+}
+
+async function deleteVoiceTraining() {
+  ui.voiceTraining.generation += 1;
+  try {
+    await window.translive.voiceTrainingDelete({
+      confirmedDeleteTraining:
+        elements["voice-training-delete-confirm"].checked === true,
+      id: ui.voiceTraining.status.id,
+    });
+    elements["voice-training-delete-confirm"].checked = false;
+    renderVoiceTraining(await window.translive.voiceTrainingStatus());
+  } catch {
+    showAssertiveError("無法刪除本人音色工作，請稍後再試。");
+  }
+}
+
+async function initializeVoiceTraining() {
+  try {
+    renderVoiceTraining(await window.translive.voiceTrainingStatus());
+  } catch {
+    renderVoiceTraining({ state: "idle" });
+  }
 }
 
 async function initializeTray() {
@@ -2076,6 +2471,47 @@ elements["voice-profile-delete"].addEventListener("click", async () => {
     showAssertiveError("無法刪除本人音色。請確認刪除確認並稍後再試。");
   }
 });
+elements["voice-training-microphone"].addEventListener("change", (event) => {
+  ui.voiceTraining.microphoneId = event.target.value;
+  updateVoiceTrainingControls();
+});
+elements["voice-training-consent"].addEventListener(
+  "change",
+  updateVoiceTrainingControls,
+);
+elements["voice-training-final-consent"].addEventListener(
+  "change",
+  updateVoiceTrainingControls,
+);
+elements["voice-training-delete-confirm"].addEventListener(
+  "change",
+  updateVoiceTrainingControls,
+);
+elements["voice-profile-name"].addEventListener(
+  "input",
+  updateVoiceTrainingControls,
+);
+elements["voice-training-start"].addEventListener("click", () =>
+  void startVoiceTrainingRecording(),
+);
+elements["voice-training-pause"].addEventListener("click", () =>
+  void pauseVoiceTrainingRecording(),
+);
+elements["voice-training-resume"].addEventListener("click", () =>
+  void resumeVoiceTrainingRecording(),
+);
+elements["voice-training-stop"].addEventListener("click", () =>
+  void stopVoiceTrainingRecording(),
+);
+elements["voice-training-train"].addEventListener("click", () =>
+  void startVoiceTraining(),
+);
+elements["voice-training-cancel"].addEventListener("click", () =>
+  void cancelVoiceTraining(),
+);
+elements["voice-training-delete"].addEventListener("click", () =>
+  void deleteVoiceTraining(),
+);
 elements["tray-close-behavior"].addEventListener("change", async (event) => {
   const result = await window.translive.traySetCloseBehavior(
     event.target.value,
@@ -2132,6 +2568,9 @@ document.addEventListener("keydown", (event) => {
   }
 });
 window.addEventListener("pagehide", () => {
+  const media = ui.voiceTraining.media;
+  if (media?.recorder.state !== "inactive") media.recorder.stop();
+  releaseVoiceTrainingMedia({ discard: true });
   void releaseRendererResources();
 });
 
@@ -2189,6 +2628,10 @@ window.translive.onEvent(async (event) => {
   }
   if (event.type === "voice-conversion") {
     renderVoiceConversion(event.status);
+    return;
+  }
+  if (event.type === "voice-training") {
+    renderVoiceTraining(event.status);
     return;
   }
   if (event.type === "tray") {
@@ -2267,4 +2710,5 @@ initializeConsent();
 initializeRetention();
 initializeGlobalAudioDefaults();
 initializeVoiceConversion();
+initializeVoiceTraining();
 initializeAccount();

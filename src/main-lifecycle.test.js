@@ -26,20 +26,19 @@ test("only the primary Electron instance can initialize shared Windows audio rou
 test("opens the raw-audio app before optional RVC initialization settles", async () => {
   const source = await mainSource();
   const createWindowAt = source.indexOf("createWindow();");
-  const initializeAt = source.search(
-    /voiceConversionController\s*\.\s*initialize\(\)/,
-  );
+  const afterWindowCreation = source.slice(createWindowAt);
 
   assert.ok(createWindowAt >= 0);
-  assert.ok(initializeAt > createWindowAt);
+  assert.match(afterWindowCreation, /void voiceStorageReady\s+\.then/);
+  assert.match(
+    afterWindowCreation,
+    /return voiceConversionController\.initialize\(\)/,
+  );
   assert.doesNotMatch(
     source,
     /const voiceConversionStartup = await voiceConversionController\.initialize\(\)/,
   );
-  assert.match(
-    source,
-    /void voiceConversionController\s*\.\s*initialize\(\)/,
-  );
+  assert.match(source, /void voiceStorageReady\s+\.then/);
 });
 
 test("limits every RVC IPC to the main renderer and requires explicit profile deletion confirmation", async () => {
@@ -61,6 +60,66 @@ test("limits every RVC IPC to the main renderer and requires explicit profile de
     source,
     /voiceConversionController\.deleteProfile\(request\.id\)/,
   );
+});
+
+test("owns one sender-validated local own-voice training boundary", async () => {
+  const source = await mainSource();
+
+  for (const channel of [
+    "voice-training-status",
+    "voice-training-start-recording",
+    "voice-training-pause-recording",
+    "voice-training-resume-recording",
+    "voice-training-stop-recording",
+    "voice-training-start",
+    "voice-training-cancel",
+    "voice-training-delete",
+  ]) {
+    const pattern = new RegExp(
+      `translive:${channel}"[\\s\\S]{0,240}requireMainRenderer\\(event\\)`,
+    );
+    assert.match(source, pattern, channel);
+  }
+  assert.match(
+    source,
+    /new VoiceTrainingStore\(\{[\s\S]{0,120}directory: voiceTrainingRoot,[\s\S]{0,120}ensureStorage: ensureVoiceStorage/,
+  );
+  assert.match(source, /new VoiceTrainingSessionController\(\{/);
+  assert.match(
+    source,
+    /loadRvcRuntimeManifest\(\{[\s\S]{0,120}runtimeRoot,[\s\S]{0,120}trust: RVC_RUNTIME_TRUST/,
+  );
+  assert.match(source, /voiceTrainingController\?\.dispose\(\)/);
+  assert.doesNotMatch(source, /console\.log\([^)]*voice-training/i);
+});
+
+test("provisions private ACLs for both voice data and the executable RVC runtime", async () => {
+  const source = await mainSource();
+
+  assert.match(
+    source,
+    /ensurePrivateVoiceStorage\(voiceUserDataRoot\)/,
+  );
+  assert.match(
+    source,
+    /ensurePrivateVoiceStorage\(runtimeStorageRoot\)/,
+  );
+  assert.match(source, /results\.every\(Boolean\)/);
+});
+
+test("keeps existing voice profiles under app userData and requires fresh training consent", async () => {
+  const source = await mainSource();
+
+  assert.match(
+    source,
+    /new VoiceProfileStore\(\{[\s\S]{0,180}directory: join\(app\.getPath\("userData"\), "voice-profiles"\)/,
+  );
+  assert.match(
+    source,
+    /confirmedOwnAuthorizedVoice:\s+request\?\.confirmedOwnAuthorizedVoice === true/,
+  );
+  assert.match(source, /consentVersion: request\?\.consentVersion/);
+  assert.match(source, /validateVoiceTrainingStopRequest\(request\)/);
 });
 
 test("owns mini captions in a separate non-modal window with a bounded renderer IPC seam", async () => {

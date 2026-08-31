@@ -35,6 +35,13 @@ test("packages only production runtime files and excludes secrets, evidence, and
     "src/voice-conversion-capability.js",
     "src/voice-conversion-controller.js",
     "src/voice-profile-store.js",
+    "src/private-local-storage.js",
+    "src/rvc-runtime-trust.js",
+    "src/voice-training-ipc.cjs",
+    "src/voice-training-policy.js",
+    "src/voice-training-runtime.js",
+    "src/voice-training-session-controller.js",
+    "src/voice-training-store.js",
     "src/windows-audio-defaults-controller.js",
     "src/windows-audio-defaults-store.js",
     "src/windows-meeting-device-adapter.js",
@@ -43,7 +50,12 @@ test("packages only production runtime files and excludes secrets, evidence, and
     "assets/codex/win32/codex.exe",
     "assets/codex/win32/codex.exe.sig",
     "scripts/windows-meeting-devices.ps1",
+    "scripts/create-rvc-runtime-manifest.mjs",
+    "scripts/ensure-rvc-private-root.ps1",
     "scripts/probe-rvc-capability.ps1",
+    "scripts/rvc-runtime-trust.json",
+    "scripts/rvc-training-runtime.py",
+    "scripts/verify-rvc-python.ps1",
   ]) {
     assert.equal(packagedPathIsAllowed(path), true, path);
   }

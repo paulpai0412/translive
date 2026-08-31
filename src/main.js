@@ -11,9 +11,12 @@ import {
   shell,
   Tray,
 } from "electron";
+import { execFile as defaultExecFile } from "node:child_process";
 import { writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
 import { AccountController } from "./account-controller.js";
 import { resolveCodexLaunch } from "./codex-launch.js";
@@ -23,9 +26,11 @@ import { sanitizeMeetingSetupRequest } from "./meeting-setup-request.js";
 import { MeetingSetupStore } from "./meeting-setup-store.js";
 import { MiniCaptionWindowController } from "./mini-caption-window.js";
 import { PhaseOneController } from "./phase-one-controller.js";
+import { assertPrivateLocalDirectory } from "./private-local-storage.js";
 import { allowsLocalAudioPermission } from "./permissions.js";
 import { recordsDirectory } from "./records-path.js";
 import { RecordsStore } from "./records-store.js";
+import { RVC_RUNTIME_TRUST } from "./rvc-runtime-trust.js";
 import { RendererControlBridge } from "./renderer-control-bridge.js";
 import { RELEASE_METADATA } from "./release-config.js";
 import { CodexSummaryService } from "./summary-service.js";
@@ -36,11 +41,22 @@ import { TrayPreferences } from "./tray-preferences.js";
 import { VoiceConversionCapabilityProbe } from "./voice-conversion-capability.js";
 import { VoiceConversionController } from "./voice-conversion-controller.js";
 import { VoiceProfileStore } from "./voice-profile-store.js";
+import {
+  loadRvcRuntimeManifest,
+  VoiceTrainingRuntime,
+} from "./voice-training-runtime.js";
+import { VoiceTrainingSessionController } from "./voice-training-session-controller.js";
+import { VoiceTrainingStore } from "./voice-training-store.js";
 import { WindowsAudioDefaultsController } from "./windows-audio-defaults-controller.js";
 import { WindowsAudioDefaultsStore } from "./windows-audio-defaults-store.js";
 import { WindowsMeetingDeviceAdapter } from "./windows-meeting-device-adapter.js";
 
 const sourceDirectory = dirname(fileURLToPath(import.meta.url));
+const execFile = promisify(defaultExecFile);
+const require = createRequire(import.meta.url);
+const {
+  validateVoiceTrainingStopRequest,
+} = require("./voice-training-ipc.cjs");
 const isPrimaryInstance = app.requestSingleInstanceLock();
 const windowIconPath = join(
   sourceDirectory,
@@ -66,6 +82,11 @@ let globalAudioRoutingStarted = false;
 let globalAudioStartupPromise;
 let globalAudioState = { state: "unknown" };
 let voiceConversionController;
+let voiceProfileStore;
+let voiceTrainingController;
+let voiceTrainingRoot;
+let voiceTrainingRuntime;
+let voiceStorageReady;
 let rendererControls;
 let translationLifecycle;
 
@@ -121,6 +142,97 @@ function sendRendererControl(event) {
 function requireMainRenderer(event) {
   if (event?.sender !== mainWindow?.webContents) {
     throw new Error("TRANSLIVE_UNAUTHORIZED_RENDERER");
+  }
+}
+
+function localRvcRuntimeDirectory() {
+  const localAppData = process.env.LOCALAPPDATA;
+  if (typeof localAppData !== "string" || !localAppData) return undefined;
+  return join(localAppData, "TransLive", "rvc-runtime");
+}
+
+async function ensurePrivateVoiceStorage(directory) {
+  if (process.platform !== "win32") return false;
+  try {
+    const { stdout } = await execFile(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        join(app.getAppPath(), "scripts", "ensure-rvc-private-root.ps1"),
+        "-Directory",
+        directory,
+      ],
+      { timeout: 30_000, windowsHide: true },
+    );
+    return JSON.parse(String(stdout).trim())?.ready === true;
+  } catch {
+    return false;
+  }
+}
+
+async function verifyRvcPython({ path }) {
+  try {
+    const { stdout } = await execFile(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        join(app.getAppPath(), "scripts", "verify-rvc-python.ps1"),
+        "-PythonPath",
+        path,
+      ],
+      { timeout: 30_000, windowsHide: true },
+    );
+    return JSON.parse(String(stdout).trim())?.verified === true;
+  } catch {
+    return false;
+  }
+}
+
+async function configureVoiceTrainingRuntime(capability) {
+  if (capability?.provider === "unavailable" || !voiceTrainingController) {
+    voiceTrainingRuntime = undefined;
+    return voiceTrainingController?.configureRuntime(undefined);
+  }
+  try {
+    if (!(await voiceStorageReady)) {
+      throw new Error("VOICE_STORAGE_UNAVAILABLE");
+    }
+    const runtimeRoot = localRvcRuntimeDirectory();
+    if (!runtimeRoot) throw new Error("VOICE_TRAINING_RUNTIME_UNAVAILABLE");
+    await assertPrivateLocalDirectory({ directory: runtimeRoot });
+    const trustedRunnerPath = join(
+      app.getAppPath(),
+      "scripts",
+      "rvc-training-runtime.py",
+    );
+    const validateRuntime = () =>
+      loadRvcRuntimeManifest({
+        runtimeRoot,
+        trust: RVC_RUNTIME_TRUST,
+        trustedRunnerPath,
+      });
+    const manifest = await validateRuntime();
+    voiceTrainingRuntime = new VoiceTrainingRuntime({
+      manifest,
+      outputRoot: voiceTrainingRoot,
+      runtimeRoot,
+      trust: RVC_RUNTIME_TRUST,
+      trustedRunnerPath,
+      validateRuntime,
+      verifyPython: verifyRvcPython,
+    });
+    return voiceTrainingController.configureRuntime(voiceTrainingRuntime);
+  } catch {
+    voiceTrainingRuntime = undefined;
+    return voiceTrainingController.configureRuntime(undefined);
   }
 }
 
@@ -260,6 +372,54 @@ function registerIpc() {
     const status = await voiceConversionController.deleteProfile(request.id);
     publish({ type: "voice-conversion", status });
     return status;
+  });
+  ipcMain.handle("translive:voice-training-status", async (event) => {
+    requireMainRenderer(event);
+    return voiceTrainingController.status();
+  });
+  ipcMain.handle("translive:voice-training-start-recording", async (event, request) => {
+    requireMainRenderer(event);
+    return voiceTrainingController.startRecording({
+      confirmedOwnAuthorizedVoice:
+        request?.confirmedOwnAuthorizedVoice === true,
+      displayName: request?.displayName,
+      microphoneLabel: request?.microphoneLabel,
+    });
+  });
+  ipcMain.handle("translive:voice-training-pause-recording", async (event, id) => {
+    requireMainRenderer(event);
+    return voiceTrainingController.pauseRecording(id);
+  });
+  ipcMain.handle("translive:voice-training-resume-recording", async (event, id) => {
+    requireMainRenderer(event);
+    return voiceTrainingController.resumeRecording(id);
+  });
+  ipcMain.handle("translive:voice-training-stop-recording", async (event, request) => {
+    requireMainRenderer(event);
+    return voiceTrainingController.stopRecording(
+      validateVoiceTrainingStopRequest(request),
+    );
+  });
+  ipcMain.handle("translive:voice-training-start", async (event, request) => {
+    requireMainRenderer(event);
+    await voiceTrainingController.startTraining({
+      confirmedOwnAuthorizedVoice:
+        request?.confirmedOwnAuthorizedVoice === true,
+      consentVersion: request?.consentVersion,
+      id: request?.id,
+    });
+    return voiceTrainingController.status();
+  });
+  ipcMain.handle("translive:voice-training-cancel", async (event) => {
+    requireMainRenderer(event);
+    return voiceTrainingController.cancel();
+  });
+  ipcMain.handle("translive:voice-training-delete", async (event, request) => {
+    requireMainRenderer(event);
+    if (request?.confirmedDeleteTraining !== true) {
+      throw new Error("VOICE_TRAINING_DELETE_CONFIRMATION_REQUIRED");
+    }
+    return voiceTrainingController.delete(request.id);
   });
   ipcMain.handle("translive:mini-caption-show", (event, snapshot) => {
     if (event.sender !== mainWindow?.webContents) return { shown: false };
@@ -441,6 +601,7 @@ function registerIpc() {
   );
 }
 
+// The primary process owns the shared Windows and local-voice lifecycle.
 if (!isPrimaryInstance) {
   app.quit();
 } else {
@@ -516,6 +677,47 @@ if (!isPrimaryInstance) {
       : Promise.resolve({ state: "legacy-recovery-needed" });
     const globalAudioStartup = await globalAudioStartupPromise;
     globalAudioState = globalAudioStartup;
+    const voiceUserDataRoot = app.getPath("userData");
+    const runtimeStorageRoot = localRvcRuntimeDirectory();
+    voiceStorageReady = Promise.all([
+      ensurePrivateVoiceStorage(voiceUserDataRoot),
+      runtimeStorageRoot
+        ? ensurePrivateVoiceStorage(runtimeStorageRoot)
+        : Promise.resolve(false),
+    ]).then((results) => results.every(Boolean));
+    const ensureVoiceStorage = async () => {
+      if (!(await voiceStorageReady)) {
+        throw new Error("VOICE_STORAGE_UNAVAILABLE");
+      }
+    };
+    voiceTrainingRoot = join(voiceUserDataRoot, "voice-training");
+    voiceProfileStore = new VoiceProfileStore({
+      directory: join(app.getPath("userData"), "voice-profiles"),
+      ensureStorage: ensureVoiceStorage,
+      trainingDirectory: voiceTrainingRoot,
+      verifyTrainingOutput: (request) => {
+        if (!voiceTrainingRuntime) {
+          throw new Error("VOICE_TRAINING_RUNTIME_UNAVAILABLE");
+        }
+        return voiceTrainingRuntime.verifyOutput(request);
+      },
+    });
+    voiceTrainingController = new VoiceTrainingSessionController({
+      onProfileVerified: async () => {
+        const status = await voiceConversionController.initialize();
+        publish({ type: "voice-conversion", status });
+      },
+      profiles: voiceProfileStore,
+      publish,
+      store: new VoiceTrainingStore({
+        directory: voiceTrainingRoot,
+        ensureStorage: ensureVoiceStorage,
+      }),
+    });
+    void voiceProfileStore.recover().catch(() => {});
+    void voiceTrainingController.recover().catch(() => {
+      publish({ type: "voice-training", status: { state: "failed" } });
+    });
     voiceConversionController = new VoiceConversionController({
       capabilityProbe: new VoiceConversionCapabilityProbe({
         platform: process.platform,
@@ -525,9 +727,7 @@ if (!isPrimaryInstance) {
           "probe-rvc-capability.ps1",
         ),
       }),
-      profiles: new VoiceProfileStore({
-        directory: join(app.getPath("userData"), "voice-profiles"),
-      }),
+      profiles: voiceProfileStore,
     });
     miniCaptionWindowController = new MiniCaptionWindowController({
       createWindow: (options) =>
@@ -580,11 +780,22 @@ if (!isPrimaryInstance) {
     });
     registerIpc();
     publish({ type: "global-audio", state: globalAudioStartup.state });
-    // Optional RVC discovery must never delay the raw GPT-audio application.
-    void voiceConversionController
-      .initialize()
-      .then((status) => publish({ type: "voice-conversion", status }))
-      .catch(() =>
+    // Optional RVC discovery/training setup must never delay raw GPT audio.
+    void voiceStorageReady
+      .then((ready) => {
+        if (!ready) throw new Error("VOICE_STORAGE_UNAVAILABLE");
+        return voiceConversionController.initialize();
+      })
+      .then(async (status) => {
+        publish({ type: "voice-conversion", status });
+        const trainingStatus = await configureVoiceTrainingRuntime(status);
+        publish({ type: "voice-training", status: trainingStatus });
+      })
+      .catch(async () => {
+        voiceTrainingRuntime = undefined;
+        const trainingStatus = await voiceTrainingController.configureRuntime(
+          undefined,
+        );
         publish({
           type: "voice-conversion",
           status: {
@@ -594,8 +805,9 @@ if (!isPrimaryInstance) {
             reason: "initialization-failed",
             state: "unavailable",
           },
-        }),
-      );
+        });
+        publish({ type: "voice-training", status: trainingStatus });
+      });
     if (startupRestore.reason) {
       publish({
         type: "meeting-setup",
@@ -623,6 +835,7 @@ if (!isPrimaryInstance) {
       summaryController?.dispose(),
       trayController?.dispose(),
       voiceConversionController?.dispose(),
+      voiceTrainingController?.dispose(),
     ])
       .then(async () => {
         await globalAudioStartupPromise?.catch(() => {});

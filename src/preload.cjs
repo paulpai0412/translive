@@ -1,5 +1,22 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
+// Sandboxed Electron preloads may only require Electron's whitelisted module.
+// Validate the bounded binary handoff here before any renderer request crosses
+// IPC; main repeats the same check at its trust boundary.
+const MAX_RECORDING_IPC_BYTES = 64 * 1024 * 1024;
+function validateVoiceTrainingStopRequest(request) {
+  const bytes = request?.recording?.bytes;
+  if (
+    typeof request?.id !== "string" ||
+    !(bytes instanceof Uint8Array) ||
+    bytes.byteLength === 0 ||
+    bytes.byteLength > MAX_RECORDING_IPC_BYTES
+  ) {
+    throw new Error("VOICE_TRAINING_IPC_INVALID_RECORDING");
+  }
+  return { id: request.id, recording: { bytes } };
+}
+
 contextBridge.exposeInMainWorld("translive", {
   accountStatus: () => ipcRenderer.invoke("translive:account-status"),
   accountLogin: () => ipcRenderer.invoke("translive:account-login"),
@@ -16,6 +33,25 @@ contextBridge.exposeInMainWorld("translive", {
     ipcRenderer.invoke("translive:voice-profile-import", request),
   voiceProfileDelete: (request) =>
     ipcRenderer.invoke("translive:voice-profile-delete", request),
+  voiceTrainingStatus: () =>
+    ipcRenderer.invoke("translive:voice-training-status"),
+  voiceTrainingStartRecording: (request) =>
+    ipcRenderer.invoke("translive:voice-training-start-recording", request),
+  voiceTrainingPauseRecording: (id) =>
+    ipcRenderer.invoke("translive:voice-training-pause-recording", id),
+  voiceTrainingResumeRecording: (id) =>
+    ipcRenderer.invoke("translive:voice-training-resume-recording", id),
+  voiceTrainingStopRecording: (request) =>
+    ipcRenderer.invoke(
+      "translive:voice-training-stop-recording",
+      validateVoiceTrainingStopRequest(request),
+    ),
+  voiceTrainingStart: (request) =>
+    ipcRenderer.invoke("translive:voice-training-start", request),
+  voiceTrainingCancel: () =>
+    ipcRenderer.invoke("translive:voice-training-cancel"),
+  voiceTrainingDelete: (request) =>
+    ipcRenderer.invoke("translive:voice-training-delete", request),
   miniCaptionShow: (snapshot) =>
     ipcRenderer.invoke("translive:mini-caption-show", snapshot),
   miniCaptionUpdate: (snapshot) =>

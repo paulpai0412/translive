@@ -72,6 +72,12 @@ const voiceConversionProbeScript = await readFile(
   "scripts/probe-rvc-capability.ps1",
   "utf8",
 );
+const voiceTrainingRunner = await readFile(
+  "scripts/rvc-training-runtime.py",
+  "utf8",
+);
+const rvcRuntimeTrust = await readFile("scripts/rvc-runtime-trust.json", "utf8");
+const rvcPythonVerifier = await readFile("scripts/verify-rvc-python.ps1", "utf8");
 if (!main.includes('preload: join(sourceDirectory, "preload.cjs")')) {
   throw new Error("main.js must load the restricted preload bridge");
 }
@@ -95,6 +101,10 @@ for (const required of [
   "new VoiceConversionCapabilityProbe",
   "new VoiceConversionController",
   "new VoiceProfileStore",
+  "new VoiceTrainingRuntime",
+  "new VoiceTrainingSessionController",
+  "new VoiceTrainingStore",
+  '"translive:voice-training-stop-recording"',
   "sanitizeMeetingSetupRequest(setup)",
   'ipcMain.handle("translive:tray-status"',
   "shell.openExternal(login.authUrl)",
@@ -111,13 +121,29 @@ for (const required of [
 }
 if (
   !voiceConversionProbeScript.includes("Get-CimInstance Win32_Processor") ||
+  !voiceConversionProbeScript.includes("rvc-runtime-trust.json") ||
+  !voiceConversionProbeScript.includes("Has-ReparsePoint") ||
   !voiceConversionProbeScript.includes("ConvertTo-Json -Compress") ||
-  /Invoke-WebRequest|pip install|winget install|Copy-Item|Remove-Item/i.test(
+  /Invoke-WebRequest|pip install|winget install|Copy-Item|Remove-Item|Get-Command/i.test(
     voiceConversionProbeScript,
   )
 ) {
   throw new Error(
     "probe-rvc-capability.ps1 must remain a read-only capability probe",
+  );
+}
+if (
+  !rvcRuntimeTrust.includes('"rvcCommit"') ||
+  !rvcPythonVerifier.includes("Get-AuthenticodeSignature") ||
+  !voiceTrainingRunner.includes("weights_only=True") ||
+  !voiceTrainingRunner.includes("shell=False") ||
+  !voiceTrainingRunner.includes("cpu-baseline") ||
+  /requests\.get|urllib\.request|socket\.socket|http:\/\//i.test(
+    voiceTrainingRunner,
+  )
+) {
+  throw new Error(
+    "rvc-training-runtime.py must keep local-only fixed CPU training and weights-only verification",
   );
 }
 for (const required of [
@@ -159,6 +185,13 @@ for (const required of [
   'id="voice-conversion-toggle"',
   'id="voice-profile-select"',
   'id="voice-profile-consent"',
+  'id="voice-training-microphone"',
+  'id="voice-training-consent"',
+  'id="voice-training-final-consent"',
+  'id="voice-training-start"',
+  'id="voice-training-stop"',
+  'id="voice-training-status"',
+  'aria-label="本人音色錄製與訓練進度"',
   'aria-live="polite"',
   'role="alert"',
 ]) {
@@ -190,6 +223,10 @@ for (const required of [
   "voiceConversionStatus",
   "voiceConversionSetEnabled",
   "voiceProfileImport",
+  "voiceTrainingStatus",
+  "voiceTrainingStartRecording",
+  "voiceTrainingStopRecording",
+  "voiceTrainingCancel",
   "rendererControlAck",
 ]) {
   if (!preload.includes(required)) {
@@ -208,6 +245,11 @@ if (!renderer.includes("exportAggregate")) {
 }
 if (!renderer.includes("diagnosticsExport")) {
   throw new Error("renderer-entry.js must expose redacted diagnostic export");
+}
+if (!renderer.includes("initializeVoiceTraining")) {
+  throw new Error(
+    "renderer-entry.js must expose local own-voice training status",
+  );
 }
 if (!renderer.includes("initializeVoiceConversion")) {
   throw new Error(
