@@ -116,6 +116,71 @@ class PacingClient extends EventEmitter {
       },
     });
   }
+
+  itemStarted(id, role = "assistant", threadId = this.thread.id) {
+    this.emit("notification", {
+      method: "thread/realtime/item/started",
+      params: {
+        threadId,
+        item: { id, realtimeSessionId: "test-session", type: "transcriptSegment", role, text: "" },
+      },
+    });
+  }
+
+  itemDelta(id, delta, threadId = this.thread.id) {
+    this.emit("notification", {
+      method: "thread/realtime/item/transcript/delta",
+      params: { threadId, itemId: id, delta },
+    });
+  }
+
+  itemCompleted(id, role, text, threadId = this.thread.id) {
+    this.emit("notification", {
+      method: "thread/realtime/item/completed",
+      params: {
+        threadId,
+        item: { id, realtimeSessionId: "test-session", type: "transcriptSegment", role, text },
+      },
+    });
+  }
+}
+
+class PromptClient extends EventEmitter {
+  realtimeStarts = [];
+  threadNumber = 0;
+
+  async start() {}
+
+  async startEphemeralThread() {
+    this.threadNumber += 1;
+    return { id: `prompt-thread-${this.threadNumber}` };
+  }
+
+  async startRealtime(request) {
+    this.realtimeStarts.push(request);
+  }
+
+  async stopRealtime() {}
+  async close() {}
+}
+
+class MeetingItemClient extends PacingClient {
+  threadNumber = 0;
+  txThreadId;
+  rxThreadId;
+
+  async startEphemeralThread() {
+    this.threadNumber += 1;
+    return { id: `meeting-thread-${this.threadNumber}` };
+  }
+
+  async startRealtime(request) {
+    if (request.prompt.includes("one fixed target language")) {
+      this.rxThreadId = request.threadId;
+    } else {
+      this.txThreadId = request.threadId;
+    }
+  }
 }
 
 class DeferredPacingClient extends PacingClient {
@@ -140,6 +205,26 @@ class DeferredPacingClient extends PacingClient {
     pending.reject(new Error("append rejected"));
   }
 }
+
+test("GPT-Live initialization permits translation only and sends complete short utterances", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-prompt-"),
+  );
+  const client = new PromptClient();
+  const controller = controllerFor({
+    evidenceDirectory,
+    createClient: () => client,
+  });
+
+  await controller.start(validConfig());
+  assert.equal(client.realtimeStarts.length, 2);
+  for (const { prompt } of client.realtimeStarts) {
+    assert.match(prompt, /Translate questions as questions; never answer them\./);
+    assert.match(prompt, /Translate each completed utterance exactly once/);
+    assert.match(prompt, /Immediately translate and speak complete short utterances/);
+  }
+  await controller.stop("user-stop");
+});
 
 function manualPacingTimers() {
   let nextId = 1;
@@ -199,6 +284,32 @@ class PendingStartClient extends EventEmitter {
     this.#rejectStart?.(new Error("client closed"));
   }
 }
+
+test("Stop and Restart create fresh GPT-Live clients and threads", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-restart-"),
+  );
+  const clients = [];
+  const controller = controllerFor({
+    evidenceDirectory,
+    createClient: () => {
+      const client = new PromptClient();
+      clients.push(client);
+      return client;
+    },
+  });
+
+  for (let cycle = 0; cycle < 5; cycle += 1) {
+    await controller.start(validConfig());
+    await controller.stop("user-stop");
+  }
+
+  assert.equal(clients.length, 5);
+  for (const client of clients) {
+    assert.equal(client.realtimeStarts.length, 2);
+    assert.equal(client.threadNumber, 2);
+  }
+});
 
 test("returns VoiceMeeter meeting endpoint instructions for the free route profile", async () => {
   const evidenceDirectory = await mkdtemp(
@@ -479,6 +590,101 @@ test("arms only the RX pacing head and refills a rolling outstanding queue in or
   await controller.stop("user-stop");
 });
 
+test("item-level playback transcripts never re-enter RX pacing", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-item-echo-"),
+  );
+  const client = new PacingClient();
+  const timers = manualPacingTimers();
+  const controller = controllerFor({
+    evidenceDirectory,
+    createClient: () => client,
+    pacingPolicy: testPacingPolicy(),
+    schedulePacing: timers.schedule,
+    cancelPacingSchedule: timers.clear,
+  });
+  const { tx: _tx, ...media } = validConfig({ mode: "media" });
+
+  await controller.start(media);
+  client.itemStarted("translation-1");
+  client.itemDelta("translation-1", "第一段完成。");
+  client.itemCompleted("translation-1", "assistant", "第一段完成。");
+  await timers.fireHead();
+  assert.deepEqual(
+    client.appendRequests.map((request) => request.text),
+    ["第一段完成。"],
+  );
+
+  client.itemStarted("playback-1");
+  client.itemDelta("playback-1", "第一段完成！第一段完成！");
+  client.itemCompleted(
+    "playback-1",
+    "assistant",
+    "第一段完成！第一段完成！",
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(timers.size, 0);
+  assert.deepEqual(
+    client.appendRequests.map((request) => request.text),
+    ["第一段完成。"],
+  );
+  await controller.stop("user-stop");
+});
+
+test("a TX assistant item cannot consume the pending RX playback identity", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-cross-thread-item-"),
+  );
+  const client = new MeetingItemClient();
+  const timers = manualPacingTimers();
+  const controller = controllerFor({
+    evidenceDirectory,
+    createClient: () => client,
+    pacingPolicy: testPacingPolicy(),
+    schedulePacing: timers.schedule,
+    cancelPacingSchedule: timers.clear,
+  });
+
+  await controller.start(validConfig());
+  client.itemStarted("translation-rx", "assistant", client.rxThreadId);
+  client.itemDelta("translation-rx", "第一段完成。", client.rxThreadId);
+  client.itemCompleted(
+    "translation-rx",
+    "assistant",
+    "第一段完成。",
+    client.rxThreadId,
+  );
+  await timers.fireHead();
+
+  client.itemStarted("translation-tx", "assistant", client.txThreadId);
+  client.itemCompleted(
+    "translation-tx",
+    "assistant",
+    "English translation.",
+    client.txThreadId,
+  );
+  client.itemStarted("playback-rx", "assistant", client.rxThreadId);
+  client.itemDelta(
+    "playback-rx",
+    "第一段完成！第一段完成！",
+    client.rxThreadId,
+  );
+  client.itemCompleted(
+    "playback-rx",
+    "assistant",
+    "第一段完成！第一段完成！",
+    client.rxThreadId,
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(timers.size, 0);
+  assert.deepEqual(
+    client.appendRequests.map((request) => request.text),
+    ["第一段完成。"],
+  );
+  await controller.stop("user-stop");
+});
+
 test("suppresses ordered delayed echoes and duplicate finals without replaying speech", async () => {
   const evidenceDirectory = await mkdtemp(
     join(tmpdir(), "translive-controller-pacing-echoes-"),
@@ -657,7 +863,7 @@ test("keeps the suffix of a same-prefix transcript final eligible for speech", a
   await controller.stop("user-stop");
 });
 
-test("drains an eligible stop tail, reports a sub-minimum tail as unsent, and suppresses late append completion", async () => {
+test("drains eligible long and short stop tails and suppresses late append completion", async () => {
   const evidenceDirectory = await mkdtemp(
     join(tmpdir(), "translive-controller-pacing-stop-"),
   );
@@ -721,14 +927,16 @@ test("drains an eligible stop tail, reports a sub-minimum tail as unsent, and su
   });
   await short.start(media);
   await short.stop("user-stop");
+  assert.deepEqual(
+    shortClient.appendRequests.map((request) => request.text),
+    ["太短。"],
+  );
   assert.equal(
     shortEvents.some(
       (event) =>
-        event.type === "speech-fallback" &&
-        event.state === "unsent" &&
-        event.characters === 3,
+        event.type === "speech-fallback" && event.state === "unsent",
     ),
-    true,
+    false,
   );
 });
 

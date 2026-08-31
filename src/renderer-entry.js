@@ -2336,9 +2336,7 @@ elements["cancel-connect-button"].addEventListener(
   () => void cancelTranslationStartup(),
 );
 elements["stop-button"].addEventListener("click", stopTranslation);
-elements["restart-button"].addEventListener("click", () =>
-  setAppState("ready"),
-);
+elements["restart-button"].addEventListener("click", startTranslation);
 for (const button of document.querySelectorAll(".mute-button")) {
   button.addEventListener("click", () =>
     toggleMute(button.dataset.direction || activeSingleDirection()),

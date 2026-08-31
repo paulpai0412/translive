@@ -692,7 +692,7 @@ errorMs   = backlogMs - targetBacklogMs
 
 第一階段採有 hysteresis 的有界佇列控制，不直接使用會放大語音抖動的高增益 PID。控制動作只影響尚未送出的分段與 appendSpeech dispatch 時機；已開始播放的語音不突然變速。僅 arm queue head；若 backlog bound 暫存後續文字，會在已規劃播放結束時 wake 再判定，不會遺失或讓後段超車。
 
-`thread/realtime/transcript/*` 的 flat experimental notification 沒有 itemId；雖然 item-level schema 存在 id，現行 flat RX fallback 以「append RPC 已成功後的有序 expectation queue」抑制 echo，並用有界近期歷史處理 duplicate delta/done。不同原始語句剛好與未到達 echo 完全相同時無法由 flat API 完美區分，因此不以猜測重播；itemId 併入 flat notification 後應升級為直接 correlation。
+`thread/realtime/transcript/*` 的 flat experimental notification 沒有 itemId，不能安全區分原始翻譯與 `appendSpeech` playback。Windows 真實會議已證實文字比對 heuristic 會把 playback transcript 重新送入 pacing，形成 assistant-only amplification。正式路徑改以 `thread/realtime/item/started`、`item/transcript/delta`、`item/completed` 的 itemId 建立單向 translation item → playback item；playback item 永不得回到 pacing。偵測到 item-level 後忽略同 thread 的 flat transcript，舊 flat 路徑僅作相容 fallback，不再作 item-level production correlation。
 
 ### 21.4 字幕同步
 
@@ -715,6 +715,14 @@ errorMs   = backlogMs - targetBacklogMs
 
 ### 21.6 P1–P5 implementation status
 
-已實作：versioned `natural-sync` policy、時間型估算、最短可播 guard、fast-start／steady semantic segmentation、policy-capped long-clause split、head-only serialized appendSpeech、rolling outstanding/backlog admission、ordered flat-echo suppression、取消 generation guard、eligible Stop tail drain／sub-minimum unsent state、安全 aggregate pacing evidence、RX target caption defer／dispatch advance。
+已實作：versioned `natural-sync` policy、時間型估算、final 短句立即送出、fast-start／steady semantic segmentation、policy-capped long-clause split、head-only serialized appendSpeech、rolling outstanding/backlog admission、item-level playback 隔離、取消 generation guard、eligible Stop tail drain、安全 aggregate pacing evidence、RX target caption defer／dispatch advance。
 
 尚未實作：WSOLA／AudioWorklet、播放中 time-scale modification、動態模型 concise RPC、以真實音訊 output-completion 校正 policy。這些都需要長段 YouTube／會議真機量測後才決定是否值得增加。
+
+## 22. 2026-08-31 修訂：Restart 與嚴格翻譯契約
+
+- Stopped 畫面的「再次開始」直接執行完整 `startTranslation()`，重建 GPT-Live thread、WebRTC peer／SDP、mode-scoped Windows route 與 route health；不得只返回 Ready，也不得要求再次執行 Teams／Zoom 快速設定。
+- 每次 Restart 使用新 renderer peer 與 main-side runtime；Start／Stop／Restart 仍遵守既有 cancellation、checkpoint 與 restore 順序。
+- TX／RX init prompt 明確要求只忠實翻譯：問句仍翻成問句，禁止回答、解釋、建議、承接對話、補 filler、重用前句或無來源重複。
+- 完整 final 短句（如 `Yes`、`No`、`OK`、`Thanks`、`好`、`是`）立即 flush；未 final 的短 fragment 仍等待，避免 partial transcript 抖動。
+- TDD seams：renderer Restart click contract、`PhaseOneController.start()` prompt／fresh-runtime contract、`AdaptivePacingController.ingest()` final-short contract，以及 Windows 同 process Start → Stop → Restart 五輪 E2E。

@@ -137,7 +137,7 @@ function policySegmentLimit({ desiredDurationMs, policy }) {
 function selectSegment(text, { final, first, policy, constrained }) {
   const units = textUnits(text);
   const minimum = policy.minimumAudibleCharacters;
-  if (units.length < minimum) return undefined;
+  if (units.length < minimum) return final ? units.join("") : undefined;
 
   const desiredDurationMs = targetDuration({ first, policy, constrained });
   const desiredIndex = targetIndex(units, desiredDurationMs, policy);

@@ -339,7 +339,25 @@ test("speaks a complete final that fits the policy cap instead of stranding a ti
   assert.deepEqual(controller.unsent(), { characters: 13, segments: 1 });
 });
 
-test("uses a rolling outstanding cap and reports a final sub-minimum tail as unsent", () => {
+test("sends a complete short final immediately while partial fragments still wait", () => {
+  const finalController = new AdaptivePacingController({
+    policy: { ...NATURAL_SYNC_PACING_POLICY, minimumAudibleCharacters: 12 },
+  });
+  const flush = finalController
+    .ingest({ text: "OK", final: true, atMs: 0 })
+    .find((decision) => decision.type === "flush");
+  assert.equal(flush.text, "OK");
+  assert.equal(flush.kind, "fast-start");
+
+  const partialController = new AdaptivePacingController({
+    policy: { ...NATURAL_SYNC_PACING_POLICY, minimumAudibleCharacters: 12 },
+  });
+  assert.deepEqual(partialController.ingest({ text: "OK", atMs: 0 }), [
+    { type: "wait", reason: "below-minimum" },
+  ]);
+});
+
+test("uses a rolling outstanding cap", () => {
   const controller = new AdaptivePacingController({
     policy: {
       ...NATURAL_SYNC_PACING_POLICY,
@@ -370,17 +388,6 @@ test("uses a rolling outstanding cap and reports a final sub-minimum tail as uns
     true,
   );
 
-  const shortTail = new AdaptivePacingController({
-    policy: { ...NATURAL_SYNC_PACING_POLICY, minimumAudibleCharacters: 12 },
-  });
-  assert.deepEqual(shortTail.ingest({ text: "太短。", final: true, atMs: 0 }), [
-    { type: "wait", reason: "final-below-minimum" },
-  ]);
-  assert.deepEqual(shortTail.cancel(), {
-    type: "canceled",
-    segments: 0,
-    characters: 3,
-  });
 });
 
 function expectDispatch(segment) {

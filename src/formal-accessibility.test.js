@@ -45,6 +45,22 @@ test("formal UI exposes every app state and destructive action through accessibl
   assert.match(renderer, /event\.key !== "Escape"/);
 });
 
+test("Restart immediately creates a fresh translation instead of returning to setup", async () => {
+  const renderer = await readFile(
+    new URL("./renderer-entry.js", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    renderer,
+    /elements\["restart-button"\]\.addEventListener\("click", startTranslation\)/,
+  );
+  assert.doesNotMatch(
+    renderer,
+    /elements\["restart-button"\][\s\S]{0,100}setAppState\("ready"\)/,
+  );
+});
+
 test("formal UI provides Traditional-Chinese actionable persistence and summary failures", async () => {
   const renderer = await readFile(
     new URL("./renderer-entry.js", import.meta.url),

@@ -23,6 +23,9 @@ const TRANSLATION_PROMPTS = Object.freeze({
     "You are a simultaneous interpreter.",
     "Continuously translate spoken Traditional Chinese used in Taiwan into natural professional English.",
     "Output only the English interpretation.",
+    "Translate questions as questions; never answer them.",
+    "Translate each completed utterance exactly once and never repeat text from an earlier utterance unless the speaker repeats it.",
+    "Immediately translate and speak complete short utterances such as Yes, No, OK, Thanks, 好, and 是.",
     "Speak every interpretation aloud through the audio output; never return text only.",
     "Do not wait for sentence completion; begin speaking after each stable short phrase while continuing to listen.",
     "Keep a rolling delay near one to two seconds and translate in short clauses without restarting spoken words.",
@@ -38,6 +41,9 @@ const TRANSLATION_PROMPTS = Object.freeze({
     "If the input is already Traditional Chinese, reproduce it faithfully without paraphrasing, omission, or commentary.",
     "For mixed-language speech, translate non-Chinese portions and preserve names, numbers, and technical terms.",
     "Always produce the Traditional Chinese output even when the source is already Chinese; never remain silent.",
+    "Translate questions as questions; never answer them.",
+    "Translate each completed utterance exactly once and never repeat text from an earlier utterance unless the speaker repeats it.",
+    "Immediately translate and speak complete short utterances such as Yes, No, OK, Thanks, 好, and 是.",
     "Speak every interpretation aloud through the audio output; never return text only.",
     "Do not wait for sentence completion; begin speaking after each stable short phrase while continuing to listen.",
     "Keep a rolling delay near one to two seconds and translate in short clauses without restarting spoken words.",
@@ -282,6 +288,9 @@ export class PhaseOneController {
           echoes: [],
           generation: 0,
           inFlight: new Map(),
+          itemModeThreads: new Set(),
+          items: new Map(),
+          pendingReplayItems: [],
           pacer: new AdaptivePacingController({
             policy: this.#pacingPolicy,
           }),
@@ -569,26 +578,27 @@ export class PhaseOneController {
     if (notification.method === "thread/realtime/sdp") {
       this.#publish({ type: "sdp", direction, sdp: notification.params.sdp });
     }
-    if (
-      notification.method === "thread/realtime/transcript/delta" ||
-      notification.method === "thread/realtime/transcript/done"
-    ) {
+    const transcript = this.#normalizeTranscriptNotification(
+      context,
+      notification,
+    );
+    if (transcript) {
       const pacing = this.#handleRxSpeechFallback(
         context,
         direction,
-        notification,
+        transcript,
       );
       if (!pacing.suppressed) {
         this.#publish({
           type: "transcript",
           direction,
-          role: notification.params.role,
-          text: notification.params.delta ?? notification.params.text,
-          final: notification.method === "thread/realtime/transcript/done",
+          role: transcript.params.role,
+          text: transcript.params.delta ?? transcript.params.text,
+          final: transcript.method === "thread/realtime/transcript/done",
           deferred:
-            direction === "rx" && notification.params.role === "assistant",
+            direction === "rx" && transcript.params.role === "assistant",
         });
-        this.#recordTranscript(context, direction, notification, atMs);
+        this.#recordTranscript(context, direction, transcript, atMs);
       }
     }
     if (
@@ -608,6 +618,72 @@ export class PhaseOneController {
           this.#publish({ type: "error", message: safeMessage(error) }),
       );
     }
+  }
+
+  #normalizeTranscriptNotification(context, notification) {
+    const state = context.speechFallback;
+    const threadId = notification.params?.threadId;
+    if (
+      notification.method === "thread/realtime/transcript/delta" ||
+      notification.method === "thread/realtime/transcript/done"
+    ) {
+      return state.itemModeThreads.has(threadId) ? undefined : notification;
+    }
+    if (notification.method === "thread/realtime/item/started") {
+      const item = notification.params?.item;
+      if (item?.type !== "transcriptSegment" || !item.id || !item.role) {
+        return undefined;
+      }
+      state.itemModeThreads.add(threadId);
+      const expected =
+        context.threads.get(threadId) === "rx" && item.role === "assistant"
+          ? state.pendingReplayItems.shift()
+          : undefined;
+      state.items.set(item.id, {
+        expected,
+        replay: Boolean(expected),
+        role: item.role,
+      });
+      if (expected) expected.itemId = item.id;
+      return undefined;
+    }
+    if (notification.method === "thread/realtime/item/transcript/delta") {
+      const item = state.items.get(notification.params?.itemId);
+      if (!item || item.replay) return undefined;
+      return {
+        method: "thread/realtime/transcript/delta",
+        params: {
+          delta: notification.params.delta,
+          role: item.role,
+          threadId,
+        },
+      };
+    }
+    if (notification.method !== "thread/realtime/item/completed") {
+      return undefined;
+    }
+    const completed = notification.params?.item;
+    const item = state.items.get(completed?.id);
+    if (!item || completed?.type !== "transcriptSegment") return undefined;
+    state.items.delete(completed.id);
+    if (item.replay) {
+      item.expected.completed = true;
+      if (item.expected.accepted) {
+        state.echoes = state.echoes.filter(
+          (entry) => entry !== item.expected,
+        );
+        this.#rememberEcho(state, item.expected.text, Date.now());
+      }
+      return undefined;
+    }
+    return {
+      method: "thread/realtime/transcript/done",
+      params: {
+        role: item.role,
+        text: completed.text,
+        threadId,
+      },
+    };
   }
 
   #recordTranscript(context, direction, notification, atMs) {
@@ -870,6 +946,9 @@ export class PhaseOneController {
       text: decision.text,
     };
     state.echoes.push(expected);
+    if (state.itemModeThreads.has(threadId)) {
+      state.pendingReplayItems.push(expected);
+    }
     state.inFlight.set(expected, {
       characters: decision.characters,
       id: decision.id,
@@ -884,10 +963,16 @@ export class PhaseOneController {
 
     if (!this.#pacingIsCurrent(context, state, generation)) {
       state.echoes = state.echoes.filter((entry) => entry !== expected);
+      state.pendingReplayItems = state.pendingReplayItems.filter(
+        (entry) => entry !== expected,
+      );
       return;
     }
     if (failure) {
       state.echoes = state.echoes.filter((entry) => entry !== expected);
+      state.pendingReplayItems = state.pendingReplayItems.filter(
+        (entry) => entry !== expected,
+      );
       for (const held of expected.held) {
         this.#handleRxSpeechFallback(context, "rx", held, {
           skipEcho: true,
@@ -937,6 +1022,8 @@ export class PhaseOneController {
     state.generation += 1;
     state.accepting = false;
     state.echoes = [];
+    state.items.clear();
+    state.pendingReplayItems = [];
     state.inFlight.clear();
     const canceled = state.pacer.cancel();
     const unsent = {
