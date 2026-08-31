@@ -164,6 +164,11 @@ export async function verifyPythonImportTree(
     }
   }
   await walk(root);
+  entries.sort((left, right) => {
+    if (left.path < right.path) return -1;
+    if (left.path > right.path) return 1;
+    return 0;
+  });
   const digest = packageRecordTreeDigest(entries);
   if (entries.length !== expected.fileCount || digest !== expected.sha256) {
     fail("PYTHON_IMPORT_TRUST");
