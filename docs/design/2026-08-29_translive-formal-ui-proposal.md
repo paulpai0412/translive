@@ -724,7 +724,7 @@ errorMs   = backlogMs - targetBacklogMs
 - Stopped 畫面的「再次開始」直接執行完整 `startTranslation()`，重建 GPT-Live thread、WebRTC peer／SDP、mode-scoped Windows route 與 route health；不得只返回 Ready，也不得要求再次執行 Teams／Zoom 快速設定。
 - 每次 preflight 必須先套用 mode-scoped Windows route，再由 renderer 執行 VoiceMeeter B1／B2 tone probe；這會重新啟用 Chromium 對虛擬 Communications endpoint 的輸出。若 preflight、probe 或 startup 失敗，main-side cancel 必須還原該 route。
 - 每次 Restart 使用新 renderer peer 與 main-side runtime；Start／Stop／Restart 仍遵守既有 cancellation、checkpoint 與 restore 順序。
-- TX／RX init prompt 明確要求只忠實翻譯：問句仍翻成問句，禁止回答、解釋、建議、承接對話、補 filler、重用前句或無來源重複。
+- TX／RX init prompt 明確要求只忠實翻譯：問句仍翻成問句，禁止回答、解釋、建議、承接對話、補 filler、重用前句或無來源重複；第一個可理解的穩定短語形成後立即開始朗讀，不等待完整句、長停頓或 speaker turn 結束。
 - 完整 final 短句（如 `Yes`、`No`、`OK`、`Thanks`、`好`、`是`）立即 flush；未 final 的短 fragment 仍等待，避免 partial transcript 抖動。
 - TDD seams：renderer Restart click contract、`PhaseOneController.start()` prompt／fresh-runtime contract、`AdaptivePacingController.ingest()` final-short contract，以及 Windows 同 process Start → Stop → Restart 五輪 E2E。
 

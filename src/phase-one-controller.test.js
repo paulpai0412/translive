@@ -222,6 +222,7 @@ test("GPT-Live initialization permits translation only and sends complete short 
     assert.match(prompt, /Translate questions as questions; never answer them\./);
     assert.match(prompt, /Translate each completed utterance exactly once/);
     assert.match(prompt, /Immediately translate and speak complete short utterances/);
+    assert.match(prompt, /Start speaking the first translation as soon as the first stable phrase is understandable/);
   }
   await controller.stop("user-stop");
 });
