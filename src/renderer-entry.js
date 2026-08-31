@@ -1,4 +1,4 @@
-import { attachAudioToSink } from "./audio-output.js";
+import { DirectionalAudioOutput } from "./directional-audio-output.js";
 import {
   emptyDevicePreferences,
   isVirtualDevice,
@@ -925,12 +925,12 @@ async function createRealtimePeer({ direction, source, sink }) {
   let stream;
   let peerConnection;
   let eventChannel;
-  let audio;
   let stopInputProbe = () => {};
   let statsTimer;
   let cleaned = false;
+  const audioOutput = new DirectionalAudioOutput({ sinkId: sink.id });
 
-  const cleanup = () => {
+  const cleanup = async () => {
     if (cleaned) return;
     cleaned = true;
     clearInterval(statsTimer);
@@ -942,14 +942,11 @@ async function createRealtimePeer({ direction, source, sink }) {
     try {
       peerConnection?.close();
     } catch {}
-    if (audio) {
-      audio.pause();
-      audio.srcObject = null;
-      audio.remove();
-    }
+    await audioOutput.close();
   };
 
   try {
+    await audioOutput.prepare();
     stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         deviceId: { exact: source.id },
@@ -964,11 +961,6 @@ async function createRealtimePeer({ direction, source, sink }) {
       peerConnection.addTrack(track, stream);
     }
     eventChannel = peerConnection.createDataChannel("oai-events");
-    audio = document.createElement("audio");
-    audio.autoplay = false;
-    audio.playsInline = true;
-    audio.hidden = true;
-    document.body.append(audio);
 
     peerConnection.addEventListener("connectionstatechange", () => {
       if (["failed", "disconnected"].includes(peerConnection.connectionState)) {
@@ -987,16 +979,8 @@ async function createRealtimePeer({ direction, source, sink }) {
           () => recordMetric(direction, "output-audio", {}),
           { once: true },
         );
-        audio.addEventListener(
-          "playing",
-          () => recordMetric(direction, "output-audio", {}),
-          { once: true },
-        );
-        await attachAudioToSink({
-          audio,
-          sinkId: sink.id,
-          stream: remoteStream,
-        });
+        await audioOutput.attach(remoteStream);
+        recordMetric(direction, "output-audio", {});
       } catch (error) {
         window.translive.rendererError(
           direction,
@@ -1029,7 +1013,7 @@ async function createRealtimePeer({ direction, source, sink }) {
             track.enabled = !muted;
           }
         } else {
-          audio.muted = muted;
+          audioOutput.setMuted(muted);
         }
       },
       async applyAnswer(sdp) {
@@ -1038,7 +1022,7 @@ async function createRealtimePeer({ direction, source, sink }) {
       stop: cleanup,
     };
   } catch (error) {
-    cleanup();
+    await cleanup();
     throw error;
   }
 }

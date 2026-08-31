@@ -16,6 +16,7 @@ const PACKAGED_PATHS = new Set([
   "src/audio-output.js",
   "src/codex-app-server.js",
   "src/device-recommendations.js",
+  "src/directional-audio-output.js",
   "src/codex-launch.js",
   "src/codex-runtime.js",
   "src/diagnostics-service.js",

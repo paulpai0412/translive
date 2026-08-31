@@ -61,6 +61,21 @@ test("Restart immediately creates a fresh translation instead of returning to se
   );
 });
 
+test("WebRTC playout uses direction-owned AudioContext sinks instead of HTML audio", async () => {
+  const renderer = await readFile(
+    new URL("./renderer-entry.js", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(renderer, /import \{ DirectionalAudioOutput \}/);
+  assert.match(renderer, /new DirectionalAudioOutput\(\{/);
+  assert.match(renderer, /await audioOutput\.prepare\(\)/);
+  assert.match(renderer, /await audioOutput\.attach\(remoteStream\)/);
+  assert.match(renderer, /audioOutput\.setMuted\(muted\)/);
+  assert.match(renderer, /await audioOutput\.close\(\)/);
+  assert.doesNotMatch(renderer, /audio = document\.createElement\("audio"\)/);
+});
+
 test("formal UI provides Traditional-Chinese actionable persistence and summary failures", async () => {
   const renderer = await readFile(
     new URL("./renderer-entry.js", import.meta.url),

@@ -727,3 +727,46 @@ errorMs   = backlogMs - targetBacklogMs
 - TX／RX init prompt 明確要求只忠實翻譯：問句仍翻成問句，禁止回答、解釋、建議、承接對話、補 filler、重用前句或無來源重複。
 - 完整 final 短句（如 `Yes`、`No`、`OK`、`Thanks`、`好`、`是`）立即 flush；未 final 的短 fragment 仍等待，避免 partial transcript 抖動。
 - TDD seams：renderer Restart click contract、`PhaseOneController.start()` prompt／fresh-runtime contract、`AdaptivePacingController.ingest()` final-short contract，以及 Windows 同 process Start → Stop → Restart 五輪 E2E。
+
+## 23. 2026-08-31 修訂：WebRTC playout 的 direction-aware WebAudio sink
+
+### 23.1 已否定假設
+
+曾嘗試把 TX／RX 拆成兩個 Codex app-server clients（commit `942d727`），但真實 sender-level Windows 測試仍重現 RX→B2，因此該變更回滾。共用 client 不是已證實根因，不能為 speculative isolation 承擔雙 process 的啟動、記憶體與清理成本。
+
+### 23.2 已證實故障邊界
+
+在正式 package 中直接替換真實 `RTCRtpSender`：
+
+- TX 中文輸入可產生英文，B2 max RMS 0.0907；
+- TX input muted、只注入 RX 英文時，B2 仍有 max RMS 0.0776；
+- mute TX output element 不影響 RX→B2；mute RX output element 後 B2 變為 0；
+- runtime `HTMLMediaElement.sinkId` 仍宣稱 RX=Poly、TX=AUX。
+
+故 `<audio>.setSinkId()` 的 property success 不能作為 WebRTC remote playout 的實際 routing 證明。正式路徑不得再由 HTML audio element 直接播放 remote stream。
+
+### 23.3 正式輸出架構
+
+每個 direction 建立一個 `DirectionalAudioOutput`：
+
+```text
+remote MediaStream
+→ MediaStreamAudioSourceNode
+→ GainNode
+→ direction-owned AudioContext.destination
+```
+
+- 建立順序固定為 `new AudioContext()` → `await context.setSinkId(expectedId)` → 驗證 `context.sinkId` → connect remote stream；
+- TX context 固定 AUX，RX context 固定使用者確認的 Poly 耳機；不得使用 default／communications pseudo-device；
+- TX／RX 各自擁有 context、source node、gain node；不共用 graph；
+- mute 透過 direction gain（0／1），不使用 `<audio>.muted`；
+- Stop／Cancel／failed start 依序 disconnect source、停止 remote tracks、close context，且 cleanup idempotent；
+- 若 `AudioContext.setSinkId` 缺失、拒絕或實際 gate 不符，fail closed，不回退到 HTML audio/default sink。
+
+### 23.4 TDD 與 Windows ship gate
+
+- 公開 seam：`DirectionalAudioOutput.attach(stream)`、`setMuted()`、`close()`，以 fake AudioContext 驗證 sink-before-connect、direction isolation 與 cleanup；
+- renderer integration 不再建立正式 playout `<audio>`；remote track 只交給 direction-owned output；
+- 真實 sender injection：TX→B2 必須高於 signal threshold；TX muted 的 RX injection→B2 必須維持 noise floor，且本機 Poly 必須可聽；
+- Restart 五輪後重跑相同 gate，避免 stale device ID／context；
+- RX 舊句重複是獨立未結案問題，不得因 audio routing 修復而宣告完成。
