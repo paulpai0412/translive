@@ -1742,7 +1742,7 @@ export const RVC_RUNTIME_TRUST = Object.freeze({
     "importTree": {
       "root": ".venv/Lib/site-packages",
       "fileCount": 28476,
-      "sha256": "6356a79e0a5f1d5c4ccdc13c2f21cc9241f201c8490fb5a084703599955dfee1"
+      "sha256": "b6de1ac297afac12c47b355cd551d74cc500135e6267356aff1b15e544507f7b"
     }
   }
 });
