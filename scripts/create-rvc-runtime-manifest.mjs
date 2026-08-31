@@ -11,11 +11,16 @@ if (
   typeof localAppData !== "string" ||
   !/^[A-Za-z]:[\\/]/.test(localAppData)
 ) {
-  throw new Error("This manifest must be generated under a drive-local Windows LOCALAPPDATA");
+  throw new Error(
+    "This manifest must be generated under a drive-local Windows LOCALAPPDATA",
+  );
 }
 
 const runtimeRoot = join(localAppData, "TransLive", "rvc-runtime");
-await assertPrivateLocalDirectory({ directory: runtimeRoot, platform: "win32" });
+await assertPrivateLocalDirectory({
+  directory: runtimeRoot,
+  platform: "win32",
+});
 
 function isReparsePoint(info) {
   return (
@@ -27,19 +32,28 @@ function isReparsePoint(info) {
 
 async function digest(path) {
   const { createHash } = await import("node:crypto");
-  return createHash("sha256").update(await readFile(path)).digest("hex");
+  return createHash("sha256")
+    .update(await readFile(path))
+    .digest("hex");
 }
 
 async function assertTrustedFile(entry) {
   const path = win32.join(runtimeRoot, entry.path);
   const info = await lstat(path);
-  if (!info.isFile() || isReparsePoint(info) || (await digest(path)) !== entry.sha256) {
+  if (
+    !info.isFile() ||
+    isReparsePoint(info) ||
+    (await digest(path)) !== entry.sha256
+  ) {
     throw new Error("A fixed runtime receipt file is missing or modified");
   }
 }
 
 const packagedRunner = join(import.meta.dirname, "rvc-training-runtime.py");
-const runnerDestination = win32.join(runtimeRoot, RVC_RUNTIME_TRUST.runner.path);
+const runnerDestination = win32.join(
+  runtimeRoot,
+  RVC_RUNTIME_TRUST.runner.path,
+);
 await mkdir(win32.dirname(runnerDestination), { recursive: true, mode: 0o700 });
 await copyFile(packagedRunner, runnerDestination);
 

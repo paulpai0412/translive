@@ -38,6 +38,11 @@ import { SummaryController } from "./summary-controller.js";
 import { TranslationLifecycle } from "./translation-lifecycle.js";
 import { TrayController } from "./tray-controller.js";
 import { TrayPreferences } from "./tray-preferences.js";
+import {
+  createVoiceMeeterRoutingStore,
+  VoiceMeeterRoutingAdapter,
+  VoiceMeeterRoutingController,
+} from "./voicemeeter-routing.js";
 import { VoiceConversionCapabilityProbe } from "./voice-conversion-capability.js";
 import { VoiceConversionController } from "./voice-conversion-controller.js";
 import { VoiceProfileStore } from "./voice-profile-store.js";
@@ -82,6 +87,9 @@ let globalAudioRoutingStarted = false;
 let globalAudioStartupPromise;
 let globalAudioState = { state: "unknown" };
 let voiceConversionController;
+let voiceMeeterRoutingController;
+let voiceMeeterRoutingStartupPromise;
+let voiceMeeterRoutingState = { state: "checking" };
 let voiceProfileStore;
 let voiceTrainingController;
 let voiceTrainingRoot;
@@ -130,6 +138,16 @@ async function restoreMeetingDevices() {
     });
   }
   return result;
+}
+
+async function requireVoiceMeeterRouting() {
+  const status = await voiceMeeterRoutingStartupPromise?.catch(() => ({
+    state: "unavailable",
+  }));
+  if (status?.state !== "active") {
+    throw new Error("VOICEMEETER_ROUTING_NOT_READY");
+  }
+  return status;
 }
 
 function sendRendererControl(event) {
@@ -323,6 +341,10 @@ function registerIpc() {
     accountController.cancelLogin(),
   );
   ipcMain.handle("translive:audio-defaults-status", () => globalAudioState);
+  ipcMain.handle(
+    "translive:voicemeeter-routing-status",
+    () => voiceMeeterRoutingState,
+  );
   ipcMain.handle("translive:voice-conversion-status", (event) => {
     requireMainRenderer(event);
     return voiceConversionController.status();
@@ -377,29 +399,41 @@ function registerIpc() {
     requireMainRenderer(event);
     return voiceTrainingController.status();
   });
-  ipcMain.handle("translive:voice-training-start-recording", async (event, request) => {
-    requireMainRenderer(event);
-    return voiceTrainingController.startRecording({
-      confirmedOwnAuthorizedVoice:
-        request?.confirmedOwnAuthorizedVoice === true,
-      displayName: request?.displayName,
-      microphoneLabel: request?.microphoneLabel,
-    });
-  });
-  ipcMain.handle("translive:voice-training-pause-recording", async (event, id) => {
-    requireMainRenderer(event);
-    return voiceTrainingController.pauseRecording(id);
-  });
-  ipcMain.handle("translive:voice-training-resume-recording", async (event, id) => {
-    requireMainRenderer(event);
-    return voiceTrainingController.resumeRecording(id);
-  });
-  ipcMain.handle("translive:voice-training-stop-recording", async (event, request) => {
-    requireMainRenderer(event);
-    return voiceTrainingController.stopRecording(
-      validateVoiceTrainingStopRequest(request),
-    );
-  });
+  ipcMain.handle(
+    "translive:voice-training-start-recording",
+    async (event, request) => {
+      requireMainRenderer(event);
+      return voiceTrainingController.startRecording({
+        confirmedOwnAuthorizedVoice:
+          request?.confirmedOwnAuthorizedVoice === true,
+        displayName: request?.displayName,
+        microphoneLabel: request?.microphoneLabel,
+      });
+    },
+  );
+  ipcMain.handle(
+    "translive:voice-training-pause-recording",
+    async (event, id) => {
+      requireMainRenderer(event);
+      return voiceTrainingController.pauseRecording(id);
+    },
+  );
+  ipcMain.handle(
+    "translive:voice-training-resume-recording",
+    async (event, id) => {
+      requireMainRenderer(event);
+      return voiceTrainingController.resumeRecording(id);
+    },
+  );
+  ipcMain.handle(
+    "translive:voice-training-stop-recording",
+    async (event, request) => {
+      requireMainRenderer(event);
+      return voiceTrainingController.stopRecording(
+        validateVoiceTrainingStopRequest(request),
+      );
+    },
+  );
   ipcMain.handle("translive:voice-training-start", async (event, request) => {
     requireMainRenderer(event);
     await voiceTrainingController.startTraining({
@@ -432,10 +466,12 @@ function registerIpc() {
   ipcMain.on("translive:mini-caption-return", () =>
     miniCaptionWindowController?.hideAndFocusMain(),
   );
-  ipcMain.handle("translive:preflight", (_event, config) =>
-    controller.preflight(config),
-  );
+  ipcMain.handle("translive:preflight", async (_event, config) => {
+    await requireVoiceMeeterRouting();
+    return controller.preflight(config);
+  });
   ipcMain.handle("translive:start", async (_event, config) => {
+    await requireVoiceMeeterRouting();
     activeMode = config.mode ?? "meeting";
     const result = await controller.start(config);
     trayState = result.aggregate;
@@ -677,6 +713,28 @@ if (!isPrimaryInstance) {
       : Promise.resolve({ state: "legacy-recovery-needed" });
     const globalAudioStartup = await globalAudioStartupPromise;
     globalAudioState = globalAudioStartup;
+    voiceMeeterRoutingController = new VoiceMeeterRoutingController({
+      adapter: new VoiceMeeterRoutingAdapter({
+        scriptPath: join(
+          app.getAppPath(),
+          "scripts",
+          "windows-voicemeeter-routing.ps1",
+        ),
+      }),
+      store: createVoiceMeeterRoutingStore({
+        directory: app.getPath("userData"),
+      }),
+    });
+    voiceMeeterRoutingStartupPromise = voiceMeeterRoutingController
+      .start()
+      .then((status) => {
+        voiceMeeterRoutingState = status;
+        return status;
+      })
+      .catch(() => {
+        voiceMeeterRoutingState = { state: "unavailable" };
+        return voiceMeeterRoutingState;
+      });
     const voiceUserDataRoot = app.getPath("userData");
     const voiceProfileRoot = join(voiceUserDataRoot, "voice-profiles");
     voiceTrainingRoot = join(voiceUserDataRoot, "voice-training");
@@ -782,6 +840,10 @@ if (!isPrimaryInstance) {
     });
     registerIpc();
     publish({ type: "global-audio", state: globalAudioStartup.state });
+    publish({ type: "voicemeeter-routing", state: voiceMeeterRoutingState.state });
+    void voiceMeeterRoutingStartupPromise.then((status) =>
+      publish({ type: "voicemeeter-routing", state: status.state }),
+    );
     // Optional RVC discovery/training setup must never delay raw GPT audio.
     void voiceStorageReady
       .then((ready) => {
@@ -795,9 +857,8 @@ if (!isPrimaryInstance) {
       })
       .catch(async () => {
         voiceTrainingRuntime = undefined;
-        const trainingStatus = await voiceTrainingController.configureRuntime(
-          undefined,
-        );
+        const trainingStatus =
+          await voiceTrainingController.configureRuntime(undefined);
         publish({
           type: "voice-conversion",
           status: {
@@ -840,6 +901,12 @@ if (!isPrimaryInstance) {
       voiceTrainingController?.dispose(),
     ])
       .then(async () => {
+        await voiceMeeterRoutingStartupPromise?.catch(() => {});
+        const voiceMeeterRestore =
+          await voiceMeeterRoutingController?.restore();
+        if (voiceMeeterRestore?.reason) {
+          voiceMeeterRoutingState = { state: voiceMeeterRestore.reason };
+        }
         await globalAudioStartupPromise?.catch(() => {});
         if (!globalAudioRoutingStarted) return undefined;
         return windowsAudioDefaultsController?.restore();

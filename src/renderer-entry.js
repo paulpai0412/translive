@@ -93,6 +93,7 @@ const elements = Object.fromEntries(
     "health-devices",
     "health-runtime",
     "global-audio-status",
+    "voicemeeter-routing-status",
     "live-mode-label",
     "live-route-summary",
     "live-save-status",
@@ -1268,6 +1269,33 @@ async function initializeGlobalAudioDefaults() {
     applyGlobalAudioStatus(await window.translive.audioDefaultsStatus());
   } catch {
     applyGlobalAudioStatus({ state: "snapshot-failed" });
+  }
+}
+
+function applyVoiceMeeterRoutingStatus({ state } = {}) {
+  elements["voicemeeter-routing-status"].textContent =
+    {
+      checking: "正在自動設定 VoiceMeeter 內部路由…",
+      active:
+        "VoiceMeeter 已自動設定：VAIO → B1、AUX → B2；完全結束 TransLive 後會還原。",
+      restored: "VoiceMeeter 內部路由已還原。",
+      unavailable:
+        "無法自動設定 VoiceMeeter。請確認 VoiceMeeter Banana 已安裝後重新開啟 TransLive。",
+      "restore-failed":
+        "前次 VoiceMeeter 路由無法還原；本次不會開始翻譯，請先檢查 VoiceMeeter。",
+      "recovery-needed":
+        "VoiceMeeter 路由已由其他程式變更；為避免覆蓋，本次不會自動設定。",
+      unsupported: "VoiceMeeter 自動路由僅支援 Windows。",
+    }[state] ?? "VoiceMeeter 內部路由狀態尚未確認。";
+}
+
+async function initializeVoiceMeeterRouting() {
+  try {
+    applyVoiceMeeterRoutingStatus(
+      await window.translive.voiceMeeterRoutingStatus(),
+    );
+  } catch {
+    applyVoiceMeeterRoutingStatus({ state: "unavailable" });
   }
 }
 
@@ -2626,6 +2654,10 @@ window.translive.onEvent(async (event) => {
     applyGlobalAudioStatus(event);
     return;
   }
+  if (event.type === "voicemeeter-routing") {
+    applyVoiceMeeterRoutingStatus(event);
+    return;
+  }
   if (event.type === "voice-conversion") {
     renderVoiceConversion(event.status);
     return;
@@ -2709,6 +2741,7 @@ initializeTray();
 initializeConsent();
 initializeRetention();
 initializeGlobalAudioDefaults();
+initializeVoiceMeeterRouting();
 initializeVoiceConversion();
 initializeVoiceTraining();
 initializeAccount();

@@ -43,10 +43,14 @@ export async function smokePackage({ appDirectory, platform }) {
     "voice-training-runtime.js",
     "voice-training-session-controller.js",
     "voice-training-store.js",
+    "voicemeeter-routing.js",
   ]) {
     await stat(join(appDirectory, "src", asset));
   }
   await stat(join(appDirectory, "scripts", "windows-meeting-devices.ps1"));
+  await stat(
+    join(appDirectory, "scripts", "windows-voicemeeter-routing.ps1"),
+  );
   for (const asset of [
     "create-rvc-runtime-manifest.mjs",
     "ensure-rvc-private-root.ps1",

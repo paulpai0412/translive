@@ -10,7 +10,10 @@ import {
 } from "./private-local-storage.js";
 
 test("accepts only drive-local Windows roots and rejects UNC or device paths", () => {
-  assert.equal(isDriveLocalWindowsPath("C:\\Users\\Ada\\AppData\\Local\\TransLive"), true);
+  assert.equal(
+    isDriveLocalWindowsPath("C:\\Users\\Ada\\AppData\\Local\\TransLive"),
+    true,
+  );
   for (const path of [
     "\\\\server\\share\\TransLive",
     "\\\\?\\C:\\Temp\\TransLive",
@@ -43,15 +46,22 @@ test("refuses a reparse-point storage root before handling sensitive artifacts",
   try {
     await symlink(target, link, "dir");
   } catch (error) {
-    if (error?.code === "EPERM") return t.skip("Windows symlink privilege unavailable");
+    if (error?.code === "EPERM")
+      return t.skip("Windows symlink privilege unavailable");
     throw error;
   }
 
   await assert.rejects(
-    assertPrivateLocalDirectory({ directory: link, platform: process.platform }),
+    assertPrivateLocalDirectory({
+      directory: link,
+      platform: process.platform,
+    }),
     /TRANSLIVE_PRIVATE_STORAGE_REPARSE/,
   );
   await assert.doesNotReject(
-    assertPrivateLocalDirectory({ directory: target, platform: process.platform }),
+    assertPrivateLocalDirectory({
+      directory: target,
+      platform: process.platform,
+    }),
   );
 });

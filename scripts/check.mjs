@@ -68,6 +68,10 @@ const windowsMeetingScript = await readFile(
   "scripts/windows-meeting-devices.ps1",
   "utf8",
 );
+const voiceMeeterRoutingScript = await readFile(
+  "scripts/windows-voicemeeter-routing.ps1",
+  "utf8",
+);
 const voiceConversionProbeScript = await readFile(
   "scripts/probe-rvc-capability.ps1",
   "utf8",
@@ -91,6 +95,7 @@ for (const required of [
   'ipcMain.handle("translive:cancel-start"',
   'ipcMain.handle("translive:meeting-setup-apply"',
   '"translive:audio-defaults-status"',
+  '"translive:voicemeeter-routing-status"',
   'ipcMain.handle("translive:diagnostics-export"',
   'ipcMain.handle("translive:records-list"',
   'ipcMain.handle("translive:summary-session-start"',
@@ -111,9 +116,12 @@ for (const required of [
   "new TrayController",
   "new RendererControlBridge",
   "new TranslationLifecycle",
+  "new VoiceMeeterRoutingController",
+  "new VoiceMeeterRoutingAdapter",
   "resolveCodexLaunch",
   'ipcMain.on("translive:renderer-control-ack"',
   "windows-meeting-devices.ps1",
+  "windows-voicemeeter-routing.ps1",
 ]) {
   if (!main.includes(required)) {
     throw new Error(`main.js is missing account integration: ${required}`);
@@ -157,6 +165,20 @@ for (const required of [
   if (!windowsMeetingScript.includes(required)) {
     throw new Error(
       `windows-meeting-devices.ps1 is missing native endpoint resolution: ${required}`,
+    );
+  }
+}
+for (const required of [
+  'ValidateSet("snapshot", "apply", "restore")',
+  "VBVMR_GetParameterFloat",
+  "VBVMR_SetParameterFloat",
+  'Strip[3].B1',
+  'Strip[4].B2',
+  "ValuesBase64",
+]) {
+  if (!voiceMeeterRoutingScript.includes(required)) {
+    throw new Error(
+      `windows-voicemeeter-routing.ps1 is missing ${required}`,
     );
   }
 }

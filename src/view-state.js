@@ -24,6 +24,7 @@ export function diagnosticEventLabel(type) {
       account: "帳戶狀態更新",
       blocked: "連線受阻",
       "global-audio": "Windows 系統音訊設定",
+      "voicemeeter-routing": "VoiceMeeter 內部路由",
       "meeting-setup": "會議裝置設定",
       pacing: "翻譯節奏調整",
       record: "紀錄已保存",

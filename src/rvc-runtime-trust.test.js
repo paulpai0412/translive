@@ -25,8 +25,14 @@ test("anchors the local runtime receipt to packaged runner bytes and a complete 
   );
   assert.match(RVC_RUNTIME_TRUST.source.treeSha256, /^[a-f0-9]{64}$/);
   assert.equal(RVC_RUNTIME_TRUST.pythonEnvironment.records.length >= 20, true);
-  assert.match(RVC_RUNTIME_TRUST.pythonEnvironment.treeSha256, /^[a-f0-9]{64}$/);
-  assert.equal(RVC_RUNTIME_TRUST.pythonEnvironment.importTree.fileCount, 28_476);
+  assert.match(
+    RVC_RUNTIME_TRUST.pythonEnvironment.treeSha256,
+    /^[a-f0-9]{64}$/,
+  );
+  assert.equal(
+    RVC_RUNTIME_TRUST.pythonEnvironment.importTree.fileCount,
+    28_476,
+  );
   assert.match(
     RVC_RUNTIME_TRUST.pythonEnvironment.importTree.sha256,
     /^[a-f0-9]{64}$/,

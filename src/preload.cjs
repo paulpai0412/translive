@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld("translive", {
     ipcRenderer.invoke("translive:account-login-cancel"),
   audioDefaultsStatus: () =>
     ipcRenderer.invoke("translive:audio-defaults-status"),
+  voiceMeeterRoutingStatus: () =>
+    ipcRenderer.invoke("translive:voicemeeter-routing-status"),
   voiceConversionStatus: () =>
     ipcRenderer.invoke("translive:voice-conversion-status"),
   voiceConversionSetEnabled: (request) =>

@@ -51,6 +51,7 @@ async function writeStagedWindowsApp(appDirectory) {
     writeFile(join(appDirectory, "src", "voice-training-runtime.js"), "export {};\n"),
     writeFile(join(appDirectory, "src", "voice-training-session-controller.js"), "export {};\n"),
     writeFile(join(appDirectory, "src", "voice-training-store.js"), "export {};\n"),
+    writeFile(join(appDirectory, "src", "voicemeeter-routing.js"), "export {};\n"),
     writeFile(join(appDirectory, "scripts", "create-rvc-runtime-manifest.mjs"), ""),
     writeFile(join(appDirectory, "scripts", "ensure-rvc-private-root.ps1"), ""),
     writeFile(join(appDirectory, "scripts", "probe-rvc-capability.ps1"), ""),
@@ -58,6 +59,7 @@ async function writeStagedWindowsApp(appDirectory) {
     writeFile(join(appDirectory, "scripts", "rvc-training-runtime.py"), ""),
     writeFile(join(appDirectory, "scripts", "verify-rvc-python.ps1"), ""),
     writeFile(join(appDirectory, "scripts", "windows-meeting-devices.ps1"), ""),
+    writeFile(join(appDirectory, "scripts", "windows-voicemeeter-routing.ps1"), ""),
     writeFile(
       join(appDirectory, "assets", "translive-brand", "translive-mark.svg"),
       "<svg/>\n",

@@ -90,9 +90,7 @@ function sourceFiles(value) {
 
 function packageRecordTreeDigest(records) {
   return createHash("sha256")
-    .update(
-      records.map((entry) => `${entry.path}\0${entry.sha256}\n`).join(""),
-    )
+    .update(records.map((entry) => `${entry.path}\0${entry.sha256}\n`).join(""))
     .digest("hex");
 }
 
@@ -141,12 +139,20 @@ function includeImportTreeFile(relativePath) {
 export async function verifyPythonImportTree(
   runtimeRoot,
   expected,
-  { lstat = defaultLstat, readFile = defaultReadFile, readdir = defaultReaddir } = {},
+  {
+    lstat = defaultLstat,
+    readFile = defaultReadFile,
+    readdir = defaultReaddir,
+  } = {},
 ) {
   if (!expected) fail("PYTHON_IMPORT_TRUST");
   const api = pathApi(runtimeRoot);
   const root = api.join(runtimeRoot, expected.root);
-  await assertNoReparsePath(root, { directory: true, lstat, root: runtimeRoot });
+  await assertNoReparsePath(root, {
+    directory: true,
+    lstat,
+    root: runtimeRoot,
+  });
   const entries = [];
   async function walk(directory, prefix = "") {
     const children = await readdir(directory, { withFileTypes: true });
@@ -159,7 +165,10 @@ export async function verifyPythonImportTree(
       if (child.isDirectory()) {
         await walk(absolute, relative);
       } else if (child.isFile() && includeImportTreeFile(relative)) {
-        entries.push({ path: relative, sha256: await hashFile(absolute, readFile) });
+        entries.push({
+          path: relative,
+          sha256: await hashFile(absolute, readFile),
+        });
       }
     }
   }
@@ -181,7 +190,8 @@ function sameEntries(left, right) {
     left.length === right.length &&
     left.every(
       (entry, index) =>
-        entry.path === right[index].path && entry.sha256 === right[index].sha256,
+        entry.path === right[index].path &&
+        entry.sha256 === right[index].sha256,
     )
   );
 }
@@ -199,7 +209,11 @@ function inside(root, value) {
   const resolvedRoot = api.resolve(root);
   const resolved = api.resolve(value);
   const relative = api.relative(resolvedRoot, resolved);
-  if (relative === "" || relative.startsWith("..") || api.isAbsolute(relative)) {
+  if (
+    relative === "" ||
+    relative.startsWith("..") ||
+    api.isAbsolute(relative)
+  ) {
     fail("PATH");
   }
   return resolved;
@@ -271,11 +285,10 @@ function assertDriveLocalRoot(value, platform) {
   }
 }
 
-async function assertNoReparsePath(path, {
-  directory,
-  lstat = defaultLstat,
-  root,
-} = {}) {
+async function assertNoReparsePath(
+  path,
+  { directory, lstat = defaultLstat, root } = {},
+) {
   const api = pathApi(path);
   const absolute = api.resolve(path);
   const start = root ? api.resolve(root) : api.parse(absolute).root;
@@ -299,7 +312,10 @@ async function assertNoReparsePath(path, {
   } catch {
     fail("REPARSE");
   }
-  if (isReparsePoint(target) || (directory ? !target.isDirectory() : !target.isFile())) {
+  if (
+    isReparsePoint(target) ||
+    (directory ? !target.isDirectory() : !target.isFile())
+  ) {
     fail("REPARSE");
   }
   return absolute;
@@ -319,10 +335,16 @@ export function normalizeRvcRuntimeManifest(value, { runtimeRoot } = {}) {
     runtime.rvcCommit !== RVC_RUNTIME_CONTRACT.rvcCommit ||
     runtime.source?.hfRevision !== RVC_RUNTIME_CONTRACT.hfRevision ||
     runtime.assets?.hfRevision !== RVC_RUNTIME_CONTRACT.hfRevision ||
-    !versionStartsWith(runtime.python?.version, RVC_RUNTIME_CONTRACT.pythonVersion) ||
+    !versionStartsWith(
+      runtime.python?.version,
+      RVC_RUNTIME_CONTRACT.pythonVersion,
+    ) ||
     runtime.torchVersion !== RVC_RUNTIME_CONTRACT.torchVersion ||
     runtime.directmlVersion !== RVC_RUNTIME_CONTRACT.directmlVersion ||
-    !versionStartsWith(runtime.ffmpeg?.version, RVC_RUNTIME_CONTRACT.ffmpegVersion)
+    !versionStartsWith(
+      runtime.ffmpeg?.version,
+      RVC_RUNTIME_CONTRACT.ffmpegVersion,
+    )
   ) {
     fail("MANIFEST");
   }
@@ -381,11 +403,16 @@ function assertManifestMatchesTrust(manifest, trusted) {
     manifest.ffmpeg.version !== trusted.ffmpeg.version ||
     manifest.python.path !== trusted.python.path ||
     manifest.python.sha256 !== trusted.python.sha256 ||
-    manifest.pythonEnvironment?.sitePackages !== trusted.pythonEnvironment?.sitePackages ||
-    manifest.pythonEnvironment?.treeSha256 !== trusted.pythonEnvironment?.treeSha256 ||
-    manifest.pythonEnvironment?.importTree?.root !== trusted.pythonEnvironment?.importTree?.root ||
-    manifest.pythonEnvironment?.importTree?.fileCount !== trusted.pythonEnvironment?.importTree?.fileCount ||
-    manifest.pythonEnvironment?.importTree?.sha256 !== trusted.pythonEnvironment?.importTree?.sha256 ||
+    manifest.pythonEnvironment?.sitePackages !==
+      trusted.pythonEnvironment?.sitePackages ||
+    manifest.pythonEnvironment?.treeSha256 !==
+      trusted.pythonEnvironment?.treeSha256 ||
+    manifest.pythonEnvironment?.importTree?.root !==
+      trusted.pythonEnvironment?.importTree?.root ||
+    manifest.pythonEnvironment?.importTree?.fileCount !==
+      trusted.pythonEnvironment?.importTree?.fileCount ||
+    manifest.pythonEnvironment?.importTree?.sha256 !==
+      trusted.pythonEnvironment?.importTree?.sha256 ||
     !sameEntries(
       manifest.pythonEnvironment?.records ?? [],
       trusted.pythonEnvironment?.records ?? [],
@@ -405,7 +432,9 @@ function assertManifestMatchesTrust(manifest, trusted) {
 }
 
 async function hashFile(path, readFile = defaultReadFile) {
-  return createHash("sha256").update(await readFile(path)).digest("hex");
+  return createHash("sha256")
+    .update(await readFile(path))
+    .digest("hex");
 }
 
 /**
@@ -427,7 +456,10 @@ export async function loadRvcRuntimeManifest({
   assertDriveLocalRoot(runtimeRoot, platform);
   const api = pathApi(runtimeRoot);
   const expectedManifest = api.join(runtimeRoot, "runtime-manifest.json");
-  if (api.resolve(manifestPath ?? expectedManifest) !== api.resolve(expectedManifest)) {
+  if (
+    api.resolve(manifestPath ?? expectedManifest) !==
+    api.resolve(expectedManifest)
+  ) {
     fail("MANIFEST_PATH");
   }
   await assertNoReparsePath(runtimeRoot, {
@@ -748,23 +780,26 @@ export class VoiceTrainingRuntime {
           ],
         ),
       );
-      await runCommand(api.join(this.#runtimeRoot, this.#manifest.ffmpeg.path), [
-        "-nostdin",
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-y",
-        "-i",
-        input,
-        "-vn",
-        "-ac",
-        String(VOICE_TRAINING_POLICY.normalization.channels),
-        "-ar",
-        String(VOICE_TRAINING_POLICY.normalization.sampleRate),
-        "-c:a",
-        VOICE_TRAINING_POLICY.normalization.sampleFormat,
-        output,
-      ]);
+      await runCommand(
+        api.join(this.#runtimeRoot, this.#manifest.ffmpeg.path),
+        [
+          "-nostdin",
+          "-hide_banner",
+          "-loglevel",
+          "error",
+          "-y",
+          "-i",
+          input,
+          "-vn",
+          "-ac",
+          String(VOICE_TRAINING_POLICY.normalization.channels),
+          "-ar",
+          String(VOICE_TRAINING_POLICY.normalization.sampleRate),
+          "-c:a",
+          VOICE_TRAINING_POLICY.normalization.sampleFormat,
+          output,
+        ],
+      );
       return inspection;
     })();
     completed.catch(() => {});
@@ -836,7 +871,8 @@ export class VoiceTrainingRuntime {
               const update = JSON.parse(line);
               const progress = boundedProgress(update?.progress);
               const stage = boundedStage(update?.stage);
-              if (progress !== undefined && stage) onProgress({ progress, stage });
+              if (progress !== undefined && stage)
+                onProgress({ progress, stage });
             } catch {
               // Upstream output is deliberately ignored rather than logged.
             }
@@ -866,17 +902,38 @@ export class VoiceTrainingRuntime {
     const session = sessionId(requestedSessionId);
     const api = pathApi(this.#runtimeRoot);
     const fixed = [
-      { path: api.join(this.#runtimeRoot, "source", "logs", session), recursive: true },
       {
-        path: api.join(this.#runtimeRoot, "source", "assets", "weights", `${session}.pth`),
+        path: api.join(this.#runtimeRoot, "source", "logs", session),
+        recursive: true,
+      },
+      {
+        path: api.join(
+          this.#runtimeRoot,
+          "source",
+          "assets",
+          "weights",
+          `${session}.pth`,
+        ),
         recursive: false,
       },
       {
-        path: api.join(this.#runtimeRoot, "source", "assets", "indices", `${session}.index`),
+        path: api.join(
+          this.#runtimeRoot,
+          "source",
+          "assets",
+          "indices",
+          `${session}.index`,
+        ),
         recursive: false,
       },
       {
-        path: api.join(this.#runtimeRoot, "source", "assets", "indices", `${session}.npy`),
+        path: api.join(
+          this.#runtimeRoot,
+          "source",
+          "assets",
+          "indices",
+          `${session}.npy`,
+        ),
         recursive: false,
       },
     ];

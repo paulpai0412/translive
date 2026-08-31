@@ -98,10 +98,7 @@ test("provisions private ACLs for both voice data and the executable RVC runtime
 
   assert.match(source, /ensurePrivateVoiceStorage\(voiceProfileRoot\)/);
   assert.match(source, /ensurePrivateVoiceStorage\(voiceTrainingRoot\)/);
-  assert.match(
-    source,
-    /ensurePrivateVoiceStorage\(runtimeStorageRoot\)/,
-  );
+  assert.match(source, /ensurePrivateVoiceStorage\(runtimeStorageRoot\)/);
   assert.match(source, /results\.every\(Boolean\)/);
 });
 
@@ -152,6 +149,27 @@ test("app quit disposes local voice conversion sidecars before process exit", as
     source,
     /Promise\.allSettled\(\[[\s\S]{0,420}voiceConversionController\?\.dispose\(\)/,
   );
+});
+
+test("translation waits for automatic VoiceMeeter routing and exit restores it first", async () => {
+  const source = await mainSource();
+
+  assert.match(
+    source,
+    /translive:preflight"[\s\S]{0,180}await requireVoiceMeeterRouting\(\)/,
+  );
+  assert.match(
+    source,
+    /translive:start"[\s\S]{0,180}await requireVoiceMeeterRouting\(\)/,
+  );
+  const voiceMeeterRestore = source.indexOf(
+    "voiceMeeterRoutingController?.restore()",
+  );
+  const windowsRestore = source.indexOf(
+    "windowsAudioDefaultsController?.restore()",
+  );
+  assert.ok(voiceMeeterRestore >= 0);
+  assert.ok(windowsRestore > voiceMeeterRestore);
 });
 
 test("early quit awaits global-audio startup and uses optional cleanup before restore", async () => {

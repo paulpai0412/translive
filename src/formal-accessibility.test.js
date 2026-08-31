@@ -99,6 +99,21 @@ test("shows a safe global Windows audio-routing status", async () => {
   assert.doesNotMatch(renderer, /global-audio.*renderId/);
 });
 
+test("shows automatic VoiceMeeter internal routing without exposing bus snapshots", async () => {
+  const [html, preload, renderer] = await Promise.all([
+    readFile(new URL("./index.html", import.meta.url), "utf8"),
+    readFile(new URL("./preload.cjs", import.meta.url), "utf8"),
+    readFile(new URL("./renderer-entry.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(html, /id="voicemeeter-routing-status"[^>]*role="status"/);
+  assert.match(preload, /voiceMeeterRoutingStatus/);
+  assert.match(renderer, /voiceMeeterRoutingStatus\(\)/);
+  assert.match(renderer, /event\.type === "voicemeeter-routing"/);
+  assert.match(renderer, /VAIO → B1、AUX → B2/);
+  assert.doesNotMatch(renderer, /voicemeeter-routing.*Strip\[/);
+});
+
 test("renderer advances deferred RX target captions only when speech fallback dispatches", async () => {
   const renderer = await readFile(
     new URL("./renderer-entry.js", import.meta.url),

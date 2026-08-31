@@ -42,6 +42,7 @@ test("packages only production runtime files and excludes secrets, evidence, and
     "src/voice-training-runtime.js",
     "src/voice-training-session-controller.js",
     "src/voice-training-store.js",
+    "src/voicemeeter-routing.js",
     "src/windows-audio-defaults-controller.js",
     "src/windows-audio-defaults-store.js",
     "src/windows-meeting-device-adapter.js",
@@ -56,6 +57,7 @@ test("packages only production runtime files and excludes secrets, evidence, and
     "scripts/rvc-runtime-trust.json",
     "scripts/rvc-training-runtime.py",
     "scripts/verify-rvc-python.ps1",
+    "scripts/windows-voicemeeter-routing.ps1",
   ]) {
     assert.equal(packagedPathIsAllowed(path), true, path);
   }

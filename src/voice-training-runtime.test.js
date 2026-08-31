@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
@@ -26,7 +33,10 @@ function manifest(overrides = {}) {
     runtime: {
       assets: {
         files: [
-          { path: "source/assets/hubert_base/config.json", sha256: "f".repeat(64) },
+          {
+            path: "source/assets/hubert_base/config.json",
+            sha256: "f".repeat(64),
+          },
           { path: "source/assets/rmvpe/rmvpe.pt", sha256: "1".repeat(64) },
         ],
         hfRevision: RVC_RUNTIME_CONTRACT.hfRevision,
@@ -113,7 +123,10 @@ test("rejects unlisted Python startup hooks across the complete import tree", as
   };
 
   await assert.doesNotReject(verifyPythonImportTree(root, expected));
-  await writeFile(join(site, "sitecustomize.py"), "raise RuntimeError('injected')\n");
+  await writeFile(
+    join(site, "sitecustomize.py"),
+    "raise RuntimeError('injected')\n",
+  );
   await assert.rejects(
     verifyPythonImportTree(root, expected),
     /VOICE_TRAINING_RUNTIME_PYTHON_IMPORT_TRUST/,
@@ -139,9 +152,19 @@ test("pins a local RVC runtime manifest instead of accepting arbitrary paths or 
     },
   );
   for (const invalid of [
-    manifest({ runtime: { ...manifest().runtime, python: { ...manifest().runtime.python, path: "../python.exe" } } }),
+    manifest({
+      runtime: {
+        ...manifest().runtime,
+        python: { ...manifest().runtime.python, path: "../python.exe" },
+      },
+    }),
     manifest({ runtime: { ...manifest().runtime, torchVersion: "latest" } }),
-    manifest({ runtime: { ...manifest().runtime, source: { ...manifest().runtime.source, hfRevision: "main" } } }),
+    manifest({
+      runtime: {
+        ...manifest().runtime,
+        source: { ...manifest().runtime.source, hfRevision: "main" },
+      },
+    }),
   ]) {
     assert.throws(
       () => normalizeRvcRuntimeManifest(invalid, { runtimeRoot: ROOT }),
@@ -156,7 +179,9 @@ test("inspects actual local WebM Opus before fixed ffmpeg normalization without 
     commandRunner: (command, args, options) => {
       calls.push({ args, command, options });
       const isProbe = command.endsWith("ffprobe.exe");
-      const isAnalysis = args.includes("silencedetect=n=-50dB:d=0.1,volumedetect");
+      const isAnalysis = args.includes(
+        "silencedetect=n=-50dB:d=0.1,volumedetect",
+      );
       return {
         cancel() {},
         completed: Promise.resolve(
@@ -197,12 +222,18 @@ test("inspects actual local WebM Opus before fixed ffmpeg normalization without 
     sampleRate: 48_000,
     silenceRatio: 12 / 540,
   });
-  assert.deepEqual(calls.map((call) => call.command), [
-    `${ROOT}/tools/ffprobe.exe`,
-    `${ROOT}/tools/ffmpeg.exe`,
-    `${ROOT}/tools/ffmpeg.exe`,
-  ]);
-  assert.equal(calls.every((call) => call.options.shell === false), true);
+  assert.deepEqual(
+    calls.map((call) => call.command),
+    [
+      `${ROOT}/tools/ffprobe.exe`,
+      `${ROOT}/tools/ffmpeg.exe`,
+      `${ROOT}/tools/ffmpeg.exe`,
+    ],
+  );
+  assert.equal(
+    calls.every((call) => call.options.shell === false),
+    true,
+  );
 });
 
 test("parses only tagged filter statistics, never input metadata", async () => {
@@ -245,8 +276,10 @@ test("parses only tagged filter statistics, never input metadata", async () => {
     },
   });
 
-  const inspection = await runtime.normalize({ inputPath: INPUT, outputPath: WAV })
-    .completed;
+  const inspection = await runtime.normalize({
+    inputPath: INPUT,
+    outputPath: WAV,
+  }).completed;
   assert.equal(inspection.rmsDb, -18);
   assert.equal(inspection.silenceRatio, 12 / 540);
 });
@@ -257,7 +290,8 @@ test("normalizes local recording through fixed ffmpeg arguments without a shell"
   });
 
   assert.throws(
-    () => runtime.normalize({ inputPath: "/tmp/recording.webm", outputPath: WAV }),
+    () =>
+      runtime.normalize({ inputPath: "/tmp/recording.webm", outputPath: WAV }),
     /VOICE_TRAINING_RUNTIME_PATH/,
   );
 });
@@ -427,13 +461,26 @@ test("loads only a fixed hash-verified local runtime manifest", async () => {
     await writeFile(join(root, path), path);
   }
   const digest = async (path) =>
-    createHash("sha256").update(await readFile(path)).digest("hex");
+    createHash("sha256")
+      .update(await readFile(path))
+      .digest("hex");
   const value = manifest();
-  value.runtime.python.sha256 = await digest(join(root, value.runtime.python.path));
-  value.runtime.ffmpeg.sha256 = await digest(join(root, value.runtime.ffmpeg.path));
-  value.runtime.ffprobe.sha256 = await digest(join(root, value.runtime.ffprobe.path));
-  value.runtime.runner.sha256 = await digest(join(root, value.runtime.runner.path));
-  for (const entry of [...value.runtime.source.files, ...value.runtime.assets.files]) {
+  value.runtime.python.sha256 = await digest(
+    join(root, value.runtime.python.path),
+  );
+  value.runtime.ffmpeg.sha256 = await digest(
+    join(root, value.runtime.ffmpeg.path),
+  );
+  value.runtime.ffprobe.sha256 = await digest(
+    join(root, value.runtime.ffprobe.path),
+  );
+  value.runtime.runner.sha256 = await digest(
+    join(root, value.runtime.runner.path),
+  );
+  for (const entry of [
+    ...value.runtime.source.files,
+    ...value.runtime.assets.files,
+  ]) {
     entry.sha256 = await digest(join(root, entry.path));
   }
   await writeFile(join(root, "runtime-manifest.json"), JSON.stringify(value));
@@ -482,7 +529,9 @@ test("rejects a mutable manifest that tries to select a different executable or 
     await writeFile(join(root, path), path);
   }
   const digest = async (path) =>
-    createHash("sha256").update(await readFile(path)).digest("hex");
+    createHash("sha256")
+      .update(await readFile(path))
+      .digest("hex");
   const trusted = manifest();
   for (const entry of [
     trusted.runtime.python,
@@ -554,7 +603,9 @@ test("rejects a runtime source reparse point even when a mutable manifest hash m
     await writeFile(join(root, path), path);
   }
   const digest = async (path) =>
-    createHash("sha256").update(await readFile(path)).digest("hex");
+    createHash("sha256")
+      .update(await readFile(path))
+      .digest("hex");
   const value = manifest();
   for (const entry of [
     value.runtime.python,
@@ -572,7 +623,8 @@ test("rejects a runtime source reparse point even when a mutable manifest hash m
   try {
     await symlink(target, join(root, "source/infer/rtrvc.py"));
   } catch (error) {
-    if (error?.code === "EPERM") return t.skip("Windows symlink privilege unavailable");
+    if (error?.code === "EPERM")
+      return t.skip("Windows symlink privilege unavailable");
     throw error;
   }
   await writeFile(join(root, "runtime-manifest.json"), JSON.stringify(value));
@@ -611,10 +663,20 @@ test("cleans only the fixed RVC workspace artifacts after forced cancellation", 
   await cleanup.cleanupSession("vt_alpha");
 
   await assert.rejects(readFile(join(root, "source/logs/vt_alpha/raw.wav")));
-  await assert.rejects(readFile(join(root, "source/assets/weights/vt_alpha.pth")));
-  await assert.rejects(readFile(join(root, "source/assets/indices/vt_alpha.index")));
-  assert.equal(await readFile(join(root, "source/assets/weights/unrelated.pth"), "utf8"), "sensitive");
-  assert.equal(await readFile(join(root, "source/logs/unrelated/keep.txt"), "utf8"), "sensitive");
+  await assert.rejects(
+    readFile(join(root, "source/assets/weights/vt_alpha.pth")),
+  );
+  await assert.rejects(
+    readFile(join(root, "source/assets/indices/vt_alpha.index")),
+  );
+  assert.equal(
+    await readFile(join(root, "source/assets/weights/unrelated.pth"), "utf8"),
+    "sensitive",
+  );
+  assert.equal(
+    await readFile(join(root, "source/logs/unrelated/keep.txt"), "utf8"),
+    "sensitive",
+  );
 });
 
 test("requires independent weights-only verification and expected RVC schema before promotion", async () => {
