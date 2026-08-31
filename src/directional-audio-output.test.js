@@ -7,6 +7,21 @@ function fixture({ reportedSinkId } = {}) {
   const calls = [];
   const track = { stop: () => calls.push("track:stop") };
   const stream = { getAudioTracks: () => [track] };
+  const audio = {
+    muted: false,
+    set srcObject(value) {
+      calls.push(value ? "audio:stream" : "audio:clear");
+    },
+    async play() {
+      calls.push("audio:play");
+    },
+    pause() {
+      calls.push("audio:pause");
+    },
+    remove() {
+      calls.push("audio:remove");
+    },
+  };
   const gain = {
     gain: { value: 1 },
     connect(destination) {
@@ -49,13 +64,14 @@ function fixture({ reportedSinkId } = {}) {
       calls.push("context:close");
     },
   };
-  return { calls, context, gain, stream };
+  return { audio, calls, context, gain, stream };
 }
 
 test("binds the direction sink before connecting a remote WebRTC stream", async () => {
-  const { calls, context, stream } = fixture();
+  const { audio, calls, context, stream } = fixture();
   const output = new DirectionalAudioOutput({
     createAudioContext: () => context,
+    createAudioElement: () => audio,
     sinkId: "poly-headphones",
   });
 
@@ -68,14 +84,18 @@ test("binds the direction sink before connecting a remote WebRTC stream", async 
     "source:create",
     "source:connect",
     "gain:connect:destination",
+    "audio:stream",
+    "audio:play",
     "resume",
   ]);
+  assert.equal(audio.muted, true);
 });
 
 test("fails closed when AudioContext cannot prove the requested sink", async () => {
-  const { calls, context, stream } = fixture({ reportedSinkId: "wrong-sink" });
+  const { audio, calls, context, stream } = fixture({ reportedSinkId: "wrong-sink" });
   const output = new DirectionalAudioOutput({
     createAudioContext: () => context,
+    createAudioElement: () => audio,
     sinkId: "poly-headphones",
   });
 
@@ -85,9 +105,10 @@ test("fails closed when AudioContext cannot prove the requested sink", async () 
 });
 
 test("mutes through a GainNode and closes tracks and graph idempotently", async () => {
-  const { calls, context, gain, stream } = fixture();
+  const { audio, calls, context, gain, stream } = fixture();
   const output = new DirectionalAudioOutput({
     createAudioContext: () => context,
+    createAudioElement: () => audio,
     sinkId: "voicemeeter-aux",
   });
   await output.prepare();
@@ -104,4 +125,7 @@ test("mutes through a GainNode and closes tracks and graph idempotently", async 
   assert.equal(calls.filter((call) => call === "track:stop").length, 1);
   assert.ok(calls.includes("source:disconnect"));
   assert.ok(calls.includes("gain:disconnect"));
+  assert.ok(calls.includes("audio:pause"));
+  assert.ok(calls.includes("audio:clear"));
+  assert.ok(calls.includes("audio:remove"));
 });

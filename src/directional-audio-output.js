@@ -1,6 +1,8 @@
 export class DirectionalAudioOutput {
+  #audio;
   #context;
   #createAudioContext;
+  #createAudioElement;
   #gain;
   #muted = false;
   #sinkId;
@@ -9,12 +11,20 @@ export class DirectionalAudioOutput {
 
   constructor({
     createAudioContext = () => new AudioContext(),
+    createAudioElement = () => {
+      const audio = document.createElement("audio");
+      audio.hidden = true;
+      audio.playsInline = true;
+      document.body.append(audio);
+      return audio;
+    },
     sinkId,
   } = {}) {
     if (typeof sinkId !== "string" || !sinkId) {
       throw new Error("AUDIO_OUTPUT_SINK_REQUIRED");
     }
     this.#createAudioContext = createAudioContext;
+    this.#createAudioElement = createAudioElement;
     this.#sinkId = sinkId;
   }
 
@@ -47,6 +57,11 @@ export class DirectionalAudioOutput {
     const source = this.#context.createMediaStreamSource(stream);
     source.connect(this.#gain);
     this.#gain.connect(this.#context.destination);
+    const audio = this.#createAudioElement();
+    audio.muted = true;
+    audio.srcObject = stream;
+    this.#audio = audio;
+    await audio.play();
     await this.#context.resume();
     this.#source = source;
     this.#stream = stream;
@@ -61,6 +76,11 @@ export class DirectionalAudioOutput {
     const context = this.#context;
     if (!context) return;
     this.#context = undefined;
+    this.#audio?.pause();
+    if (this.#audio) {
+      this.#audio.srcObject = null;
+      this.#audio.remove();
+    }
     try {
       this.#source?.disconnect();
     } catch {}
@@ -68,6 +88,7 @@ export class DirectionalAudioOutput {
       this.#gain?.disconnect();
     } catch {}
     for (const track of this.#stream?.getAudioTracks?.() ?? []) track.stop();
+    this.#audio = undefined;
     this.#source = undefined;
     this.#gain = undefined;
     this.#stream = undefined;
