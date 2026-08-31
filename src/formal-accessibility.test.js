@@ -87,7 +87,7 @@ test("formal UI provides Traditional-Chinese actionable persistence and summary 
   assert.doesNotMatch(renderer, /cleanup.*error\.message/);
   assert.match(
     renderer,
-    /if \(canceled\) \{\s+await releaseRendererResources\(\);/,
+    /const canceled =[\s\S]{0,120}await releaseRendererResources\(\);[\s\S]{0,180}await window\.translive\.cancelStart\(\);[\s\S]{0,180}if \(canceled\)/,
   );
 });
 

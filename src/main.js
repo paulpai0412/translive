@@ -503,7 +503,11 @@ function registerIpc() {
   );
   ipcMain.handle("translive:preflight", async (_event, config) => {
     await requireVoiceMeeterRouting();
-    return controller.preflight(config);
+    activeMode = config.mode ?? "meeting";
+    await applyTranslationAudioRouting(activeMode);
+    const result = await controller.preflight(config);
+    if (!result.ok) await restoreTranslationAudioRouting();
+    return result;
   });
   ipcMain.handle("translive:start", async (_event, config) => {
     await requireVoiceMeeterRouting();

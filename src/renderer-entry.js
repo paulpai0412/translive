@@ -1133,13 +1133,17 @@ async function startTranslation() {
     applyAggregate(result.aggregate);
   } catch (error) {
     const canceled = error?.name === "AbortError" || startup.isCanceled();
+    await releaseRendererResources();
+    try {
+      await window.translive.cancelStart();
+    } catch {
+      // Main-side route recovery is retried at the next startup.
+    }
     if (canceled) {
-      await releaseRendererResources();
       setAppState("ready");
       updateReadyMessage();
       return;
     }
-    await releaseRendererResources();
     if (config) window.translive.rendererBlocked(config, error.message);
     showAssertiveError("無法建立翻譯連線，請檢查設定後再試。");
     showBlocked("無法建立翻譯連線", error.message);

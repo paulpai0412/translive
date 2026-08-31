@@ -40,6 +40,18 @@ test("applies mode routing at Start and restores quick setup before mode roles",
   );
 });
 
+test("preflight applies mode routing before the renderer route probe and failed startup restores it", async () => {
+  const source = await mainSource();
+  assert.match(
+    source,
+    /translive:preflight"[\s\S]{0,220}activeMode = config\.mode \?\? "meeting"[\s\S]{0,120}await applyTranslationAudioRouting\(activeMode\)[\s\S]{0,160}controller\.preflight\(config\)/,
+  );
+  assert.match(
+    source,
+    /translive:cancel-start"[\s\S]{0,220}finally \{[\s\S]{0,100}restoreTranslationAudioRouting\(\)/,
+  );
+});
+
 test("opens the raw-audio app before optional RVC initialization settles", async () => {
   const source = await mainSource();
   const createWindowAt = source.indexOf("createWindow();");
