@@ -146,7 +146,6 @@ class PacingClient extends EventEmitter {
 }
 
 class PromptClient extends EventEmitter {
-  closed = false;
   realtimeStarts = [];
   threadNumber = 0;
 
@@ -162,8 +161,25 @@ class PromptClient extends EventEmitter {
   }
 
   async stopRealtime() {}
-  async close() {
-    this.closed = true;
+  async close() {}
+}
+
+class MeetingItemClient extends PacingClient {
+  threadNumber = 0;
+  txThreadId;
+  rxThreadId;
+
+  async startEphemeralThread() {
+    this.threadNumber += 1;
+    return { id: `meeting-thread-${this.threadNumber}` };
+  }
+
+  async startRealtime(request) {
+    if (request.prompt.includes("one fixed target language")) {
+      this.rxThreadId = request.threadId;
+    } else {
+      this.txThreadId = request.threadId;
+    }
   }
 }
 
@@ -190,84 +206,19 @@ class DeferredPacingClient extends PacingClient {
   }
 }
 
-test("Meeting owns one Codex client, thread, and realtime session per direction", async () => {
-  const evidenceDirectory = await mkdtemp(
-    join(tmpdir(), "translive-controller-direction-owners-"),
-  );
-  const clients = [];
-  const controller = controllerFor({
-    evidenceDirectory,
-    createClient: (direction) => {
-      const client = new PromptClient();
-      client.direction = direction;
-      clients.push(client);
-      return client;
-    },
-  });
-
-  await controller.start(validConfig());
-  assert.deepEqual(
-    clients.map((client) => client.direction).sort(),
-    ["rx", "tx"],
-  );
-  assert.deepEqual(
-    clients.map((client) => client.threadNumber),
-    [1, 1],
-  );
-  assert.deepEqual(
-    clients.map((client) => client.realtimeStarts.length),
-    [1, 1],
-  );
-  await controller.stop("user-stop");
-  assert.equal(clients.every((client) => client.closed), true);
-});
-
-test("a directional client failure does not fail its sibling", async () => {
-  const evidenceDirectory = await mkdtemp(
-    join(tmpdir(), "translive-controller-direction-error-"),
-  );
-  const clients = new Map();
-  const events = [];
-  const controller = controllerFor({
-    evidenceDirectory,
-    createClient: (direction) => {
-      const client = new PacingClient();
-      clients.set(direction, client);
-      return client;
-    },
-    publish: (event) => events.push(event),
-  });
-
-  await controller.start(validConfig());
-  clients.get("tx").emit("protocolError", new Error("TX client failed"));
-
-  assert.deepEqual(controller.status(), { tx: "failed", rx: "connecting" });
-  assert.equal(
-    events.some(
-      (event) => event.type === "error" && event.direction === "tx",
-    ),
-    true,
-  );
-  await controller.stop("user-stop");
-});
-
 test("GPT-Live initialization permits translation only and sends complete short utterances", async () => {
   const evidenceDirectory = await mkdtemp(
     join(tmpdir(), "translive-controller-prompt-"),
   );
-  const clients = [];
+  const client = new PromptClient();
   const controller = controllerFor({
     evidenceDirectory,
-    createClient: () => {
-      const client = new PromptClient();
-      clients.push(client);
-      return client;
-    },
+    createClient: () => client,
   });
 
   await controller.start(validConfig());
-  assert.equal(clients.length, 2);
-  for (const { prompt } of clients.flatMap((client) => client.realtimeStarts)) {
+  assert.equal(client.realtimeStarts.length, 2);
+  for (const { prompt } of client.realtimeStarts) {
     assert.match(prompt, /Translate questions as questions; never answer them\./);
     assert.match(prompt, /Translate each completed utterance exactly once/);
     assert.match(prompt, /Immediately translate and speak complete short utterances/);
@@ -353,10 +304,10 @@ test("Stop and Restart create fresh GPT-Live clients and threads", async () => {
     await controller.stop("user-stop");
   }
 
-  assert.equal(clients.length, 10);
+  assert.equal(clients.length, 5);
   for (const client of clients) {
-    assert.equal(client.realtimeStarts.length, 1);
-    assert.equal(client.threadNumber, 1);
+    assert.equal(client.realtimeStarts.length, 2);
+    assert.equal(client.threadNumber, 2);
   }
 });
 
@@ -482,14 +433,10 @@ test("keeps channels connecting until the renderer confirms both SDP answers", a
   );
   assert.equal(evidence.route.platform, "zoom");
   assert.equal(evidence.sessions.tx.threadId, "fixture-thread-1");
-  assert.equal(evidence.sessions.rx.threadId, "fixture-thread-1");
-  assert.equal(
+  assert.equal(evidence.sessions.rx.threadId, "fixture-thread-2");
+  assert.notEqual(
     evidence.sessions.tx.realtimeSessionId,
-    "fixture-session-fixture-thread-1",
-  );
-  assert.equal(
     evidence.sessions.rx.realtimeSessionId,
-    "fixture-session-fixture-thread-1",
   );
   assert.equal(evidence.termination.outcome, "stopped");
   assert.doesNotMatch(
@@ -688,45 +635,53 @@ test("a TX assistant item cannot consume the pending RX playback identity", asyn
   const evidenceDirectory = await mkdtemp(
     join(tmpdir(), "translive-controller-cross-thread-item-"),
   );
-  const clients = new Map();
+  const client = new MeetingItemClient();
   const timers = manualPacingTimers();
   const controller = controllerFor({
     evidenceDirectory,
-    createClient: (direction) => {
-      const client = new PacingClient();
-      clients.set(direction, client);
-      return client;
-    },
+    createClient: () => client,
     pacingPolicy: testPacingPolicy(),
     schedulePacing: timers.schedule,
     cancelPacingSchedule: timers.clear,
   });
 
   await controller.start(validConfig());
-  const rx = clients.get("rx");
-  const tx = clients.get("tx");
-  rx.itemStarted("translation-rx");
-  rx.itemDelta("translation-rx", "第一段完成。");
-  rx.itemCompleted("translation-rx", "assistant", "第一段完成。");
+  client.itemStarted("translation-rx", "assistant", client.rxThreadId);
+  client.itemDelta("translation-rx", "第一段完成。", client.rxThreadId);
+  client.itemCompleted(
+    "translation-rx",
+    "assistant",
+    "第一段完成。",
+    client.rxThreadId,
+  );
   await timers.fireHead();
 
-  tx.itemStarted("translation-tx");
-  tx.itemCompleted("translation-tx", "assistant", "English translation.");
-  rx.itemStarted("playback-rx");
-  rx.itemDelta("playback-rx", "第一段完成！第一段完成！");
-  rx.itemCompleted(
+  client.itemStarted("translation-tx", "assistant", client.txThreadId);
+  client.itemCompleted(
+    "translation-tx",
+    "assistant",
+    "English translation.",
+    client.txThreadId,
+  );
+  client.itemStarted("playback-rx", "assistant", client.rxThreadId);
+  client.itemDelta(
+    "playback-rx",
+    "第一段完成！第一段完成！",
+    client.rxThreadId,
+  );
+  client.itemCompleted(
     "playback-rx",
     "assistant",
     "第一段完成！第一段完成！",
+    client.rxThreadId,
   );
   await new Promise((resolve) => setImmediate(resolve));
 
   assert.equal(timers.size, 0);
   assert.deepEqual(
-    rx.appendRequests.map((request) => request.text),
+    client.appendRequests.map((request) => request.text),
     ["第一段完成。"],
   );
-  assert.deepEqual(tx.appendRequests, []);
   await controller.stop("user-stop");
 });
 
@@ -1120,14 +1075,10 @@ test("cancels a main-side startup before a delayed app-server starts", async () 
   const evidenceDirectory = await mkdtemp(
     join(tmpdir(), "translive-controller-cancel-start-"),
   );
-  const clients = [];
+  const client = new PendingStartClient();
   const controller = controllerFor({
     evidenceDirectory,
-    createClient: () => {
-      const client = new PendingStartClient();
-      clients.push(client);
-      return client;
-    },
+    createClient: () => client,
   });
 
   const start = controller.start(validConfig());
@@ -1136,8 +1087,7 @@ test("cancels a main-side startup before a delayed app-server starts", async () 
 
   assert.deepEqual(result, { canceled: true });
   await assert.rejects(start, { name: "AbortError" });
-  assert.equal(clients.length, 2);
-  assert.equal(clients.every((client) => client.closed), true);
+  assert.equal(client.closed, true);
   assert.deepEqual(controller.status(), { tx: "stopped", rx: "stopped" });
 });
 
