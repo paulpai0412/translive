@@ -49,6 +49,7 @@ function validConfig(overrides = {}) {
     routeProfile: "vb-cable",
     mode: "meeting",
     headphonesConfirmed: true,
+    autoSummary: false,
     tx: {
       sourceEndpointId: "mic",
       sourceEndpointName: "Physical Microphone",
@@ -292,7 +293,7 @@ test("stop saves the record, generates the summary, and indexes both", async (t)
   const { client, controller, meetingIndex, published, records, cleanup } =
     await controllerFor();
   t.after(cleanup);
-  await controller.start(validConfig());
+  await controller.start(validConfig({ autoSummary: true }));
   client.emitTranscript(threadFor(client, 0), {
     text: "rollout 延後到九月五號",
   });
@@ -316,7 +317,7 @@ test("a summary failure still saves the transcript", async (t) => {
       },
     });
   t.after(cleanup);
-  await controller.start(validConfig());
+  await controller.start(validConfig({ autoSummary: true }));
   client.emitTranscript(threadFor(client, 0), { text: "內容" });
   await controller.stop();
   await waitForPublish(published, "summary", "failed");
@@ -408,7 +409,7 @@ test("stop returns after the record saves; summary completes in background", asy
     },
   });
   t.after(cleanup);
-  await controller.start(validConfig());
+  await controller.start(validConfig({ autoSummary: true }));
   client.emitTranscript(threadFor(client, 0), { text: "內容" });
 
   const stopResult = await controller.stop();

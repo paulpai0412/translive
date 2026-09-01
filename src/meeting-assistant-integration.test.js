@@ -24,6 +24,7 @@ function rendererConfig() {
     mode: "assistant",
     headphonesConfirmed: false,
     persistTranscript: true,
+    autoSummary: true,
     wakePhrase: "小泥小泥",
     qaSdp: "v=0\r\nfixture-qa",
     tx: {
@@ -114,7 +115,7 @@ test("assistant mode end-to-end over the real app-server transport", async (t) =
   assert.equal(controller.isActive(), true);
 
   // Renderer applies every SDP answer, then reports each channel.
-  for (const direction of ["tx", "rx", "qa"]) {
+  for (const _direction of ["tx", "rx", "qa"]) {
     await waitForEvent(published, "sdp");
   }
   const txApplied = await controller.answerApplied("tx");

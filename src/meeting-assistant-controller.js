@@ -501,14 +501,7 @@ export class MeetingAssistantController {
         // Summary generation is a full codex turn — run it in the background
         // so stopping the meeting never looks hung. It reads the saved record
         // and does not need this run's (now closing) client.
-        this.#publish({ type: "summary", state: "generating", sessionId: record.id });
-        void this.#summarize(context, record).catch((error) =>
-          this.#publish({
-            type: "summary",
-            state: "failed",
-            message: safeMessage(error),
-          }),
-        );
+        this.#summarize(context, record);
       }
     } finally {
       context.finalized = true;
