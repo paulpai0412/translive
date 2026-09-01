@@ -809,6 +809,10 @@ if (isPrimaryInstance) {
       publish,
       records: recordsStore,
       meetingIndex,
+      summaryService: new CodexSummaryService({
+        codexExecutable: codexLaunch.executable,
+        cwd: app.getAppPath(),
+      }),
       answer: (prompt) =>
         new CodexTextTurn({
           codexExecutable: codexLaunch.executable,

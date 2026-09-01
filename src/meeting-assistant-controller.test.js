@@ -146,6 +146,20 @@ async function controllerFor(overrides = {}) {
   };
 }
 
+async function waitForPublish(published, type, state, timeoutMs = 5_000) {
+  const started = Date.now();
+  for (;;) {
+    const event = published.find(
+      (entry) => entry.type === type && (!state || entry.state === state),
+    );
+    if (event) return event;
+    if (Date.now() - started > timeoutMs) {
+      throw new Error(`Timed out waiting for ${type}:${state ?? "*"}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
 function threadFor(client, index = 0) {
   return client.realtime[index].threadId;
 }
@@ -275,7 +289,7 @@ test("gate suspends while an answer is pending and resumes after approval", asyn
 });
 
 test("stop saves the record, generates the summary, and indexes both", async (t) => {
-  const { client, controller, meetingIndex, records, cleanup } =
+  const { client, controller, meetingIndex, published, records, cleanup } =
     await controllerFor();
   t.after(cleanup);
   await controller.start(validConfig());
@@ -283,6 +297,7 @@ test("stop saves the record, generates the summary, and indexes both", async (t)
     text: "rollout 延後到九月五號",
   });
   await controller.stop();
+  await waitForPublish(published, "summary", "saved");
   const [session] = await records.listSessions();
   const record = await records.readSession(session.id);
   assert.equal(record.metadata.hasSummary, true);
@@ -304,6 +319,7 @@ test("a summary failure still saves the transcript", async (t) => {
   await controller.start(validConfig());
   client.emitTranscript(threadFor(client, 0), { text: "內容" });
   await controller.stop();
+  await waitForPublish(published, "summary", "failed");
   const sessions = await records.listSessions();
   assert.equal(sessions.length, 1);
   assert.ok(
@@ -359,4 +375,53 @@ test("pre-context start failures still write blocked evidence", async (t) => {
   const { readdir } = await import("node:fs/promises");
   const files = await readdir(join(directory, "evidence"));
   assert.ok(files.some((name) => name.endsWith(".json")));
+});
+
+test("stop returns after the record saves; summary completes in background", async (t) => {
+  let resolveSummary;
+  const summaryGate = new Promise((resolve) => {
+    resolveSummary = resolve;
+  });
+  const { client, controller, published, cleanup } = await controllerFor({
+    summaryService: {
+      generate: async ({ sessions }) => {
+        await summaryGate;
+        return {
+          sections: {
+            重點: [],
+            決策: [
+              {
+                text: "背景摘要決策",
+                citations: [
+                  {
+                    sessionId: sessions[0].metadata.id,
+                    offsetMs: sessions[0].entries[0]?.offsetMs ?? 0,
+                  },
+                ],
+              },
+            ],
+            待辦: [],
+            未決問題: [],
+          },
+        };
+      },
+    },
+  });
+  t.after(cleanup);
+  await controller.start(validConfig());
+  client.emitTranscript(threadFor(client, 0), { text: "內容" });
+
+  const stopResult = await controller.stop();
+  assert.equal(stopResult.aggregate, "stopped");
+  // stop() resolved while the summary was still pending
+  assert.ok(
+    published.some((event) => event.type === "record" && event.state === "saved"),
+  );
+  assert.ok(!published.some((event) => event.type === "summary" && event.state === "saved"));
+
+  resolveSummary();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.ok(
+    published.some((event) => event.type === "summary" && event.state === "saved"),
+  );
 });

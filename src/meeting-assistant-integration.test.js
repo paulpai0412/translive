@@ -131,7 +131,16 @@ test("assistant mode end-to-end over the real app-server transport", async (t) =
   await waitForEvent(published, "qa-sent");
 
   await controller.stop("user-stop");
-  await waitForEvent(published, "summary");
+  // summary runs in the background; wait for the terminal event
+  const startedWait = Date.now();
+  while (
+    !published.some(
+      (entry) => entry.type === "summary" && ["saved", "failed"].includes(entry.state),
+    ) &&
+    Date.now() - startedWait < 10_000
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
 
   const sessions = await records.listSessions();
   assert.equal(sessions.length, 1);

@@ -52,6 +52,7 @@ const PACKAGED_PATHS = new Set([
   "src/renderer-control.js",
   "src/renderer-entry.js",
   "src/renderer-state.js",
+  "src/session-summary-job.js",
   "src/startup-session.js",
   "src/styles.css",
   "src/summary-controller.js",

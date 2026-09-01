@@ -61,6 +61,7 @@ function controllerFor({
   records,
   meetingIndex,
   answer,
+  summaryService,
 } = {}) {
   return new PhaseOneController({
     appVersion: "0.0.0-test",
@@ -75,6 +76,7 @@ function controllerFor({
     records,
     meetingIndex,
     answer,
+    summaryService,
   });
 }
 
@@ -886,4 +888,57 @@ test("translation mode answers the wake phrase through the qa voice channel", as
   assert.equal(client.speech[0].threadId, client.realtime[2].threadId);
 
   await controller.stop("user-stop");
+});
+
+test("translation runs auto-summarize in the background after stop", async () => {
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-autosummary-"),
+  );
+  const savedSummaries = [];
+  let savedSessionId;
+  let resolveSummary;
+  const summaryGate = new Promise((resolve) => {
+    resolveSummary = resolve;
+  });
+  const controller = controllerFor({
+    evidenceDirectory,
+    records: {
+      saveSession: async (record) => {
+        savedSessionId = record.id;
+        return { ...record.metadata, id: record.id, path: "/safe/x" };
+      },
+      readSession: async (id) => ({
+        metadata: { id, mode: "meeting", startedAtMs: 1_700_000_000_000 },
+        entries: [
+          { offsetMs: 0, direction: "rx", side: "source", text: "內容" },
+        ],
+      }),
+      saveSessionSummary: async (id, payload) => {
+        savedSummaries.push({ id, payload });
+      },
+    },
+    summaryService: {
+      generate: async () => {
+        await summaryGate;
+        return {
+          sections: { 重點: [], 決策: [], 待辦: [], 未決問題: [] },
+        };
+      },
+    },
+  });
+
+  await controller.start(
+    validConfig({ rx: { sdp: "fixture-chinese-target" } }),
+  );
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  await controller.stop("user-stop");
+  assert.equal(savedSummaries.length, 0); // background, not blocking stop
+
+  resolveSummary();
+  const deadline = Date.now() + 3_000;
+  while (savedSummaries.length === 0 && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  assert.equal(savedSummaries.length, 1);
+  assert.equal(savedSummaries[0].id, savedSessionId);
 });

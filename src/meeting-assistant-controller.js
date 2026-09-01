@@ -9,7 +9,7 @@ import {
 } from "./dual-channel-run.js";
 import { RunEvidence } from "./evidence.js";
 import { MeetingQa, QA_VOICE_PROMPT } from "./meeting-qa.js";
-import { formatSummaryMarkdown } from "./summary-service.js";
+import { summarizeSessionInBackground } from "./session-summary-job.js";
 import { sanitizeText } from "./text-sanitizer.js";
 import { WakeGate } from "./wake-gate.js";
 
@@ -496,10 +496,20 @@ export class MeetingAssistantController {
       await waitFor(TAIL_TRANSCRIPT_SETTLE_MS);
       context.evidence.finish(Date.now(), termination);
       const record = await this.#persistTranscript(context);
-      if (record && context.config.autoSummary !== false) {
-        await this.#summarize(context, record);
-      }
       await context.evidence.write(this.#evidenceDirectory);
+      if (record && context.config.autoSummary !== false) {
+        // Summary generation is a full codex turn — run it in the background
+        // so stopping the meeting never looks hung. It reads the saved record
+        // and does not need this run's (now closing) client.
+        this.#publish({ type: "summary", state: "generating", sessionId: record.id });
+        void this.#summarize(context, record).catch((error) =>
+          this.#publish({
+            type: "summary",
+            state: "failed",
+            message: safeMessage(error),
+          }),
+        );
+      }
     } finally {
       context.finalized = true;
       await context.client.close();
@@ -527,46 +537,14 @@ export class MeetingAssistantController {
     return metadata;
   }
 
-  // One summary system for both modes: same service, same store, same index.
-  async #summarize(context, record) {
-    if (!this.#summaryService) return;
-    try {
-      const saved = await this.#records.readSession(record.id);
-      const sessions = [{ metadata: saved.metadata, entries: saved.entries }];
-      const structured = await this.#summaryService.generate({
-        kind: "session",
-        sessions,
-      });
-      const sourceSessions = [
-        {
-          id: record.id,
-          timestamps: saved.entries.map((entry) => entry.offsetMs),
-        },
-      ];
-      const markdown = formatSummaryMarkdown({
-        kind: "session",
-        modelOutput: structured,
-        sourceSessions,
-      });
-      await this.#records.saveSessionSummary(record.id, {
-        generatedAtMs: Date.now(),
-        markdown,
-        sourceSessions,
-        structured,
-      });
-      context.summary = structured;
-      this.#meetingIndex?.indexSession({
-        metadata: saved.metadata,
-        entries: saved.entries,
-        summary: structured,
-      });
-      this.#publish({ type: "summary", state: "saved", sessionId: record.id });
-    } catch (error) {
-      this.#publish({
-        type: "summary",
-        state: "failed",
-        message: safeMessage(error),
-      });
-    }
+  // One summary system for every mode: same service, same store, same index.
+  #summarize(context, record) {
+    summarizeSessionInBackground({
+      records: this.#records,
+      summaryService: this.#summaryService,
+      meetingIndex: this.#meetingIndex,
+      publish: this.#publish,
+      sessionId: record.id,
+    });
   }
 }

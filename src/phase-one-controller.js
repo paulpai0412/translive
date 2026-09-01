@@ -10,6 +10,7 @@ import {
 } from "./dual-channel-run.js";
 import { RunEvidence } from "./evidence.js";
 import { MeetingQa, QA_VOICE_PROMPT } from "./meeting-qa.js";
+import { summarizeSessionInBackground } from "./session-summary-job.js";
 import { WakeGate } from "./wake-gate.js";
 import { sanitizeText } from "./text-sanitizer.js";
 
@@ -182,6 +183,7 @@ export class PhaseOneController {
   #publish;
   #qa;
   #records;
+  #summaryService;
   #starting = false;
   #startingContext;
 
@@ -204,10 +206,12 @@ export class PhaseOneController {
     records,
     meetingIndex,
     answer,
+    summaryService,
   }) {
     this.#appVersion = appVersion;
     this.#meetingIndex = meetingIndex;
     this.#answer = answer;
+    this.#summaryService = summaryService;
     this.#codexExecutable = codexExecutable;
     this.#codexVersion = codexVersion;
     this.#cwd = cwd;
@@ -897,6 +901,17 @@ export class PhaseOneController {
         record: metadata,
         path: metadata.path,
       });
+      // Auto-summarize in the background (all modes share this behavior);
+      // stopping never blocks on a codex turn.
+      if (this.#summaryService && context.config.autoSummary !== false) {
+        summarizeSessionInBackground({
+          records: this.#records,
+          summaryService: this.#summaryService,
+          meetingIndex: this.#meetingIndex,
+          publish: this.#publish,
+          sessionId: metadata.id,
+        });
+      }
       // Feed the shared search index so assistant-mode Q&A can answer from
       // translation sessions too. Read-side concern: never fail the save.
       if (
