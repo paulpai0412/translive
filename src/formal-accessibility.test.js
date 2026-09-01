@@ -114,7 +114,7 @@ test("shows a safe global Windows audio-routing status", async () => {
   ]);
 
   assert.match(html, /id="global-audio-status"[^>]*role="status"/);
-  assert.match(html, /開始翻譯時只切換目前模式需要的 Windows 音訊角色/);
+  assert.match(html, /開始翻譯時只切換目前模式需要的\s+Windows\s+音訊角色/);
   assert.match(preload, /audioDefaultsStatus/);
   assert.match(renderer, /audioDefaultsStatus\(\)/);
   assert.match(renderer, /event\.type === "global-audio"/);
@@ -200,7 +200,7 @@ test("RVC settings require opt-in consent and expose only safe status/profile fi
     readFile(new URL("./renderer-entry.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(html, /本機自訂音色 RVC/);
+  assert.match(html, /本機自訂音色\s+RVC/);
   assert.match(html, /id="voice-conversion-toggle"[^>]*role="switch"/);
   assert.match(html, /id="voice-profile-select"/);
   assert.match(html, /id="voice-profile-consent"/);
@@ -262,7 +262,7 @@ test("own-voice training settings keep recording local and expose accessible lif
     /id="voice-training-progress"[\s\S]{0,120}aria-label="本人音色錄製與訓練進度"/,
   );
   assert.match(html, /CPU 訓練可能需要較長時間/);
-  assert.match(html, /DirectML 目前僅作推論候選/);
+  assert.match(html, /DirectML\s+目前僅作推論候選/);
   for (const method of [
     "voiceTrainingStatus",
     "voiceTrainingStartRecording",
@@ -278,12 +278,21 @@ test("own-voice training settings keep recording local and expose accessible lif
   assert.match(main, /"translive:voice-training-stop-recording"/);
   assert.match(main, /requireMainRenderer\(event\)/);
   assert.match(renderer, /navigator\.mediaDevices\.getUserMedia/);
+  assert.match(renderer, /addEventListener\("devicechange"/);
+  assert.match(html, /id="test-tx-sink"/);
+  assert.match(html, /id="test-headphones"/);
+  assert.match(html, /id="voice-empty-state"/);
+  assert.match(renderer, /createOutputTester/);
+  assert.match(renderer, /voiceEmptyStateVisible/);
   assert.match(renderer, /new MediaRecorder/);
   assert.match(renderer, /audio\/webm;codecs=opus/);
   assert.match(renderer, /voiceTrainingStopRecording/);
   assert.match(renderer, /voice-training-final-consent/);
   assert.match(renderer, /consentVersion: VOICE_TRAINING_POLICY\.version/);
-  assert.doesNotMatch(renderer, /fetch\(|WebSocket|OpenAI|recording\.webm|normalized\.wav|output\.pth/);
+  assert.doesNotMatch(
+    renderer,
+    /fetch\(|WebSocket|OpenAI|recording\.webm|normalized\.wav|output\.pth/,
+  );
 });
 
 test("applies route-valid device recommendations while preserving manual physical choices", async () => {

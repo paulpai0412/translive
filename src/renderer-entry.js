@@ -1,5 +1,9 @@
 import { DirectionalAudioOutput } from "./directional-audio-output.js";
 import {
+  SLOT_LABELS,
+  decideDeviceChangeReaction,
+} from "./device-change-controller.js";
+import {
   emptyDevicePreferences,
   isVirtualDevice,
   loadDevicePreferences,
@@ -11,6 +15,7 @@ import {
   createRendererControlHandler,
   releaseRendererResources as releaseResources,
 } from "./renderer-control.js";
+import { createOutputTester } from "./output-tester.js";
 import { createStartupSession } from "./startup-session.js";
 import { VOICE_TRAINING_POLICY } from "./voice-training-policy.js";
 import { verifyVoiceMeeterRoute } from "./voicemeeter-route-health.js";
@@ -26,6 +31,8 @@ import {
   diagnosticsPresentation,
   modeLabel,
   runStatePresentation,
+  stoppedStatePresentation,
+  voiceEmptyStateVisible,
 } from "./view-state.js";
 
 const DIRECTIONS_BY_MODE = Object.freeze({
@@ -91,6 +98,11 @@ const elements = Object.fromEntries(
     "drawer-scrim",
     "headphones",
     "headphones-confirmed",
+    "audio-role-info",
+    "caption-size-down",
+    "caption-size-up",
+    "role-note",
+    "status-open-diagnostics",
     "health-account",
     "health-devices",
     "health-runtime",
@@ -128,6 +140,7 @@ const elements = Object.fromEntries(
     "settings-retention-button",
     "settings-retention-status",
     "voice-conversion-toggle",
+    "voice-empty-state",
     "voice-conversion-status",
     "voice-profile-consent",
     "voice-profile-import",
@@ -169,6 +182,9 @@ const elements = Object.fromEntries(
     "stop-button",
     "stopped-generate-summary",
     "stopped-copy",
+    "stopped-restore-status",
+    "test-tx-sink",
+    "test-headphones",
     "theme-button",
     "theme-label",
     "tx-sink",
@@ -198,6 +214,8 @@ const ui = {
   },
   mode: "meeting",
   muted: { tx: false, rx: false },
+  audioDefaultsState: undefined,
+  routingState: undefined,
   records: {
     aggregates: [],
     current: undefined,
@@ -264,9 +282,21 @@ function directionsForMode(mode = ui.mode) {
   return DIRECTIONS_BY_MODE[mode];
 }
 
+function renderStoppedRestore() {
+  const presentation = stoppedStatePresentation({
+    audioDefaultsState: ui.audioDefaultsState,
+    routingState: ui.routingState,
+  });
+  const element = elements["stopped-restore-status"];
+  element.textContent = presentation.restoreLine;
+  element.dataset.level = presentation.level;
+  element.hidden = presentation.level === "none";
+}
+
 function setAppState(state) {
   ui.app = state;
   document.body.dataset.appState = state;
+  if (state === "stopped") renderStoppedRestore();
   const presentation = runStatePresentation({
     appState: state,
     mode: ui.mode,
@@ -647,6 +677,7 @@ function applyModeDeviceRecommendations() {
   for (const [slot, device] of Object.entries(recommendation.selections)) {
     setRecommendedDevice(slot, device);
   }
+  syncTestToneButtons();
 }
 
 function populateVoiceTrainingMicrophone(inputs) {
@@ -669,11 +700,11 @@ function populateVoiceTrainingMicrophone(inputs) {
     recommended?.deviceId &&
     [...select.options].some((option) => option.value === recommended.deviceId)
   ) {
-    select.value = previous && [...select.options].some(
-      (option) => option.value === previous,
-    )
-      ? previous
-      : recommended.deviceId;
+    select.value =
+      previous &&
+      [...select.options].some((option) => option.value === previous)
+        ? previous
+        : recommended.deviceId;
   }
   ui.voiceTraining.microphoneId = select.value;
   updateVoiceTrainingControls();
@@ -735,20 +766,37 @@ async function refreshDevices() {
   }
 }
 
+const outputTester = createOutputTester();
+
+function syncTestToneButtons() {
+  if (outputTester.state() === "playing") return;
+  elements["test-tx-sink"].disabled = !elements["tx-sink"].value;
+  elements["test-headphones"].disabled = !elements["headphones"].value;
+}
+
+for (const [buttonId, selectId] of [
+  ["test-tx-sink", "tx-sink"],
+  ["test-headphones", "headphones"],
+]) {
+  elements[buttonId].addEventListener("click", async () => {
+    elements[buttonId].disabled = true;
+    await outputTester.play({ sinkId: elements[selectId].value });
+    if (outputTester.state() === "error") {
+      showAssertiveError("無法在此裝置播放測試音，請確認裝置連線後再試。");
+    }
+    syncTestToneButtons();
+  });
+  elements[selectId].addEventListener("change", syncTestToneButtons);
+}
+
 function updateReadyMessage() {
   const description = {
     meeting: "會同時建立 TX 與 RX 翻譯連線。",
     media: "只建立 RX 翻譯連線，不使用麥克風。",
     microphone: "只建立 TX 翻譯連線，不使用耳機或 RX 來源。",
   }[ui.mode];
-  const missingLabels = {
-    headphones: "耳機輸出",
-    physicalMic: "實體麥克風",
-    rxSource: "虛擬音訊來源",
-    txSink: "虛擬麥克風輸出",
-  };
   const missing = ui.missingRecommendedDevices
-    .map((slot) => missingLabels[slot])
+    .map((slot) => SLOT_LABELS[slot])
     .filter(Boolean);
   elements["ready-message"].textContent = missing.length
     ? `找不到${missing.join("、")}，請確認路由裝置後重新檢查。`
@@ -806,6 +854,12 @@ function publishMiniCaption() {
   window.translive.miniCaptionUpdate(miniCaptionSnapshot());
 }
 
+function pinCaptionScroll() {
+  for (const group of document.querySelectorAll(".caption-group")) {
+    if (group.dataset.unpinned !== "1") group.scrollTop = group.scrollHeight;
+  }
+}
+
 function renderCaptions() {
   for (const direction of ["tx", "rx"]) {
     const captions = ui.captions[direction];
@@ -819,6 +873,7 @@ function renderCaptions() {
   elements["single-source-caption"].textContent =
     captions.source || "等待輸入音訊…";
   elements["single-target-caption"].textContent = captions.target || "—";
+  pinCaptionScroll();
   publishMiniCaption();
 }
 
@@ -972,8 +1027,7 @@ async function createRealtimePeer({ direction, source, sink }) {
     });
     peerConnection.addEventListener("track", async (event) => {
       try {
-        const remoteStream =
-          event.streams[0] || new MediaStream([event.track]);
+        const remoteStream = event.streams[0] || new MediaStream([event.track]);
         event.track.addEventListener(
           "unmute",
           () => recordMetric(direction, "output-audio", {}),
@@ -1248,12 +1302,20 @@ function updateDiagnostics(event) {
 }
 
 function applyGlobalAudioStatus({ state } = {}) {
+  ui.audioDefaultsState = state;
+  renderStoppedRestore();
+  elements["global-audio-status"].dataset.level = [
+    "prepared",
+    "active",
+    "restored",
+  ].includes(state)
+    ? "ok"
+    : "warn";
   elements["global-audio-status"].textContent =
     {
       prepared:
         "Windows 原始音訊設定已保存；開始翻譯時只套用目前模式需要的路由。",
-      active:
-        "目前模式的 Windows 音訊路由已套用；停止翻譯後會自動還原。",
+      active: "目前模式的 Windows 音訊路由已套用；停止翻譯後會自動還原。",
       restored: "Windows 原始音訊設定已還原。",
       "target-unavailable":
         "找不到 VoiceMeeter 虛擬裝置。Windows 音訊設定未變更；請啟動 VoiceMeeter Banana 後重新開啟 TransLive。",
@@ -1282,6 +1344,14 @@ async function initializeGlobalAudioDefaults() {
 }
 
 function applyVoiceMeeterRoutingStatus({ state } = {}) {
+  ui.routingState = state;
+  renderStoppedRestore();
+  elements["voicemeeter-routing-status"].dataset.level = [
+    "active",
+    "restored",
+  ].includes(state)
+    ? "ok"
+    : "warn";
   elements["voicemeeter-routing-status"].textContent =
     {
       checking: "正在自動設定 VoiceMeeter 內部路由…",
@@ -1369,6 +1439,9 @@ function renderVoiceConversion(status = {}) {
   const presentation = voiceConversionPresentation(status);
   elements["voice-conversion-status"].textContent = presentation.detail;
   elements["voice-conversion-status"].dataset.state = presentation.state;
+  elements["voice-empty-state"].hidden = !voiceEmptyStateVisible(
+    profiles.length,
+  );
   updateVoiceProfileImportButton();
   updateVoiceProfileDeleteButton();
 }
@@ -1415,7 +1488,8 @@ function voiceTrainingPresentation(status = {}) {
       normalizing: "正在本機正規化單聲道訓練音訊…",
       "ready-to-train": "錄音已檢查完成。CPU 訓練可能需要較長時間。",
       training: "正在本機 CPU 訓練。可以取消；取消會刪除未完成音訊與輸出。",
-      verified: "本人音色模型已通過本機 weights-only 驗證，可在 RVC 設定檔中啟用。",
+      verified:
+        "本人音色模型已通過本機 weights-only 驗證，可在 RVC 設定檔中啟用。",
       failed: "本機錄製或訓練未完成；未建立可用音色模型。",
       canceled: "本機錄製或訓練已取消，敏感工作檔已刪除。",
     }[state] ?? "本機本人音色狀態尚未確認。";
@@ -1440,18 +1514,20 @@ function updateVoiceTrainingReadout() {
     VOICE_TRAINING_POLICY.targetDurationMs;
   const progress =
     ui.voiceTraining.status.state === "training"
-      ? ui.voiceTraining.status.progress ?? 0
+      ? (ui.voiceTraining.status.progress ?? 0)
       : Math.min(100, Math.round((durationMs / targetDurationMs) * 100));
-  elements["voice-training-elapsed"].textContent = `${formatVoiceTrainingDuration(
-    durationMs,
-  )} / ${formatVoiceTrainingDuration(targetDurationMs)}`;
+  elements["voice-training-elapsed"].textContent =
+    `${formatVoiceTrainingDuration(
+      durationMs,
+    )} / ${formatVoiceTrainingDuration(targetDurationMs)}`;
   elements["voice-training-progress"].value = progress;
   if (!media) return;
   const sampled = Math.max(1, media.level.sampledFrames);
   elements["voice-training-level"].textContent = `輸入電平：${Math.round(
     media.level.peak * 100,
   )}%`;
-  elements["voice-training-clip"].textContent = `削波：${media.level.clippedFrames}`;
+  elements["voice-training-clip"].textContent =
+    `削波：${media.level.clippedFrames}`;
   elements["voice-training-silence"].textContent = `靜音：${Math.round(
     (media.level.silentFrames / sampled) * 100,
   )}%`;
@@ -1473,19 +1549,27 @@ function updateVoiceTrainingControls() {
     consent &&
     name
   );
-  elements["voice-training-pause"].disabled = !(state === "recording" && recording);
-  elements["voice-training-resume"].disabled = !(state === "paused" && recording);
+  elements["voice-training-pause"].disabled = !(
+    state === "recording" && recording
+  );
+  elements["voice-training-resume"].disabled = !(
+    state === "paused" && recording
+  );
   elements["voice-training-stop"].disabled = !(
     ["recording", "paused"].includes(state) && recording
   );
   elements["voice-training-train"].disabled = !(
-    state === "ready-to-train" && runtimeAvailable && finalConsent
+    state === "ready-to-train" &&
+    runtimeAvailable &&
+    finalConsent
   );
-  elements["voice-training-cancel"].disabled = !(
-    ["recording", "paused", "inspecting", "normalizing", "training"].includes(
-      state,
-    )
-  );
+  elements["voice-training-cancel"].disabled = ![
+    "recording",
+    "paused",
+    "inspecting",
+    "normalizing",
+    "training",
+  ].includes(state);
   elements["voice-training-delete"].disabled = !(
     Boolean(status.id) && elements["voice-training-delete-confirm"].checked
   );
@@ -1624,7 +1708,10 @@ async function startVoiceTrainingRecording() {
     recorder.start(1_000);
     media.levelTimer = window.setInterval(updateVoiceTrainingLevel, 100);
     media.elapsedTimer = window.setInterval(() => {
-      if (currentVoiceTrainingDuration() >= VOICE_TRAINING_POLICY.maximumDurationMs) {
+      if (
+        currentVoiceTrainingDuration() >=
+        VOICE_TRAINING_POLICY.maximumDurationMs
+      ) {
         void stopVoiceTrainingRecording();
         return;
       }
@@ -1647,7 +1734,10 @@ async function pauseVoiceTrainingRecording() {
   if (!media || media.recorder.state !== "recording") return;
   try {
     const status = await window.translive.voiceTrainingPauseRecording(media.id);
-    media.elapsedBeforePause += Math.max(0, Date.now() - media.segmentStartedAt);
+    media.elapsedBeforePause += Math.max(
+      0,
+      Date.now() - media.segmentStartedAt,
+    );
     media.paused = true;
     media.recorder.pause();
     renderVoiceTraining(status);
@@ -1660,7 +1750,9 @@ async function resumeVoiceTrainingRecording() {
   const media = ui.voiceTraining.media;
   if (!media || media.recorder.state !== "paused") return;
   try {
-    const status = await window.translive.voiceTrainingResumeRecording(media.id);
+    const status = await window.translive.voiceTrainingResumeRecording(
+      media.id,
+    );
     media.segmentStartedAt = Date.now();
     media.paused = false;
     media.recorder.resume();
@@ -1674,7 +1766,10 @@ async function stopVoiceTrainingRecording() {
   const media = ui.voiceTraining.media;
   if (!media || media.recorder.state === "inactive") return;
   if (!media.paused) {
-    media.elapsedBeforePause += Math.max(0, Date.now() - media.segmentStartedAt);
+    media.elapsedBeforePause += Math.max(
+      0,
+      Date.now() - media.segmentStartedAt,
+    );
     media.paused = true;
   }
   media.recorder.stop();
@@ -2285,6 +2380,15 @@ for (const button of document.querySelectorAll("[data-view-button]")) {
   button.addEventListener("click", () => setView(button.dataset.viewButton));
 }
 elements["refresh-devices"].addEventListener("click", refreshDevices);
+navigator.mediaDevices?.addEventListener("devicechange", async () => {
+  await refreshDevices();
+  const reaction = decideDeviceChangeReaction({
+    appState: ui.app,
+    missingSlots: ui.missingRecommendedDevices,
+    mode: ui.mode,
+  });
+  if (reaction.level === "warn") showAssertiveError(reaction.message);
+});
 elements["account-login-button"].addEventListener("click", startAccountLogin);
 elements["account-login-cancel"].addEventListener("click", async () => {
   await window.translive.accountLoginCancel();
@@ -2331,6 +2435,17 @@ for (const button of document.querySelectorAll(".mute-button")) {
   );
 }
 elements["diagnostics-button"].addEventListener("click", () => setDrawer(true));
+elements["status-open-diagnostics"].addEventListener("click", () =>
+  setDrawer(true),
+);
+elements["audio-role-info"].addEventListener("click", () => {
+  const note = elements["role-note"];
+  note.hidden = !note.hidden;
+  elements["audio-role-info"].setAttribute(
+    "aria-expanded",
+    String(!note.hidden),
+  );
+});
 elements["diagnostics-button-live"].addEventListener("click", () =>
   setDrawer(true),
 );
@@ -2526,26 +2641,33 @@ elements["voice-profile-name"].addEventListener(
   "input",
   updateVoiceTrainingControls,
 );
-elements["voice-training-start"].addEventListener("click", () =>
-  void startVoiceTrainingRecording(),
+elements["voice-training-start"].addEventListener(
+  "click",
+  () => void startVoiceTrainingRecording(),
 );
-elements["voice-training-pause"].addEventListener("click", () =>
-  void pauseVoiceTrainingRecording(),
+elements["voice-training-pause"].addEventListener(
+  "click",
+  () => void pauseVoiceTrainingRecording(),
 );
-elements["voice-training-resume"].addEventListener("click", () =>
-  void resumeVoiceTrainingRecording(),
+elements["voice-training-resume"].addEventListener(
+  "click",
+  () => void resumeVoiceTrainingRecording(),
 );
-elements["voice-training-stop"].addEventListener("click", () =>
-  void stopVoiceTrainingRecording(),
+elements["voice-training-stop"].addEventListener(
+  "click",
+  () => void stopVoiceTrainingRecording(),
 );
-elements["voice-training-train"].addEventListener("click", () =>
-  void startVoiceTraining(),
+elements["voice-training-train"].addEventListener(
+  "click",
+  () => void startVoiceTraining(),
 );
-elements["voice-training-cancel"].addEventListener("click", () =>
-  void cancelVoiceTraining(),
+elements["voice-training-cancel"].addEventListener(
+  "click",
+  () => void cancelVoiceTraining(),
 );
-elements["voice-training-delete"].addEventListener("click", () =>
-  void deleteVoiceTraining(),
+elements["voice-training-delete"].addEventListener(
+  "click",
+  () => void deleteVoiceTraining(),
 );
 elements["tray-close-behavior"].addEventListener("change", async (event) => {
   const result = await window.translive.traySetCloseBehavior(
@@ -2741,6 +2863,33 @@ window.translive.onEvent(async (event) => {
     setAppState("stopped");
   }
 });
+
+for (const group of document.querySelectorAll(".caption-group")) {
+  group.addEventListener("scroll", () => {
+    group.dataset.unpinned =
+      group.scrollTop + group.clientHeight < group.scrollHeight - 24 ? "1" : "";
+  });
+}
+
+let captionScale =
+  Number(window.localStorage.getItem("translive-caption-scale")) || 1;
+function applyCaptionScale() {
+  captionScale =
+    Math.round(Math.min(1.4, Math.max(0.8, captionScale)) * 10) / 10;
+  document
+    .querySelector(".live-screen")
+    .style.setProperty("--caption-scale", String(captionScale));
+  window.localStorage.setItem("translive-caption-scale", String(captionScale));
+}
+elements["caption-size-down"].addEventListener("click", () => {
+  captionScale -= 0.1;
+  applyCaptionScale();
+});
+elements["caption-size-up"].addEventListener("click", () => {
+  captionScale += 0.1;
+  applyCaptionScale();
+});
+applyCaptionScale();
 
 setMode("meeting");
 setView("translate");

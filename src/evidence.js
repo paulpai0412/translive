@@ -76,9 +76,9 @@ function allSamples(timing, metric) {
 
 function pacingMetrics(metrics) {
   const safe = Object.fromEntries(
-    PACING_NUMERIC_FIELDS.filter((field) => Number.isFinite(metrics?.[field])).map(
-      (field) => [field, Math.round(metrics[field])],
-    ),
+    PACING_NUMERIC_FIELDS.filter((field) =>
+      Number.isFinite(metrics?.[field]),
+    ).map((field) => [field, Math.round(metrics[field])]),
   );
   if (/^[a-z-]{1,100}$/.test(metrics?.policyId ?? "")) {
     safe.policyId = metrics.policyId;
@@ -88,6 +88,17 @@ function pacingMetrics(metrics) {
   }
   return safe;
 }
+
+export function textFingerprint(text) {
+  let hash = 0x811c9dc5;
+  for (const char of String(text ?? "")) {
+    hash ^= char.codePointAt(0);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
+const MAX_REALTIME_NOTES = 200;
 
 export class RunEvidence {
   #data;
@@ -131,6 +142,7 @@ export class RunEvidence {
         idHash: hashEndpointId(id),
       })),
       sessions: { tx: {}, rx: {} },
+      realtimeNotes: { tx: [], rx: [] },
       blockedAttempts: [],
       stateTransitions: [],
       transcriptTimestamps: [],
@@ -210,6 +222,26 @@ export class RunEvidence {
       direction,
       role: String(role ?? "unknown"),
     });
+  }
+
+  // Content-free diagnostics ring for the realtime event stream: text is
+  // reduced to a length and a short fingerprint so loops can be traced
+  // without transcripts entering evidence.
+  recordRealtimeNote(direction, { atMs, kind, role, item, detail, text } = {}) {
+    const notes = this.#data.realtimeNotes[direction];
+    if (!notes) return;
+    const note = { atMs: safeTime(atMs), kind: String(kind ?? "unknown") };
+    if (role) note.role = String(role);
+    if (item) note.item = String(item);
+    if (detail) note.detail = String(detail);
+    if (text != null) {
+      note.textLength = String(text).length;
+      note.fp = textFingerprint(text);
+    }
+    notes.push(note);
+    if (notes.length > MAX_REALTIME_NOTES) {
+      notes.splice(0, notes.length - MAX_REALTIME_NOTES);
+    }
   }
 
   recordPacing(direction, metrics) {

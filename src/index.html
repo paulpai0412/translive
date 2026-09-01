@@ -20,8 +20,9 @@
         <button class="nav-item is-active" data-view-button="translate">
           即時翻譯
         </button>
-        <button class="nav-item" data-view-button="settings">設定</button>
+        <button class="nav-item" data-view-button="voice">音色</button>
         <button class="nav-item" data-view-button="history">紀錄</button>
+        <button class="nav-item" data-view-button="settings">設定</button>
       </nav>
       <div class="top-actions">
         <button class="account-chip" id="account-button" type="button">
@@ -138,75 +139,135 @@
 
           <section class="config-section">
             <h2>音訊路由</h2>
-            <div class="field-grid device-grid">
-              <label data-mode-show="meeting">
-                <span>會議平台</span>
-                <select id="meeting-platform">
-                  <option value="teams">Microsoft Teams</option>
-                  <option value="zoom">Zoom</option>
-                  <option value="custom">其他應用程式</option>
-                </select>
-              </label>
-              <label>
-                <span>虛擬路由</span>
-                <select id="route-profile">
-                  <option value="voicemeeter">VoiceMeeter Banana</option>
-                  <option value="vb-cable">VB-CABLE A+B</option>
-                </select>
-              </label>
-              <label data-mode-show="meeting microphone">
-                <span>實體麥克風</span>
-                <select id="physical-mic">
-                  <option value="">選擇裝置</option>
-                </select>
-              </label>
-              <label data-mode-show="meeting microphone">
-                <span>虛擬麥克風輸出</span>
-                <select id="tx-sink">
-                  <option value="">選擇裝置</option>
-                </select>
-              </label>
-              <label data-mode-show="meeting media">
-                <span>音訊來源</span>
-                <select id="rx-source">
-                  <option value="">選擇裝置</option>
-                </select>
-              </label>
-              <label data-mode-show="meeting media">
-                <span>耳機輸出</span>
-                <select id="headphones">
-                  <option value="">選擇裝置</option>
-                </select>
-              </label>
-            </div>
-            <label class="checkbox-row" data-mode-show="meeting media">
-              <input id="headphones-confirmed" type="checkbox" />
-              <span>我確認選擇的是耳機，不是實體喇叭。</span>
-            </label>
-            <p class="mode-help">
-              開始翻譯時只切換目前模式需要的 Windows 音訊角色；停止後自動還原，避免其他 App 聲音混入。
-            </p>
-            <div class="quick-setup-row" data-mode-show="meeting">
-              <button
-                class="secondary-button"
-                id="quick-setup-button"
-                type="button"
-              >
-                快速設定 Teams／Zoom
-              </button>
-              <span>套用前保存目前裝置，停止翻譯後自動還原。</span>
+            <div class="route-groups">
+              <div class="route-group">
+                <h3 data-mode-show="meeting">會議與路由</h3>
+                <div class="field-grid">
+                  <label data-mode-show="meeting">
+                    <span>會議平台</span>
+                    <select id="meeting-platform">
+                      <option value="teams">Microsoft Teams</option>
+                      <option value="zoom">Zoom</option>
+                      <option value="custom">其他應用程式</option>
+                    </select>
+                  </label>
+                  <div class="field-action" data-mode-show="meeting">
+                    <button
+                      class="secondary-button"
+                      id="quick-setup-button"
+                      type="button"
+                    >
+                      快速設定 Teams／Zoom…
+                    </button>
+                  </div>
+                  <label>
+                    <span>虛擬路由</span>
+                    <select id="route-profile">
+                      <option value="voicemeeter">VoiceMeeter Banana</option>
+                      <option value="vb-cable">VB-CABLE A+B</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+              <div class="route-group" data-mode-show="meeting microphone">
+                <h3>我說出去（TX）</h3>
+                <div class="field-grid">
+                  <label>
+                    <span>實體麥克風</span>
+                    <select id="physical-mic">
+                      <option value="">選擇裝置</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>虛擬麥克風輸出</span>
+                    <div class="select-with-action">
+                      <select id="tx-sink">
+                        <option value="">選擇裝置</option>
+                      </select>
+                      <button
+                        class="icon-button test-tone-button"
+                        id="test-tx-sink"
+                        type="button"
+                        aria-label="播放虛擬麥克風輸出測試音"
+                        title="播放測試音"
+                        disabled
+                      >
+                        ▶
+                      </button>
+                    </div>
+                  </label>
+                </div>
+              </div>
+              <div class="route-group" data-mode-show="meeting media">
+                <h3>我聽進來（RX）</h3>
+                <div class="field-grid">
+                  <label>
+                    <span>音訊來源</span>
+                    <select id="rx-source">
+                      <option value="">選擇裝置</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>耳機輸出</span>
+                    <div class="select-with-action">
+                      <select id="headphones">
+                        <option value="">選擇裝置</option>
+                      </select>
+                      <button
+                        class="icon-button test-tone-button"
+                        id="test-headphones"
+                        type="button"
+                        aria-label="播放耳機輸出測試音"
+                        title="播放測試音"
+                        disabled
+                      >
+                        ▶
+                      </button>
+                    </div>
+                  </label>
+                </div>
+                <label class="checkbox-row">
+                  <input id="headphones-confirmed" type="checkbox" />
+                  <span>我確認選擇的是耳機，不是實體喇叭。</span>
+                </label>
+              </div>
             </div>
           </section>
 
-          <div class="health-row" aria-label="系統健康狀態">
+          <div class="status-strip" aria-label="系統狀態">
             <span id="health-account"><i></i>ChatGPT</span>
             <span id="health-runtime"><i></i>GPT‑Live</span>
             <span id="health-devices"><i></i>音訊裝置</span>
+            <button
+              class="icon-button status-info"
+              id="audio-role-info"
+              type="button"
+              aria-expanded="false"
+              aria-controls="role-note"
+              aria-label="音訊角色切換說明"
+            >
+              ⓘ
+            </button>
+            <button
+              class="text-button"
+              id="status-open-diagnostics"
+              type="button"
+            >
+              診斷
+            </button>
           </div>
-          <p id="global-audio-status" class="mode-help" role="status">
+          <p class="role-note" id="role-note" hidden>
+            開始翻譯時只切換目前模式需要的 Windows
+            音訊角色；停止後自動還原，避免其他 App 聲音混入。
+          </p>
+          <p id="global-audio-status" class="status-detail" role="status">
             正在檢查 Windows 系統音訊設定…
           </p>
-          <p id="voicemeeter-routing-status" class="mode-help" role="status">
+          <p
+            id="voicemeeter-routing-status"
+            class="status-detail"
+            role="status"
+          >
             正在檢查 VoiceMeeter 內部路由…
           </p>
         </div>
@@ -335,6 +396,28 @@
 
         <footer class="live-footer">
           <span id="live-route-summary">VoiceMeeter · Cove</span>
+          <div
+            class="caption-size-controls"
+            role="group"
+            aria-label="字幕字體大小"
+          >
+            <button
+              class="icon-button"
+              id="caption-size-down"
+              type="button"
+              aria-label="縮小字幕"
+            >
+              A−
+            </button>
+            <button
+              class="icon-button"
+              id="caption-size-up"
+              type="button"
+              aria-label="放大字幕"
+            >
+              A＋
+            </button>
+          </div>
           <button class="text-button" id="mini-overlay-button" type="button">
             迷你字幕
           </button>
@@ -353,6 +436,7 @@
           <span class="success-mark">✓</span>
           <h1>翻譯已停止</h1>
           <p id="stopped-copy">音訊連線已釋放。</p>
+          <p id="stopped-restore-status" class="restore-note" hidden></p>
           <div class="stopped-actions">
             <button class="primary-button" id="restart-button">再次開始</button>
             <button class="secondary-button" id="stopped-open-records">
@@ -419,39 +503,22 @@
         </div>
       </section>
 
-      <section class="screen settings-screen" data-view-show="settings">
+      <section class="screen voice-screen" data-view-show="voice">
         <div class="page-heading">
           <div>
-            <p class="section-kicker">偏好設定</p>
-            <h1>設定</h1>
-            <p>帳戶、音訊、runtime 與本機處理偏好。</p>
+            <p class="section-kicker">本機處理</p>
+            <h1>音色</h1>
+            <p>自訂本人音色；錄音、模型與索引僅保存在本機，不會上傳。</p>
           </div>
         </div>
-        <div class="settings-list">
-          <button id="settings-account-button">
-            帳戶與 ChatGPT OAuth<span id="settings-account-status">檢查中</span>
-          </button>
-          <button id="settings-logout-button">
-            登出 ChatGPT<span>移除本機 Codex 登入</span>
-          </button>
-          <button id="theme-button">
-            外觀主題<span id="theme-label">深色</span>
-          </button>
-          <label class="settings-toggle"
-            ><span>關閉主視窗時</span
-            ><select id="tray-close-behavior">
-              <option value="tray">縮至系統匣，保持翻譯</option>
-              <option value="exit">完全結束 TransLive</option>
-            </select></label
-          >
-          <button id="settings-runtime-button">
-            Codex runtime<span id="settings-runtime-status">尚未檢查</span>
-          </button>
-          <button id="settings-retention-button">
-            本機保存上限<span id="settings-retention-status">正在檢查</span>
-          </button>
+        <div class="voice-empty-state" id="voice-empty-state">
+          <strong>尚未建立本人音色</strong>
+          <p>
+            建立音色需要約 10 分鐘的本機錄音與 CPU
+            訓練，素材只保存在這台電腦。從下方「錄製與訓練本人音色」開始，或匯入已訓練的
+            RVC 模型；未完成驗證前一律播放原 GPT 音色。
+          </p>
         </div>
-
         <section
           class="voice-conversion-settings"
           aria-labelledby="voice-conversion-title"
@@ -547,22 +614,29 @@
               <p class="section-kicker">本人資料</p>
               <h3 id="voice-training-title">錄製與訓練本人音色</h3>
               <p>
-                錄音只在這台電腦處理，不會送往 ChatGPT、逐字稿或診斷包。目標約 10 分鐘的單人、低噪音語音。
+                錄音只在這台電腦處理，不會送往 ChatGPT、逐字稿或診斷包。目標約
+                10 分鐘的單人、低噪音語音。
               </p>
               <p class="voice-training-warning">
-                CPU 訓練可能需要較長時間。DirectML 目前僅作推論候選，除非已驗證的本機訓練器另行證實。
+                CPU 訓練可能需要較長時間。DirectML
+                目前僅作推論候選，除非已驗證的本機訓練器另行證實。
               </p>
             </div>
             <div class="voice-training-controls">
               <label>
                 <span>錄音麥克風</span>
-                <select id="voice-training-microphone" aria-describedby="voice-training-status">
+                <select
+                  id="voice-training-microphone"
+                  aria-describedby="voice-training-status"
+                >
                   <option value="">正在檢查實體麥克風…</option>
                 </select>
               </label>
               <label class="checkbox-row">
                 <input id="voice-training-consent" type="checkbox" />
-                <span>我確認這是我本人聲音，並同意僅用於本機即時翻譯輸出。</span>
+                <span
+                  >我確認這是我本人聲音，並同意僅用於本機即時翻譯輸出。</span
+                >
               </label>
             </div>
             <div class="voice-training-readout" aria-live="polite">
@@ -575,7 +649,9 @@
                 aria-label="本人音色錄製與訓練進度"
                 value="0"
                 max="100"
-              >0%</progress>
+              >
+                0%
+              </progress>
               <div class="voice-training-levels">
                 <span id="voice-training-level">輸入電平：—</span>
                 <span id="voice-training-clip">削波：—</span>
@@ -586,40 +662,116 @@
               正在檢查固定本機 RVC runtime…
             </p>
             <div class="voice-training-actions">
-              <button class="primary-button" id="voice-training-start" type="button" disabled>
+              <button
+                class="primary-button"
+                id="voice-training-start"
+                type="button"
+                disabled
+              >
                 開始錄製本人音色
               </button>
-              <button class="secondary-button" id="voice-training-pause" type="button" disabled>
+              <button
+                class="secondary-button"
+                id="voice-training-pause"
+                type="button"
+                disabled
+              >
                 暫停
               </button>
-              <button class="secondary-button" id="voice-training-resume" type="button" disabled>
+              <button
+                class="secondary-button"
+                id="voice-training-resume"
+                type="button"
+                disabled
+              >
                 繼續
               </button>
-              <button class="secondary-button" id="voice-training-stop" type="button" disabled>
+              <button
+                class="secondary-button"
+                id="voice-training-stop"
+                type="button"
+                disabled
+              >
                 停止並檢查錄音
               </button>
               <label class="checkbox-row voice-training-final-consent">
                 <input id="voice-training-final-consent" type="checkbox" />
-                <span>我再次確認以本人聲音開始本機訓練與建立可用音色模型。</span>
+                <span
+                  >我再次確認以本人聲音開始本機訓練與建立可用音色模型。</span
+                >
               </label>
-              <button class="secondary-button" id="voice-training-train" type="button" disabled>
+              <button
+                class="secondary-button"
+                id="voice-training-train"
+                type="button"
+                disabled
+              >
                 開始本機 CPU 訓練
               </button>
-              <button class="text-button" id="voice-training-cancel" type="button" disabled>
+              <button
+                class="text-button"
+                id="voice-training-cancel"
+                type="button"
+                disabled
+              >
                 取消工作
               </button>
             </div>
             <div class="voice-training-delete">
               <label class="checkbox-row">
                 <input id="voice-training-delete-confirm" type="checkbox" />
-                <span>我確認永久刪除此錄音、正規化音訊、訓練工作與未完成輸出。</span>
+                <span
+                  >我確認永久刪除此錄音、正規化音訊、訓練工作與未完成輸出。</span
+                >
               </label>
-              <button class="danger-button" id="voice-training-delete" type="button" disabled>
+              <button
+                class="danger-button"
+                id="voice-training-delete"
+                type="button"
+                disabled
+              >
                 刪除本次本人音色工作
               </button>
             </div>
           </section>
         </section>
+      </section>
+
+      <section class="screen settings-screen" data-view-show="settings">
+        <div class="page-heading">
+          <div>
+            <p class="section-kicker">偏好設定</p>
+            <h1>設定</h1>
+            <p>帳戶、外觀與系統偏好。</p>
+          </div>
+        </div>
+        <div class="settings-list">
+          <div class="settings-group">帳戶</div>
+          <button id="settings-account-button">
+            帳戶與 ChatGPT OAuth<span id="settings-account-status">檢查中</span>
+          </button>
+          <button id="settings-logout-button">
+            登出 ChatGPT<span>移除本機 Codex 登入</span>
+          </button>
+          <div class="settings-group">一般</div>
+          <button id="theme-button">
+            外觀主題<span id="theme-label">深色</span>
+          </button>
+          <label class="settings-toggle"
+            ><span>關閉主視窗時</span
+            ><select id="tray-close-behavior">
+              <option value="tray">縮至系統匣，保持翻譯</option>
+              <option value="exit">完全結束 TransLive</option>
+            </select></label
+          >
+          <div class="settings-group">系統</div>
+          <button id="settings-runtime-button">
+            Codex runtime<span id="settings-runtime-status">尚未檢查</span>
+          </button>
+          <button id="settings-retention-button">
+            本機保存上限<span id="settings-retention-status">正在檢查</span>
+          </button>
+        </div>
       </section>
     </main>
 

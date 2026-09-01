@@ -44,6 +44,39 @@ export function modeLabel(mode) {
   return MODE_LABELS[mode] ?? "翻譯";
 }
 
+const RESTORE_FAILURE_STATES = new Set([
+  "restore-failed",
+  "recovery-needed",
+  "legacy-recovery-needed",
+  "checkpoint-clear-failed",
+]);
+const RESTORED_STATES = new Set(["restored", "unsupported"]);
+
+export function stoppedStatePresentation({
+  audioDefaultsState,
+  routingState,
+} = {}) {
+  const states = [audioDefaultsState, routingState];
+  if (states.some((state) => RESTORE_FAILURE_STATES.has(state))) {
+    return {
+      restoreLine:
+        "部分系統音訊設定尚未還原，請開啟診斷或 Windows 音效設定確認。",
+      level: "warn",
+    };
+  }
+  if (states.every((state) => RESTORED_STATES.has(state))) {
+    return {
+      restoreLine: "原本的 Windows 音訊設定與 VoiceMeeter 路由已還原。",
+      level: "ok",
+    };
+  }
+  return { restoreLine: "", level: "none" };
+}
+
+export function voiceEmptyStateVisible(profileCount) {
+  return profileCount === 0;
+}
+
 export function diagnosticsPresentation({ mode, status = {} }) {
   const active =
     {

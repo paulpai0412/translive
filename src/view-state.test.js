@@ -7,6 +7,8 @@ import {
   diagnosticsPresentation,
   modeLabel,
   runStatePresentation,
+  stoppedStatePresentation,
+  voiceEmptyStateVisible,
 } from "./view-state.js";
 
 test("localizes runtime channel states for the visible UI", () => {
@@ -94,4 +96,61 @@ test("names each selected mode in Traditional Chinese", () => {
   assert.equal(modeLabel("meeting"), "雙向會議");
   assert.equal(modeLabel("media"), "媒體翻譯");
   assert.equal(modeLabel("microphone"), "麥克風翻譯");
+});
+
+test("stopped 畫面在音訊設定已還原時顯示確認訊息", () => {
+  assert.deepEqual(
+    stoppedStatePresentation({
+      audioDefaultsState: "restored",
+      routingState: "restored",
+    }),
+    {
+      restoreLine: "原本的 Windows 音訊設定與 VoiceMeeter 路由已還原。",
+      level: "ok",
+    },
+  );
+});
+
+test("stopped 畫面在不支援平台的狀態視為已還原", () => {
+  const presentation = stoppedStatePresentation({
+    audioDefaultsState: "unsupported",
+    routingState: "unsupported",
+  });
+  assert.equal(presentation.level, "ok");
+});
+
+test("stopped 畫面在任一還原失敗或待還原時顯示警告", () => {
+  for (const state of [
+    "restore-failed",
+    "recovery-needed",
+    "legacy-recovery-needed",
+    "checkpoint-clear-failed",
+  ]) {
+    const presentation = stoppedStatePresentation({
+      audioDefaultsState: state,
+      routingState: "restored",
+    });
+    assert.equal(presentation.level, "warn", state);
+    assert.match(presentation.restoreLine, /尚未還原/);
+  }
+  const routingFailure = stoppedStatePresentation({
+    audioDefaultsState: "restored",
+    routingState: "restore-failed",
+  });
+  assert.equal(routingFailure.level, "warn");
+});
+
+test("stopped 畫面在狀態未知時不顯示還原訊息", () => {
+  assert.deepEqual(
+    stoppedStatePresentation({
+      audioDefaultsState: undefined,
+      routingState: undefined,
+    }),
+    { restoreLine: "", level: "none" },
+  );
+});
+
+test("音色頁在沒有設定檔時顯示空白導引", () => {
+  assert.equal(voiceEmptyStateVisible(0), true);
+  assert.equal(voiceEmptyStateVisible(2), false);
 });

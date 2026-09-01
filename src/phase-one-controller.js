@@ -47,6 +47,7 @@ const TRANSLATION_PROMPTS = Object.freeze({
     "Translate each completed utterance exactly once and never repeat text from an earlier utterance unless the speaker repeats it.",
     "Immediately translate and speak complete short utterances such as Yes, No, OK, Thanks, 好, and 是.",
     "Speak every interpretation aloud through the audio output; never return text only.",
+    "Speak every interpretation aloud to the very end of the utterance, including any short trailing words; never leave the final part unspoken.",
     "Do not wait for sentence completion; begin speaking after each stable short phrase while continuing to listen.",
     "Keep a rolling delay near one to two seconds and translate in short clauses without restarting spoken words.",
     "Use concise equivalent wording at a stable, natural conversational pace; do not rush speech to catch up.",
@@ -570,6 +571,31 @@ export class PhaseOneController {
     }
 
     const atMs = Date.now();
+    const realtimeKind = String(notification.method ?? "").startsWith(
+      "thread/realtime/",
+    )
+      ? notification.method.slice("thread/realtime/".length)
+      : undefined;
+    if (
+      [
+        "transcript/delta",
+        "transcript/done",
+        "item/started",
+        "item/transcript/delta",
+        "item/completed",
+      ].includes(realtimeKind)
+    ) {
+      context.evidence.recordRealtimeNote(direction, {
+        atMs,
+        kind: realtimeKind,
+        role: notification.params?.role ?? notification.params?.item?.role,
+        item: notification.params?.itemId ?? notification.params?.item?.id,
+        text:
+          notification.params?.delta ??
+          notification.params?.text ??
+          notification.params?.item?.text,
+      });
+    }
     if (notification.method === "thread/realtime/started") {
       context.evidence.recordSession(direction, {
         threadId,
@@ -641,6 +667,12 @@ export class PhaseOneController {
         context.threads.get(threadId) === "rx" && item.role === "assistant"
           ? state.pendingReplayItems.shift()
           : undefined;
+      context.evidence.recordRealtimeNote(context.threads.get(threadId), {
+        kind: "local/item-classify",
+        role: item.role,
+        item: item.id,
+        detail: expected ? "replay" : "new",
+      });
       state.items.set(item.id, {
         expected,
         replay: Boolean(expected),
@@ -671,9 +703,7 @@ export class PhaseOneController {
     if (item.replay) {
       item.expected.completed = true;
       if (item.expected.accepted) {
-        state.echoes = state.echoes.filter(
-          (entry) => entry !== item.expected,
-        );
+        state.echoes = state.echoes.filter((entry) => entry !== item.expected);
         this.#rememberEcho(state, item.expected.text, Date.now());
       }
       return undefined;
@@ -808,12 +838,12 @@ export class PhaseOneController {
         (text === expected.text ||
           (text === "" && expected.received === expected.text))
       ) {
-        if (!expected.accepted) {
-          expected.completed = true;
-          expected.held.push(notification);
-        } else {
+        if (expected.accepted) {
           state.echoes.shift();
           this.#rememberEcho(state, expected.text, atMs);
+        } else {
+          expected.completed = true;
+          expected.held.push(notification);
         }
         return { suppressed: true };
       }
@@ -933,73 +963,16 @@ export class PhaseOneController {
       return;
     }
     if (decision.type !== "dispatch") return;
-    const threadId = [...context.threads].find(
-      ([, direction]) => direction === "rx",
-    )?.[0];
-    if (!threadId) return;
-
-    // Register before awaiting the RPC. The flat transcript API has no
-    // correlation ID, so echo matching is an ordered, bounded heuristic.
-    const expected = {
-      accepted: false,
-      completed: false,
-      held: [],
-      received: "",
+    // RX speech is produced natively by the model's own realtime audio. The
+    // wire protocol (turn.done) re-reports accumulated spoken text without
+    // correlation ids, so re-injecting text through appendSpeech creates an
+    // uncorrelatable echo channel — the 2026-09-01 loop. A dispatch now only
+    // advances the paced target caption.
+    context.evidence.recordRealtimeNote("rx", {
+      kind: "local/dispatch",
+      detail: decision.id,
       text: decision.text,
-    };
-    state.echoes.push(expected);
-    if (state.itemModeThreads.has(threadId)) {
-      state.pendingReplayItems.push(expected);
-    }
-    state.inFlight.set(expected, {
-      characters: decision.characters,
-      id: decision.id,
     });
-    let failure;
-    try {
-      await context.client.appendSpeech(threadId, decision.text);
-    } catch (error) {
-      failure = error;
-    }
-    state.inFlight.delete(expected);
-
-    if (!this.#pacingIsCurrent(context, state, generation)) {
-      state.echoes = state.echoes.filter((entry) => entry !== expected);
-      state.pendingReplayItems = state.pendingReplayItems.filter(
-        (entry) => entry !== expected,
-      );
-      return;
-    }
-    if (failure) {
-      state.echoes = state.echoes.filter((entry) => entry !== expected);
-      state.pendingReplayItems = state.pendingReplayItems.filter(
-        (entry) => entry !== expected,
-      );
-      for (const held of expected.held) {
-        this.#handleRxSpeechFallback(context, "rx", held, {
-          skipEcho: true,
-          skipFinalDedupe: true,
-        });
-      }
-      context.evidence.recordError("rx", failure, {
-        requestId: requestIdFrom(failure),
-      });
-      this.#publish({
-        type: "error",
-        direction: "rx",
-        message: `Could not speak translated Chinese: ${safeMessage(failure)}`,
-        aggregate: context.run?.aggregateStatus(),
-      });
-      this.#armRxSpeechHead(context);
-      return;
-    }
-
-    expected.accepted = true;
-    if (expected.completed) {
-      state.echoes = state.echoes.filter((entry) => entry !== expected);
-      this.#rememberEcho(state, expected.text, Date.now());
-    }
-    expected.held = [];
     this.#publish({
       type: "speech-fallback",
       direction: "rx",
