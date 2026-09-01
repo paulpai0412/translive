@@ -97,6 +97,10 @@ const PACKAGED_PATHS = new Set([
   "assets/codex/win32/codex.exe.sig",
 ]);
 
+// Runtime dependencies ship pruned to production deps; each must be
+// explicitly allowlisted here (paths are package-root relative).
+const PACKAGED_DEPENDENCY_PREFIXES = ["node_modules/pinyin-pro/"];
+
 function normalizedPath(value) {
   return String(value ?? "")
     .replaceAll("\\", "/")
@@ -104,7 +108,12 @@ function normalizedPath(value) {
 }
 
 export function packagedPathIsAllowed(path) {
-  return PACKAGED_PATHS.has(normalizedPath(path));
+  const normalized = normalizedPath(path);
+  return (
+    PACKAGED_PATHS.has(normalized) ||
+    ["node_modules", "node_modules/pinyin-pro"].includes(normalized) ||
+    PACKAGED_DEPENDENCY_PREFIXES.some((prefix) => normalized.startsWith(prefix))
+  );
 }
 
 export function packageIgnore(path, projectRoot) {

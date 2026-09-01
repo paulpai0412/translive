@@ -57,10 +57,70 @@ test("ignores everything while suspended", () => {
 });
 
 test("rejects missing or empty questions", () => {
-  const gate = new WakeGate({ armed: true });
   for (const text of ["hey translive", "hey translive,", "translive", "喂"]) {
+    // Fresh gate per input: a bare phrase now arms the follow-up window by
+    // design, which would chain into the next input on a shared instance.
+    const gate = new WakeGate({ armed: true });
     assert.equal(gate.onFinalTranscript({ source: "me", text }), null, text);
   }
+});
+
+test("homophone drift still fires (小泥小泥 vs 小妮小妮)", () => {
+  const gate = new WakeGate({ armed: true, phrase: "小泥小泥" });
+  assert.deepEqual(
+    gate.onFinalTranscript({ source: "me", text: "小妮小妮,預算多少" }),
+    { type: "question", question: "預算多少" },
+  );
+  assert.deepEqual(
+    gate.onFinalTranscript({ source: "me", text: "小尼小尼 結論" }),
+    { type: "question", question: "結論" },
+  );
+});
+
+test("a bare wake phrase arms a short follow-up window for the question", () => {
+  let now = 10_000;
+  const gate = new WakeGate({ armed: true, phrase: "小泥小泥", now: () => now });
+  assert.equal(
+    gate.onFinalTranscript({ source: "me", text: "小妮小妮" }),
+    null,
+  );
+  now += 1_500;
+  assert.deepEqual(
+    gate.onFinalTranscript({ source: "me", text: "系統何時會上線" }),
+    { type: "question", question: "系統何時會上線" },
+  );
+});
+
+test("the follow-up window expires", () => {
+  let now = 10_000;
+  const gate = new WakeGate({ armed: true, phrase: "小泥小泥", now: () => now });
+  gate.onFinalTranscript({ source: "me", text: "小妮小妮" });
+  now += 6_000;
+  assert.equal(
+    gate.onFinalTranscript({ source: "me", text: "系統何時會上線" }),
+    null,
+  );
+});
+
+test("suspend clears an armed follow-up window", () => {
+  const now = 10_000;
+  const gate = new WakeGate({ armed: true, phrase: "小泥小泥", now: () => now });
+  gate.onFinalTranscript({ source: "me", text: "小妮小妮" });
+  gate.suspend();
+  gate.resume();
+  assert.equal(
+    gate.onFinalTranscript({ source: "me", text: "系統何時會上線" }),
+    null,
+  );
+});
+
+test("repeating the wake phrase while armed still extracts the question", () => {
+  const gate = new WakeGate({ armed: true, phrase: "小泥小泥" });
+  gate.onFinalTranscript({ source: "me", text: "小妮小妮" });
+  assert.deepEqual(
+    gate.onFinalTranscript({ source: "me", text: "小妮小妮,預算多少" }),
+    { type: "question", question: "預算多少" },
+  );
 });
 
 test("recognizes the speak-conclusions command", () => {

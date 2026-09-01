@@ -96,3 +96,13 @@ test("packages only production runtime files and excludes secrets, evidence, and
     true,
   );
 });
+
+test("allowlists the pinyin-pro runtime dependency but not arbitrary node_modules", async () => {
+  const { packagedPathIsAllowed } = await import("./release-config.js");
+  assert.equal(
+    packagedPathIsAllowed("node_modules/pinyin-pro/dist/esm/index.mjs"),
+    true,
+  );
+  assert.equal(packagedPathIsAllowed("node_modules/pinyin-pro"), true);
+  assert.equal(packagedPathIsAllowed("node_modules/electron/index.js"), false);
+});
