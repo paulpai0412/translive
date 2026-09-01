@@ -29,6 +29,7 @@ const PACKAGED_PATHS = new Set([
   "src/main.js",
   "src/meeting-assistant-controller.js",
   "src/meeting-index.js",
+  "src/meeting-index-rebuild.js",
   "src/meeting-qa.js",
   "src/meeting-setup-controller.js",
   "src/meeting-setup-request.js",
