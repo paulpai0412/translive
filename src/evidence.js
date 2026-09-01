@@ -173,7 +173,9 @@ export class RunEvidence {
   }
 
   recordSession(direction, { threadId, realtimeSessionId } = {}) {
-    const session = this.#data.sessions[direction];
+    // tx/rx buckets always exist; extra channels (e.g. the assistant-mode qa
+    // voice) get one lazily so evidence capture never breaks a run.
+    const session = (this.#data.sessions[direction] ??= {});
     const safeThreadId = safeIdentifier(threadId);
     const safeRealtimeSessionId = safeIdentifier(realtimeSessionId);
     if (safeThreadId) session.threadId = safeThreadId;

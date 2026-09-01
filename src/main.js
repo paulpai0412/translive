@@ -19,8 +19,12 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { AccountController } from "./account-controller.js";
+import { AssistantPreferences } from "./assistant-preferences.js";
 import { resolveCodexLaunch } from "./codex-launch.js";
+import { CodexTextTurn } from "./codex-text-turn.js";
 import { buildDiagnostics } from "./diagnostics-service.js";
+import { MeetingAssistantController } from "./meeting-assistant-controller.js";
+import { MeetingIndex } from "./meeting-index.js";
 import { MeetingSetupController } from "./meeting-setup-controller.js";
 import { sanitizeMeetingSetupRequest } from "./meeting-setup-request.js";
 import { MeetingSetupStore } from "./meeting-setup-store.js";
@@ -75,6 +79,9 @@ let accountState = "unknown";
 let codexLaunch;
 let activeMode = "meeting";
 let controller;
+let assistantController;
+let assistantPreferences;
+let meetingIndex;
 let meetingSetupController;
 let miniCaptionWindowController;
 let quitting = false;
@@ -615,12 +622,14 @@ function registerIpc() {
   );
   ipcMain.handle("translive:records-delete", async (_event, id) => {
     await recordsStore.deleteSession(id);
+    meetingIndex?.removeSession(id);
     return { deleted: true };
   });
   ipcMain.handle("translive:records-delete-all", async (_event, request) => {
     await recordsStore.deleteAllSessions({
       confirmation: request?.confirmation,
     });
+    meetingIndex?.rebuild([]);
     return { deleted: true };
   });
   ipcMain.handle("translive:records-open-folder", async (_event, id) => {
@@ -663,6 +672,32 @@ function registerIpc() {
   );
   ipcMain.handle("translive:summary-cancel", (_event, requestId) =>
     summaryController.cancel(requestId),
+  );
+  ipcMain.handle("translive:assistant-start", async (_event, config) => {
+    const preferences = await assistantPreferences.load();
+    return assistantController.start({ ...preferences, ...config });
+  });
+  ipcMain.handle("translive:assistant-stop", () => assistantController.stop());
+  ipcMain.handle("translive:assistant-pending", () =>
+    assistantController.pendingAnswer(),
+  );
+  ipcMain.handle("translive:assistant-approve", (_event, id) =>
+    assistantController.approveAnswer(id),
+  );
+  ipcMain.handle("translive:assistant-reject", (_event, id) =>
+    assistantController.rejectAnswer(id),
+  );
+  ipcMain.handle("translive:assistant-speak-conclusions", () =>
+    assistantController.speakConclusions(),
+  );
+  ipcMain.handle("translive:assistant-set-wake-armed", (_event, armed) =>
+    assistantController.setWakeArmed(armed),
+  );
+  ipcMain.handle("translive:assistant-preferences-load", () =>
+    assistantPreferences.load(),
+  );
+  ipcMain.handle("translive:assistant-preferences-save", (_event, request) =>
+    assistantPreferences.save(request),
   );
   ipcMain.handle("translive:tray-status", () => trayController.status());
   ipcMain.handle("translive:tray-set-close-behavior", (_event, behavior) =>
@@ -735,6 +770,33 @@ if (isPrimaryInstance) {
         join(app.getPath("userData"), ".translive-evidence"),
       publish,
       records: recordsStore,
+    });
+    assistantPreferences = new AssistantPreferences({
+      directory: app.getPath("userData"),
+    });
+    meetingIndex = new MeetingIndex({
+      databaseFile: join(recordsStore.directory(), "meeting-index.db"),
+    });
+    assistantController = new MeetingAssistantController({
+      appVersion: app.getVersion(),
+      answer: (prompt) =>
+        new CodexTextTurn({
+          codexExecutable: codexLaunch.executable,
+          cwd: app.getAppPath(),
+        }).run(prompt),
+      codexExecutable: codexLaunch.executable,
+      codexVersion: codexLaunch.version ?? process.env.TRANSLIVE_CODEX_VERSION,
+      cwd: app.getAppPath(),
+      evidenceDirectory:
+        process.env.TRANSLIVE_EVIDENCE_DIR ||
+        join(app.getPath("userData"), ".translive-evidence"),
+      meetingIndex,
+      publish,
+      records: recordsStore,
+      summaryService: new CodexSummaryService({
+        codexExecutable: codexLaunch.executable,
+        cwd: app.getAppPath(),
+      }),
     });
     const windowsAudioAdapter = new WindowsMeetingDeviceAdapter({
       openExternal: (url) => shell.openExternal(url),
@@ -947,6 +1009,7 @@ if (isPrimaryInstance) {
         restoreDevices: false,
       }),
       accountController?.dispose(),
+      assistantController?.dispose(),
       summaryController?.dispose(),
       trayController?.dispose(),
       voiceConversionController?.dispose(),

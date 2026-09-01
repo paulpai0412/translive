@@ -101,6 +101,22 @@ contextBridge.exposeInMainWorld("translive", {
     ipcRenderer.invoke("translive:summary-aggregate-start", request),
   summaryCancel: (requestId) =>
     ipcRenderer.invoke("translive:summary-cancel", requestId),
+  assistantStart: (config) =>
+    ipcRenderer.invoke("translive:assistant-start", config),
+  assistantStop: () => ipcRenderer.invoke("translive:assistant-stop"),
+  assistantPending: () => ipcRenderer.invoke("translive:assistant-pending"),
+  assistantApprove: (id) =>
+    ipcRenderer.invoke("translive:assistant-approve", id),
+  assistantReject: (id) =>
+    ipcRenderer.invoke("translive:assistant-reject", id),
+  assistantSpeakConclusions: () =>
+    ipcRenderer.invoke("translive:assistant-speak-conclusions"),
+  assistantSetWakeArmed: (armed) =>
+    ipcRenderer.invoke("translive:assistant-set-wake-armed", armed),
+  assistantPreferencesLoad: () =>
+    ipcRenderer.invoke("translive:assistant-preferences-load"),
+  assistantPreferencesSave: (request) =>
+    ipcRenderer.invoke("translive:assistant-preferences-save", request),
   trayStatus: () => ipcRenderer.invoke("translive:tray-status"),
   traySetCloseBehavior: (behavior) =>
     ipcRenderer.invoke("translive:tray-set-close-behavior", behavior),
