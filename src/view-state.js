@@ -12,6 +12,7 @@ const MODE_LABELS = Object.freeze({
   meeting: "雙向會議",
   media: "媒體翻譯",
   microphone: "麥克風翻譯",
+  assistant: "會議助手",
 });
 
 export function channelStateLabel(state) {

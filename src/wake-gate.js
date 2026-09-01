@@ -1,7 +1,10 @@
 const WAKE_PATTERN = /^(?:hey |ok )?translive[，,\s]+(.+)$/is;
 
 const COMMAND_PATTERNS = Object.freeze([
-  { command: "speak-conclusions", pattern: /^(口播結論|播報結論|播結論|read (the )?(conclusions?|summary))$/i },
+  {
+    command: "speak-conclusions",
+    pattern: /^(口播結論|播報結論|播結論|read (the )?(conclusions?|summary))$/i,
+  },
 ]);
 
 // Text-level wake gate. This is a cost/false-trigger gate, not a security

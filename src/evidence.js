@@ -230,8 +230,7 @@ export class RunEvidence {
   // reduced to a length and a short fingerprint so loops can be traced
   // without transcripts entering evidence.
   recordRealtimeNote(direction, { atMs, kind, role, item, detail, text } = {}) {
-    const notes = this.#data.realtimeNotes[direction];
-    if (!notes) return;
+    const notes = (this.#data.realtimeNotes[direction] ??= []);
     const note = { atMs: safeTime(atMs), kind: String(kind ?? "unknown") };
     if (role) note.role = String(role);
     if (item) note.item = String(item);

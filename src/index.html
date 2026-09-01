@@ -104,6 +104,9 @@
           <button class="mode-option" data-mode-button="microphone" role="tab">
             <strong>麥克風翻譯</strong><span>Microphone · TX only</span>
           </button>
+          <button class="mode-option" data-mode-button="assistant" role="tab">
+            <strong>會議助手</strong><span>Assistant · 記錄＋問答</span>
+          </button>
         </div>
 
         <div class="configuration">
@@ -137,13 +140,38 @@
             </div>
           </section>
 
+          <section class="config-section" data-mode-show="assistant">
+            <h2>會議助手</h2>
+            <div class="field-grid">
+              <label>
+                <span>答案送出方式</span>
+                <select id="assistant-answer-delivery">
+                  <option value="review">本機確認後送入語音</option>
+                  <option value="auto">自動播出（全場可聽）</option>
+                </select>
+              </label>
+              <label>
+                <span>喚醒詞</span>
+                <span class="checkbox-row">
+                  <input type="checkbox" id="assistant-wake-armed" checked />
+                  啟用「hey translive」語音喚醒
+                </span>
+              </label>
+            </div>
+            <p class="field-note">
+              此模式不翻譯：記錄雙方談話、會後自動匯整摘要；會議中可說「hey
+              translive,…」查詢本場與過去會議,或按「口播結論」。答案預設先在本機顯示,確認後才以
+              AI 合成語音送入會議。
+            </p>
+          </section>
+
           <section class="config-section">
             <h2>音訊路由</h2>
             <div class="route-groups">
               <div class="route-group">
-                <h3 data-mode-show="meeting">會議與路由</h3>
+                <h3 data-mode-show="meeting assistant">會議與路由</h3>
                 <div class="field-grid">
-                  <label data-mode-show="meeting">
+                  <label data-mode-show="meeting assistant">
                     <span>會議平台</span>
                     <select id="meeting-platform">
                       <option value="teams">Microsoft Teams</option>
@@ -151,7 +179,7 @@
                       <option value="custom">其他應用程式</option>
                     </select>
                   </label>
-                  <div class="field-action" data-mode-show="meeting">
+                  <div class="field-action" data-mode-show="meeting assistant">
                     <button
                       class="secondary-button"
                       id="quick-setup-button"
@@ -327,7 +355,7 @@
 
         <div
           class="caption-workspace meeting-captions"
-          data-mode-show="meeting"
+          data-mode-show="meeting assistant"
         >
           <article class="channel-column" data-direction="tx">
             <header>
@@ -393,6 +421,36 @@
             <p id="single-target-caption" aria-live="polite">—</p>
           </div>
         </div>
+
+        <section
+          class="qa-panel"
+          data-mode-show="assistant"
+          aria-label="會議助手問答"
+        >
+          <div class="qa-actions">
+            <button
+              class="secondary-button"
+              id="speak-conclusions-button"
+              type="button"
+            >
+              口播結論
+            </button>
+            <span class="qa-hint">說「hey translive,問題」即可提問</span>
+          </div>
+          <article class="qa-card" id="qa-card" hidden>
+            <p class="qa-question" id="qa-question"></p>
+            <p class="qa-answer" id="qa-answer" aria-live="polite"></p>
+            <p class="qa-citations" id="qa-citations"></p>
+            <div class="qa-card-actions">
+              <button class="primary-button" id="qa-approve" type="button">
+                送入會議語音
+              </button>
+              <button class="text-button" id="qa-reject" type="button">
+                拒絕
+              </button>
+            </div>
+          </article>
+        </section>
 
         <footer class="live-footer">
           <span id="live-route-summary">VoiceMeeter · Cove</span>

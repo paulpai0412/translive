@@ -107,8 +107,7 @@ contextBridge.exposeInMainWorld("translive", {
   assistantPending: () => ipcRenderer.invoke("translive:assistant-pending"),
   assistantApprove: (id) =>
     ipcRenderer.invoke("translive:assistant-approve", id),
-  assistantReject: (id) =>
-    ipcRenderer.invoke("translive:assistant-reject", id),
+  assistantReject: (id) => ipcRenderer.invoke("translive:assistant-reject", id),
   assistantSpeakConclusions: () =>
     ipcRenderer.invoke("translive:assistant-speak-conclusions"),
   assistantSetWakeArmed: (armed) =>

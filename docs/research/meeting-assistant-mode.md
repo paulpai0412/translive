@@ -38,14 +38,15 @@ TransLive 啟動二選一,共用音訊路由與儲存層,session 配置各自獨
         本機面板:答案文字 + 引用(先審,見 §5)
                    │ 使用者批准
                    ▼
-   真實麥 ──→ [GainNode: 原音直通,不經模型] ──┐
-                                              ├─→ Mixer → 虛擬麥 → Teams
-   問答答案 ──→ [GainNode: gpt-live 合成語音] ──┘
+   真實麥 ──→ DirectionalAudioOutput(原音直通,不經模型)──┐
+                                                        ├─→ Cable-A(端點自然混音) → Teams
+   問答答案 ──→ qa voice session(recvonly WebRTC)──────────┘
+                → DirectionalAudioOutput → 同一 Cable-A sink
 ```
 
 ### 音訊界線(重要,已更正初版「單一路」的錯誤)
 
-- Teams 只認一條麥克風 = 虛擬麥,其上 mixer 兩路:**使用者原音直通**(不經任何模型)+ **gpt-live 合成語音**(只播口播稿)。
+- Teams 只認一條麥克風 = 虛擬麥(Cable-A)。實作上兩路各是一個帶 setSinkId 的 AudioContext,指向同一 sink,由端點自然混音:**使用者原音直通**(不經任何模型)+ **gpt-live 合成語音**(只播口播稿)。
 - **檢索到的原始會議內容永不原樣播出**,只作為 gpt-live 改寫素材。
 - 使用者未靜音時提問,遠端自然聽到問題(原音),此模式屬預期。
 - barge-in:偵測到使用者開口 → 對問答 session `response.cancel` 並停掉已緩衝播放,人聲永遠優先。
@@ -82,8 +83,7 @@ CREATE VIRTUAL TABLE meeting_idx USING fts5(
 
 1. 喚醒觸發 → 問答 session 生成答案,**音訊緩衝在本機,不播**。
 2. 本機面板顯示答案文字 + 引用來源。
-3. 使用者按「送出」→ 緩衝音訊播入 mixer 進會議;按「拒絕」→ 丟棄,不留音訊。
-4. armed 全自動直送為明示選項,預設關。
+3. 依設定 `answerDelivery` 送出:`review`(預設)等使用者按「送入會議語音」才播;`auto` 生成後立即播出。拒絕即丟棄,不留音訊。設定持久化於 assistant-preferences.json。
 5. AI-voice 揭露:首次啟用與每場開始前提示「AI 合成語音可能發言」(OpenAI TTS guide 要求)。
 6. 所有答案(含未送出)落 meeting record 的 `assistant-answer` audit entry。
 

@@ -147,10 +147,16 @@ test("speakConclusions answers from the summary without searching", async () => 
       summary: {
         sections: {
           決策: [
-            { text: "rollout 改期到九月五號", citations: [{ sessionId: "s-9", offsetMs: 60_000 }] },
+            {
+              text: "rollout 改期到九月五號",
+              citations: [{ sessionId: "s-9", offsetMs: 60_000 }],
+            },
           ],
           待辦: [
-            { text: "Alice 更新時程", citations: [{ sessionId: "s-9", offsetMs: 90_000 }] },
+            {
+              text: "Alice 更新時程",
+              citations: [{ sessionId: "s-9", offsetMs: 90_000 }],
+            },
           ],
         },
       },

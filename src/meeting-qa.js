@@ -178,7 +178,9 @@ export class MeetingQa {
     } else {
       let parsed;
       try {
-        parsed = JSON.parse(await this.#answer(answerPrompt({ question, chunks })));
+        parsed = JSON.parse(
+          await this.#answer(answerPrompt({ question, chunks })),
+        );
       } catch {
         this.#publish({ type: "qa-error", message: "答案產生失敗,請再試一次" });
         return { state: "error" };

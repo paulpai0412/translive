@@ -181,7 +181,7 @@ export function recommendModeDevices({
   const selections = {};
   const missing = [];
 
-  if (["meeting", "microphone"].includes(mode)) {
+  if (["meeting", "microphone", "assistant"].includes(mode)) {
     const physicalMic = bestPhysical(inputs, "physicalMic", saved.physicalMic);
     if (physicalMic) selections.physicalMic = physicalMic.device;
     else missing.push("physicalMic");
@@ -189,7 +189,7 @@ export function recommendModeDevices({
     if (txSink) selections.txSink = txSink;
     else missing.push("txSink");
   }
-  if (["meeting", "media"].includes(mode)) {
+  if (["meeting", "media", "assistant"].includes(mode)) {
     const rxSource = virtualDevice(inputs, routeProfile, "rxSource");
     if (rxSource) selections.rxSource = rxSource;
     else missing.push("rxSource");

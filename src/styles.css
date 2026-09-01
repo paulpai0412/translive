@@ -716,7 +716,9 @@ body[data-app-state="degraded"] .degraded-banner {
 body[data-mode="meeting"] [data-mode-show]:not([data-mode-show~="meeting"]),
 body[data-mode="media"] [data-mode-show]:not([data-mode-show~="media"]),
 body[data-mode="microphone"]
-  [data-mode-show]:not([data-mode-show~="microphone"]) {
+  [data-mode-show]:not([data-mode-show~="microphone"]),
+body[data-mode="assistant"]
+  [data-mode-show]:not([data-mode-show~="assistant"]) {
   display: none !important;
 }
 body[data-mode="microphone"] #single-channel-label::after {
@@ -1473,4 +1475,45 @@ body[data-mode="microphone"] #single-target-label::before {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Meeting assistant Q&A panel */
+.qa-panel {
+  padding: 0 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.qa-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.qa-hint {
+  opacity: 0.7;
+  font-size: 0.85rem;
+}
+.qa-card {
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.qa-question {
+  font-weight: 600;
+}
+.qa-citations {
+  opacity: 0.7;
+  font-size: 0.8rem;
+}
+.qa-card-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }

@@ -22,7 +22,10 @@ function fakeClient({ output = "answer text", turnStatus = "completed" } = {}) {
         });
         client.emit("notification", {
           method: "turn/completed",
-          params: { threadId: "thread-1", turn: { id: "turn-1", status: turnStatus } },
+          params: {
+            threadId: "thread-1",
+            turn: { id: "turn-1", status: turnStatus },
+          },
         });
       });
       return { turn: { id: "turn-1" } };

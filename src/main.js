@@ -674,10 +674,33 @@ function registerIpc() {
     summaryController.cancel(requestId),
   );
   ipcMain.handle("translive:assistant-start", async (_event, config) => {
+    // Assistant mode shares the meeting dual-channel device layout.
+    await requireVoiceMeeterRouting();
+    activeMode = "meeting";
+    await applyTranslationAudioRouting("meeting");
     const preferences = await assistantPreferences.load();
-    return assistantController.start({ ...preferences, ...config });
+    let result;
+    try {
+      result = await assistantController.start({ ...preferences, ...config });
+    } catch (error) {
+      await restoreTranslationAudioRouting();
+      throw error;
+    }
+    trayState = result.aggregate;
+    trayController?.update({
+      appState: trayState,
+      mode: activeMode,
+      status: result.status,
+    });
+    return result;
   });
-  ipcMain.handle("translive:assistant-stop", () => assistantController.stop());
+  ipcMain.handle("translive:assistant-stop", async () => {
+    const result = await assistantController.stop();
+    await restoreTranslationAudioRouting();
+    trayState = "stopped";
+    trayController?.update({ appState: trayState, mode: activeMode });
+    return result;
+  });
   ipcMain.handle("translive:assistant-pending", () =>
     assistantController.pendingAnswer(),
   );
@@ -951,7 +974,10 @@ if (isPrimaryInstance) {
     });
     registerIpc();
     publish({ type: "global-audio", state: globalAudioStartup.state });
-    publish({ type: "voicemeeter-routing", state: voiceMeeterRoutingState.state });
+    publish({
+      type: "voicemeeter-routing",
+      state: voiceMeeterRoutingState.state,
+    });
     void voiceMeeterRoutingStartupPromise.then((status) =>
       publish({ type: "voicemeeter-routing", state: status.state }),
     );

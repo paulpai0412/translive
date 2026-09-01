@@ -37,6 +37,7 @@ const DIRECTIONS_BY_MODE = Object.freeze({
   meeting: ["tx", "rx"],
   media: ["rx"],
   microphone: ["tx"],
+  assistant: ["tx", "rx"],
 });
 
 const elements = Object.fromEntries(
@@ -123,6 +124,15 @@ const elements = Object.fromEntries(
     "records-status",
     "record-detail",
     "aggregate-summary-button",
+    "assistant-answer-delivery",
+    "assistant-wake-armed",
+    "qa-answer",
+    "qa-approve",
+    "qa-card",
+    "qa-citations",
+    "qa-question",
+    "qa-reject",
+    "speak-conclusions-button",
     "stopped-open-records",
     "summary-confirm-modal",
     "summary-confirm-title",
@@ -209,6 +219,9 @@ const ui = {
   },
   mode: "meeting",
   muted: { tx: false, rx: false },
+  passthrough: undefined,
+  passthroughStream: undefined,
+  pendingAnswerId: undefined,
   audioDefaultsState: undefined,
   routingState: undefined,
   records: {
@@ -260,6 +273,13 @@ async function releaseRendererResources() {
       ui.active = {};
     },
   });
+  if (ui.passthrough) {
+    const passthrough = ui.passthrough;
+    ui.passthrough = undefined;
+    ui.passthroughStream = undefined;
+    await passthrough.close().catch(() => {});
+  }
+  hideQaCard();
 }
 
 const handleRendererControl = createRendererControlHandler({
@@ -346,6 +366,9 @@ function setMode(mode) {
     elements["single-target-label"].textContent = "對方將聽到 Translation";
     elements["live-route-summary"].textContent =
       "麥克風 → VoiceMeeter B2 · Cove";
+  } else if (mode === "assistant") {
+    elements["live-route-summary"].textContent =
+      "麥克風原音直通 · 會議記錄＋問答";
   } else {
     elements["live-route-summary"].textContent = "VoiceMeeter · Cove";
   }
@@ -970,14 +993,18 @@ async function summarizeStats(peerConnection) {
   return stats;
 }
 
-async function createRealtimePeer({ direction, source, sink }) {
+async function createRealtimePeer({ direction, source, sink, playRemote = true }) {
   let stream;
   let peerConnection;
   let eventChannel;
   let stopInputProbe = () => {};
   let statsTimer;
   let cleaned = false;
-  const audioOutput = new DirectionalAudioOutput({ sinkId: sink.id });
+  // Assistant-mode transcribe peers discard model audio (playRemote false);
+  // the qa voice peer has no local input (source null) and only receives.
+  const audioOutput = playRemote
+    ? new DirectionalAudioOutput({ sinkId: sink.id })
+    : undefined;
 
   const cleanup = async () => {
     if (cleaned) return;
@@ -991,23 +1018,27 @@ async function createRealtimePeer({ direction, source, sink }) {
     try {
       peerConnection?.close();
     } catch {}
-    await audioOutput.close();
+    await audioOutput?.close();
   };
 
   try {
-    await audioOutput.prepare();
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        deviceId: { exact: source.id },
-        autoGainControl: false,
-        echoCancellation: false,
-        noiseSuppression: false,
-      },
-      video: false,
-    });
+    await audioOutput?.prepare();
     peerConnection = new RTCPeerConnection();
-    for (const track of stream.getAudioTracks()) {
-      peerConnection.addTrack(track, stream);
+    if (source) {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: { exact: source.id },
+          autoGainControl: false,
+          echoCancellation: false,
+          noiseSuppression: false,
+        },
+        video: false,
+      });
+      for (const track of stream.getAudioTracks()) {
+        peerConnection.addTrack(track, stream);
+      }
+    } else {
+      peerConnection.addTransceiver("audio", { direction: "recvonly" });
     }
     eventChannel = peerConnection.createDataChannel("oai-events");
 
@@ -1019,7 +1050,7 @@ async function createRealtimePeer({ direction, source, sink }) {
         );
       }
     });
-    peerConnection.addEventListener("track", async (event) => {
+    if (audioOutput) peerConnection.addEventListener("track", async (event) => {
       try {
         const remoteStream = event.streams[0] || new MediaStream([event.track]);
         event.track.addEventListener(
@@ -1037,17 +1068,18 @@ async function createRealtimePeer({ direction, source, sink }) {
       }
     });
 
-    stopInputProbe = createInputProbe(stream, direction);
-    statsTimer = setInterval(async () => {
-      try {
-        if (!cleaned)
-          recordMetric(
-            direction,
-            "webrtc",
-            await summarizeStats(peerConnection),
-          );
-      } catch {}
-    }, 1_000);
+    if (stream) stopInputProbe = createInputProbe(stream, direction);
+    if (direction !== "qa")
+      statsTimer = setInterval(async () => {
+        try {
+          if (!cleaned)
+            recordMetric(
+              direction,
+              "webrtc",
+              await summarizeStats(peerConnection),
+            );
+        } catch {}
+      }, 1_000);
 
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
@@ -1057,11 +1089,11 @@ async function createRealtimePeer({ direction, source, sink }) {
       sdp: peerConnection.localDescription.sdp,
       setMuted(muted) {
         if (direction === "tx") {
-          for (const track of stream.getAudioTracks()) {
+          for (const track of stream?.getAudioTracks() ?? []) {
             track.enabled = !muted;
           }
         } else {
-          audioOutput.setMuted(muted);
+          audioOutput?.setMuted(muted);
         }
       },
       async applyAnswer(sdp) {
@@ -1083,6 +1115,7 @@ function setConnectionStep(id, state, detail) {
 }
 
 async function startTranslation() {
+  if (ui.mode === "assistant") return startAssistant();
   if (!ui.consent.granted && !ui.consent.skipForCurrentRun) {
     setConsentModal(true);
     return;
@@ -1193,11 +1226,119 @@ async function cancelTranslationStartup() {
   updateReadyMessage();
 }
 
+// Assistant mode: Teams hears the raw microphone (passthrough into the same
+// virtual cable the QA voice uses); both codex sessions are transcribe-only
+// and their model audio is discarded (playRemote: false).
+async function startAssistant() {
+  if (!ui.consent.granted && !ui.consent.skipForCurrentRun) {
+    setConsentModal(true);
+    return;
+  }
+  if (
+    ui.startup ||
+    Object.keys(ui.active).length > 0 ||
+    ui.app === "connecting"
+  )
+    return;
+  let config;
+  const startup = createStartupSession({
+    directions: ["tx", "rx", "qa"],
+    createPeer: async ({ direction, channel }) => {
+      if (direction === "qa") {
+        return createRealtimePeer({
+          direction: "qa",
+          source: null,
+          sink: { id: channel.sinkEndpointId },
+        });
+      }
+      return createRealtimePeer({
+        direction,
+        source: { id: channel.sourceEndpointId },
+        sink: { id: channel.sinkEndpointId },
+        playRemote: false,
+      });
+    },
+    onPeerCreated: (direction, peer) => {
+      ui.active[direction] = peer;
+    },
+    startRuntime: (runtimeConfig) =>
+      window.translive.assistantStart({
+        ...runtimeConfig,
+        qaSdp: runtimeConfig.qa?.sdp,
+      }),
+    cancelRuntime: () => window.translive.assistantStop(),
+  });
+  ui.startup = startup;
+  try {
+    config = routeConfig();
+    config.qa = { sinkEndpointId: config.tx.sinkEndpointId };
+    ui.persistenceEvent = undefined;
+    hideQaCard();
+    setAppState("connecting");
+    resetLiveDisplay();
+    const { result } = await startup.start(config);
+    if (startup.isCanceled()) return;
+    ui.passthroughStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        deviceId: { exact: config.tx.sourceEndpointId },
+        autoGainControl: false,
+        echoCancellation: false,
+        noiseSuppression: false,
+      },
+      video: false,
+    });
+    ui.passthrough = new DirectionalAudioOutput({
+      sinkId: config.tx.sinkEndpointId,
+    });
+    await ui.passthrough.prepare();
+    await ui.passthrough.attach(ui.passthroughStream);
+    applyAggregate(result.aggregate);
+  } catch (error) {
+    const canceled = error?.name === "AbortError" || startup.isCanceled();
+    await releaseRendererResources();
+    try {
+      await window.translive.assistantStop();
+    } catch {
+      // Main-side cleanup is retried on the next stop.
+    }
+    if (canceled) {
+      setAppState("ready");
+      updateReadyMessage();
+      return;
+    }
+    showAssertiveError("無法建立會議助手連線，請檢查設定後再試。");
+    showBlocked("無法建立會議助手連線", error?.message);
+  } finally {
+    if (ui.startup === startup) ui.startup = undefined;
+  }
+}
+
+function showQaCard(answer) {
+  ui.pendingAnswerId = answer.id ?? undefined;
+  elements["qa-question"].textContent = answer.question ?? "會議助手";
+  elements["qa-answer"].textContent = answer.text;
+  elements["qa-citations"].textContent = (answer.citations ?? [])
+    .map((citation) => `來源 ${citation.sessionId} @ ${recordOffset(citation.offsetMs)}`)
+    .join(" · ");
+  const actionable = Boolean(answer.id);
+  elements["qa-approve"].disabled = !actionable;
+  elements["qa-reject"].disabled = !actionable;
+  elements["qa-card"].hidden = false;
+}
+
+function hideQaCard() {
+  ui.pendingAnswerId = undefined;
+  elements["qa-card"].hidden = true;
+}
+
 async function stopTranslation() {
   await cancelTranslationStartup();
   await releaseRendererResources();
   try {
-    const result = await window.translive.stop();
+    const result =
+      ui.mode === "assistant"
+        ? await window.translive.assistantStop()
+        : await window.translive.stop();
     if (result.meetingRestore?.reason) {
       elements["stopped-copy"].textContent =
         "翻譯已停止，但 Windows 通訊裝置尚未還原。TransLive 會在下次啟動時重試；你也可以在設定中手動確認。";
@@ -1218,7 +1359,9 @@ async function toggleMute(direction) {
   const muted = !ui.muted[direction];
   peer.setMuted(muted);
   ui.muted[direction] = muted;
-  await window.translive.setMuted(direction, muted);
+  if (direction === "tx") ui.passthrough?.setMuted(muted);
+  if (ui.mode !== "assistant")
+    await window.translive.setMuted(direction, muted);
   setChannelState(direction, muted ? "muted" : "live");
 }
 
@@ -2390,6 +2533,49 @@ elements["blocked-action"].addEventListener("click", () => {
   else void startAccountLogin();
 });
 elements["start-button"].addEventListener("click", startTranslation);
+elements["speak-conclusions-button"].addEventListener("click", () => {
+  window.translive.assistantSpeakConclusions().catch(() => {
+    showAssertiveError("無法產生口播結論，請稍後再試。");
+  });
+});
+elements["qa-approve"].addEventListener("click", () => {
+  if (!ui.pendingAnswerId) return;
+  window.translive.assistantApprove(ui.pendingAnswerId).catch(() => {
+    showAssertiveError("無法送出語音回答。");
+  });
+});
+elements["qa-reject"].addEventListener("click", () => {
+  if (!ui.pendingAnswerId) return;
+  window.translive.assistantReject(ui.pendingAnswerId).catch(() => {});
+});
+elements["assistant-wake-armed"].addEventListener("change", (event) => {
+  window.translive.assistantSetWakeArmed(event.target.checked).catch(() => {});
+  saveAssistantPreferences();
+});
+elements["assistant-answer-delivery"].addEventListener("change", () => {
+  saveAssistantPreferences();
+});
+
+async function saveAssistantPreferences() {
+  try {
+    await window.translive.assistantPreferencesSave({
+      answerDelivery: elements["assistant-answer-delivery"].value,
+      wakeArmed: elements["assistant-wake-armed"].checked,
+    });
+  } catch {
+    // Preference persistence is best-effort; the run keeps working.
+  }
+}
+
+async function initializeAssistantPreferences() {
+  try {
+    const preferences = await window.translive.assistantPreferencesLoad();
+    elements["assistant-answer-delivery"].value = preferences.answerDelivery;
+    elements["assistant-wake-armed"].checked = preferences.wakeArmed;
+  } catch {
+    // Defaults in the markup already match the safe settings.
+  }
+}
 elements["cancel-connect-button"].addEventListener(
   "click",
   () => void cancelTranslationStartup(),
@@ -2790,8 +2976,10 @@ window.translive.onEvent(async (event) => {
   if (event.type === "sdp" && ui.active[event.direction]) {
     try {
       await ui.active[event.direction].applyAnswer(event.sdp);
-      const result = await window.translive.answerApplied(event.direction);
-      applyAggregate(result.aggregate);
+      if (event.direction !== "qa") {
+        const result = await window.translive.answerApplied(event.direction);
+        applyAggregate(result.aggregate);
+      }
     } catch {
       window.translive.rendererError(
         event.direction,
@@ -2802,6 +2990,18 @@ window.translive.onEvent(async (event) => {
   }
   if (event.type === "transcript") {
     appendTranscript(event);
+    return;
+  }
+  if (event.type === "qa-pending") {
+    showQaCard(event.answer);
+    return;
+  }
+  if (event.type === "qa-sent" || event.type === "qa-rejected") {
+    hideQaCard();
+    return;
+  }
+  if (event.type === "qa-error") {
+    showQaCard({ question: "會議助手", text: event.message, citations: [] });
     return;
   }
   if (event.type === "error") {
@@ -2859,6 +3059,7 @@ setView("translate");
 initializeTray();
 initializeConsent();
 initializeRetention();
+initializeAssistantPreferences();
 initializeGlobalAudioDefaults();
 initializeVoiceMeeterRouting();
 initializeVoiceConversion();

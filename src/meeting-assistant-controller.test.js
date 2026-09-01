@@ -106,7 +106,12 @@ async function controllerFor(overrides = {}) {
       startedAtMs: Date.parse("2026-08-30T09:00:00+08:00"),
     },
     entries: [
-      { offsetMs: 1000, direction: "tx", side: "source", text: "預算核定為十萬元" },
+      {
+        offsetMs: 1000,
+        direction: "tx",
+        side: "source",
+        text: "預算核定為十萬元",
+      },
     ],
   });
   const controller = new MeetingAssistantController({
@@ -159,12 +164,27 @@ test("starts two transcribe-only realtime sessions", async (t) => {
 });
 
 test("records only role=user speech as source entries", async (t) => {
-  const { client, controller, published, records, cleanup } = await controllerFor();
+  const { client, controller, published, records, cleanup } =
+    await controllerFor();
   t.after(cleanup);
   await controller.start(validConfig());
-  client.emitTranscript(threadFor(client, 0), { role: "user", text: "我們下週一見" });
-  client.emitTranscript(threadFor(client, 0), { role: "assistant", text: "我們下週一見" });
-  client.emitTranscript(threadFor(client, 1), { role: "user", text: "see you Monday" });
+  client.emitTranscript(threadFor(client, 0), {
+    role: "user",
+    text: "我們下週一見",
+  });
+  client.emitTranscript(threadFor(client, 0), {
+    role: "assistant",
+    text: "我們下週一見",
+  });
+  client.emitTranscript(threadFor(client, 1), {
+    role: "user",
+    text: "see you Monday",
+  });
+  const transcriptEvents = published.filter(
+    (event) => event.type === "transcript",
+  );
+  assert.equal(transcriptEvents.length, 2);
+  assert.ok(transcriptEvents.every((event) => event.role === "user"));
   await controller.stop();
   const [session] = await records.listSessions();
   const record = await records.readSession(session.id);
@@ -176,11 +196,16 @@ test("records only role=user speech as source entries", async (t) => {
       ["rx", "source"],
     ],
   );
-  assert.ok(published.some((event) => event.type === "record" && event.state === "saved"));
+  assert.ok(
+    published.some(
+      (event) => event.type === "record" && event.state === "saved",
+    ),
+  );
 });
 
 test("wake phrase on me triggers a question; remote never triggers", async (t) => {
-  const { answerCalls, client, controller, published, cleanup } = await controllerFor();
+  const { answerCalls, client, controller, published, cleanup } =
+    await controllerFor();
   t.after(cleanup);
   await controller.start(validConfig({ qaSdp: "v=0\r\nqa-offer" }));
   client.emitTranscript(threadFor(client, 1), { text: "hey translive, 預算" });
@@ -214,10 +239,13 @@ test("gate suspends while an answer is pending and resumes after approval", asyn
 });
 
 test("stop saves the record, generates the summary, and indexes both", async (t) => {
-  const { client, controller, meetingIndex, records, cleanup } = await controllerFor();
+  const { client, controller, meetingIndex, records, cleanup } =
+    await controllerFor();
   t.after(cleanup);
   await controller.start(validConfig());
-  client.emitTranscript(threadFor(client, 0), { text: "rollout 延後到九月五號" });
+  client.emitTranscript(threadFor(client, 0), {
+    text: "rollout 延後到九月五號",
+  });
   await controller.stop();
   const [session] = await records.listSessions();
   const record = await records.readSession(session.id);
@@ -228,26 +256,33 @@ test("stop saves the record, generates the summary, and indexes both", async (t)
 });
 
 test("a summary failure still saves the transcript", async (t) => {
-  const { client, controller, published, records, cleanup } = await controllerFor({
-    summaryService: {
-      generate: async () => {
-        throw new Error("summary exploded");
+  const { client, controller, published, records, cleanup } =
+    await controllerFor({
+      summaryService: {
+        generate: async () => {
+          throw new Error("summary exploded");
+        },
       },
-    },
-  });
+    });
   t.after(cleanup);
   await controller.start(validConfig());
   client.emitTranscript(threadFor(client, 0), { text: "內容" });
   await controller.stop();
   const sessions = await records.listSessions();
   assert.equal(sessions.length, 1);
-  assert.ok(published.some((event) => event.type === "summary" && event.state === "failed"));
+  assert.ok(
+    published.some(
+      (event) => event.type === "summary" && event.state === "failed",
+    ),
+  );
 });
 
 test("auto delivery speaks without approval", async (t) => {
   const { client, controller, cleanup } = await controllerFor();
   t.after(cleanup);
-  await controller.start(validConfig({ qaSdp: "v=0\r\nqa-offer", answerDelivery: "auto" }));
+  await controller.start(
+    validConfig({ qaSdp: "v=0\r\nqa-offer", answerDelivery: "auto" }),
+  );
   client.emitTranscript(threadFor(client, 0), { text: "hey translive, 預算" });
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));

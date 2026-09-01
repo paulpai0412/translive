@@ -16,7 +16,10 @@ function queryTerms(query) {
 }
 
 function escapeLike(term) {
-  return term.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
+  return term
+    .replaceAll("\\", "\\\\")
+    .replaceAll("%", "\\%")
+    .replaceAll("_", "\\_");
 }
 
 export class MeetingIndex {
@@ -96,9 +99,7 @@ export class MeetingIndex {
   removeSession(sessionId) {
     const id = assertSessionId(sessionId);
     this.#db.prepare("DELETE FROM chunks WHERE session_id = ?").run(id);
-    this.#db
-      .prepare("DELETE FROM sessions_meta WHERE session_id = ?")
-      .run(id);
+    this.#db.prepare("DELETE FROM sessions_meta WHERE session_id = ?").run(id);
   }
 
   rebuild(sessions = []) {
@@ -134,9 +135,7 @@ export class MeetingIndex {
   }
 
   #likeSearch(terms, clause, params, limit) {
-    const likes = terms
-      .map(() => "c.body LIKE ? ESCAPE '\\'")
-      .join(" AND ");
+    const likes = terms.map(() => "c.body LIKE ? ESCAPE '\\'").join(" AND ");
     return this.#db
       .prepare(
         `SELECT c.session_id AS sessionId, c.tier, c.direction, c.side,

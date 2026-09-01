@@ -69,10 +69,11 @@ test("WebRTC playout uses direction-owned AudioContext sinks instead of HTML aud
 
   assert.match(renderer, /import \{ DirectionalAudioOutput \}/);
   assert.match(renderer, /new DirectionalAudioOutput\(\{/);
-  assert.match(renderer, /await audioOutput\.prepare\(\)/);
+  assert.match(renderer, /await audioOutput\?\.(prepare|attach)/);
+  assert.match(renderer, /await audioOutput\?\.prepare\(\)/);
   assert.match(renderer, /await audioOutput\.attach\(remoteStream\)/);
-  assert.match(renderer, /audioOutput\.setMuted\(muted\)/);
-  assert.match(renderer, /await audioOutput\.close\(\)/);
+  assert.match(renderer, /audioOutput\?\.setMuted\(muted\)/);
+  assert.match(renderer, /await audioOutput\?\.close\(\)/);
   assert.doesNotMatch(renderer, /audio = document\.createElement\("audio"\)/);
 });
 
@@ -323,4 +324,28 @@ test("enumerates audio devices as soon as ChatGPT is connected", async () => {
     renderer,
     /if \(event\.state === "connected"\) \{\s+setAppState\("ready"\);\s+await refreshDevices\(\);/,
   );
+});
+
+test("formal UI exposes the meeting assistant mode with reviewable answers", async () => {
+  const [html, renderer] = await Promise.all([
+    readFile(new URL("./index.html", import.meta.url), "utf8"),
+    readFile(new URL("./renderer-entry.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(html, /data-mode-button="assistant"/);
+  assert.match(html, /class="qa-card" id="qa-card" hidden/);
+  assert.match(html, /aria-label="會議助手問答"/);
+  assert.match(html, /id="speak-conclusions-button"/);
+  assert.match(html, /id="qa-approve"[\s\S]{0,60}送入會議語音/);
+  assert.match(html, /id="qa-reject"/);
+  assert.match(html, /id="assistant-answer-delivery"/);
+  assert.match(html, /id="assistant-wake-armed"/);
+
+  assert.match(renderer, /assistant: \["tx", "rx"\]/);
+  assert.match(renderer, /ui\.mode === "assistant"\) return startAssistant\(\)/);
+  assert.match(renderer, /window\.translive\.assistantStart\(/);
+  assert.match(renderer, /event\.direction !== "qa"/);
+  assert.match(renderer, /playRemote: false/);
+  assert.match(renderer, /direction: "recvonly"/);
+  assert.match(renderer, /ui\.passthrough\?\.setMuted\(muted\)/);
 });

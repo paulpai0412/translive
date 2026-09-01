@@ -1,4 +1,8 @@
-import { mkdir, readFile as defaultReadFile, writeFile as defaultWriteFile } from "node:fs/promises";
+import {
+  mkdir,
+  readFile as defaultReadFile,
+  writeFile as defaultWriteFile,
+} from "node:fs/promises";
 import { join } from "node:path";
 
 const DEFAULTS = Object.freeze({

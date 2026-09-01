@@ -6,7 +6,10 @@ import { WakeGate } from "./wake-gate.js";
 test("extracts the question after the wake phrase", () => {
   const gate = new WakeGate({ armed: true });
   assert.deepEqual(
-    gate.onFinalTranscript({ source: "me", text: "hey translive, 上次會議結論是什麼" }),
+    gate.onFinalTranscript({
+      source: "me",
+      text: "hey translive, 上次會議結論是什麼",
+    }),
     { type: "question", question: "上次會議結論是什麼" },
   );
 });
@@ -64,7 +67,10 @@ test("recognizes the speak-conclusions command", () => {
   const gate = new WakeGate({ armed: true });
   for (const question of ["口播結論", "播結論", "read the conclusions"]) {
     assert.deepEqual(
-      gate.onFinalTranscript({ source: "me", text: `hey translive, ${question}` }),
+      gate.onFinalTranscript({
+        source: "me",
+        text: `hey translive, ${question}`,
+      }),
       { type: "command", command: "speak-conclusions" },
       question,
     );

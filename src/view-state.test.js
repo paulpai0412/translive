@@ -95,6 +95,7 @@ test("names each selected mode in Traditional Chinese", () => {
   assert.equal(modeLabel("meeting"), "雙向會議");
   assert.equal(modeLabel("media"), "媒體翻譯");
   assert.equal(modeLabel("microphone"), "麥克風翻譯");
+  assert.equal(modeLabel("assistant"), "會議助手");
 });
 
 test("stopped 畫面在音訊設定已還原時顯示確認訊息", () => {

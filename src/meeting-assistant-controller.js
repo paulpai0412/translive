@@ -3,7 +3,10 @@ import {
   DEFAULT_CODEX_APP_SERVER_ARGS,
 } from "./codex-app-server.js";
 import { inspectCodexRuntime } from "./codex-runtime.js";
-import { startDualChannelRun, validateDualChannelConfig } from "./dual-channel-run.js";
+import {
+  startDualChannelRun,
+  validateDualChannelConfig,
+} from "./dual-channel-run.js";
 import { RunEvidence } from "./evidence.js";
 import { MeetingQa } from "./meeting-qa.js";
 import { formatSummaryMarkdown } from "./summary-service.js";
@@ -185,7 +188,11 @@ export class MeetingAssistantController {
       for (const notification of context.buffered.splice(0)) {
         this.#receiveNotification(context, notification);
       }
-      this.#publish({ type: "run", status: run.status(), aggregate: run.aggregateStatus() });
+      this.#publish({
+        type: "run",
+        status: run.status(),
+        aggregate: run.aggregateStatus(),
+      });
       return { status: run.status(), aggregate: run.aggregateStatus() };
     } catch (error) {
       if (context && !context.finalized) {
@@ -221,7 +228,7 @@ export class MeetingAssistantController {
 
   setWakeArmed(armed) {
     this.#gate.setArmed(armed);
-    return { armed: this.#gate !== undefined && Boolean(armed) };
+    return { armed: Boolean(armed) };
   }
 
   async stop(reason = "user-stop") {
@@ -231,7 +238,10 @@ export class MeetingAssistantController {
     }
     this.#active = undefined;
     await this.#finalize(context, { reason, outcome: "stopped" });
-    this.#publish({ type: "stopped", status: { tx: "stopped", rx: "stopped" } });
+    this.#publish({
+      type: "stopped",
+      status: { tx: "stopped", rx: "stopped" },
+    });
     return { status: { tx: "stopped", rx: "stopped" }, aggregate: "stopped" };
   }
 
@@ -246,7 +256,9 @@ export class MeetingAssistantController {
         typeof config?.[direction]?.sdp !== "string" ||
         config[direction].sdp.length === 0
       ) {
-        throw new Error(`${direction.toUpperCase()} requires a WebRTC SDP offer`);
+        throw new Error(
+          `${direction.toUpperCase()} requires a WebRTC SDP offer`,
+        );
       }
     }
   }
@@ -348,10 +360,12 @@ export class MeetingAssistantController {
     }
     if (notification.method === "thread/realtime/transcript/done") {
       const { role, text } = notification.params ?? {};
-      this.#publish({ type: "transcript", direction, role, text, final: true });
-      this.#recordTranscript(context, direction, role, text, atMs);
-      if (direction === "tx" && role === "user") {
-        this.#handleWake(context, text);
+      // The assistant-role echo of a transcribe-only session is the model
+      // repeating the input — never show or record it.
+      if (role === "user") {
+        this.#publish({ type: "transcript", direction, role, text, final: true });
+        this.#recordTranscript(context, direction, role, text, atMs);
+        if (direction === "tx") this.#handleWake(context, text);
       }
     }
   }
@@ -371,7 +385,11 @@ export class MeetingAssistantController {
   #recordTranscript(context, direction, role, text, atMs) {
     // Only real input speech becomes a record; the assistant-role echo of a
     // transcribe-only session is the model repeating the input, not content.
-    if (role !== "user" || typeof text !== "string" || text.trim().length === 0) {
+    if (
+      role !== "user" ||
+      typeof text !== "string" ||
+      text.trim().length === 0
+    ) {
       return;
     }
     const previous = context.lastTranscript.get(direction);
@@ -429,9 +447,7 @@ export class MeetingAssistantController {
     if (!this.#summaryService) return;
     try {
       const saved = await this.#records.readSession(record.id);
-      const sessions = [
-        { metadata: saved.metadata, entries: saved.entries },
-      ];
+      const sessions = [{ metadata: saved.metadata, entries: saved.entries }];
       const structured = await this.#summaryService.generate({
         kind: "session",
         sessions,

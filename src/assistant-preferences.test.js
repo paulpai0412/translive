@@ -44,7 +44,10 @@ test("persists and reloads explicit values", async () => {
 test("normalizes unknown values back to safe defaults", async () => {
   const { prefs, cleanup } = await prefsFor();
   try {
-    const saved = await prefs.save({ answerDelivery: "yolo", wakeArmed: "yes" });
+    const saved = await prefs.save({
+      answerDelivery: "yolo",
+      wakeArmed: "yes",
+    });
     assert.equal(saved.answerDelivery, "review");
     assert.equal(saved.wakeArmed, true);
   } finally {
