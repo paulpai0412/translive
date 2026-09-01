@@ -104,13 +104,22 @@
           <button class="mode-option" data-mode-button="microphone" role="tab">
             <strong>麥克風翻譯</strong><span>Microphone · TX only</span>
           </button>
-          <button class="mode-option" data-mode-button="assistant" role="tab">
-            <strong>會議助手</strong><span>Assistant · 記錄＋問答</span>
+        </div>
+
+        <div class="assistant-mode-entry">
+          <span class="assistant-mode-kicker">獨立模式 · 不翻譯</span>
+          <button
+            class="mode-option assistant-mode-option"
+            data-mode-button="assistant"
+            type="button"
+            aria-pressed="false"
+          >
+            <strong>會議助手</strong><span>記錄會議 ＋ 喚醒問答</span>
           </button>
         </div>
 
         <div class="configuration">
-          <section class="config-section">
+          <section class="config-section" data-mode-show="meeting media microphone">
             <h2>語言與聲音</h2>
             <div class="field-grid">
               <label data-mode-show="meeting microphone">
@@ -142,6 +151,11 @@
 
           <section class="config-section" data-mode-show="assistant">
             <h2>會議助手</h2>
+            <p class="assistant-intro">
+              此模式不翻譯：記錄雙方談話，會後自動匯整摘要。會議中可說「hey
+              translive,…」查詢本場與過去會議，或按「口播結論」。答案預設先在本機顯示，確認後才以
+              AI 合成語音送入會議。
+            </p>
             <div class="field-grid">
               <label>
                 <span>答案送出方式</span>
@@ -158,11 +172,6 @@
                 </span>
               </label>
             </div>
-            <p class="field-note">
-              此模式不翻譯：記錄雙方談話、會後自動匯整摘要；會議中可說「hey
-              translive,…」查詢本場與過去會議,或按「口播結論」。答案預設先在本機顯示,確認後才以
-              AI 合成語音送入會議。
-            </p>
           </section>
 
           <section class="config-section">

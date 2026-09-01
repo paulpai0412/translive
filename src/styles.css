@@ -377,6 +377,35 @@ body[data-app-state="auth-waiting"] #account-login-cancel {
 .mode-option span {
   font-size: 12px;
 }
+.assistant-mode-entry {
+  border-top: 1px dashed var(--border);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+.assistant-mode-kicker {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+.assistant-mode-option {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  width: 100%;
+}
+.assistant-mode-option.is-active {
+  background: var(--surface);
+}
+.assistant-intro {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--muted);
+  line-height: 1.7;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+}
 .configuration {
   margin-top: 30px;
 }

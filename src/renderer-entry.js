@@ -349,7 +349,9 @@ function setMode(mode) {
   for (const button of document.querySelectorAll("[data-mode-button]")) {
     const selected = button.dataset.modeButton === mode;
     button.classList.toggle("is-active", selected);
-    button.setAttribute("aria-selected", String(selected));
+    const stateAttribute =
+      button.getAttribute("role") === "tab" ? "aria-selected" : "aria-pressed";
+    button.setAttribute(stateAttribute, String(selected));
   }
 
   const singleDirection = activeSingleDirection();
