@@ -16,3 +16,6 @@ coverage/
 Thumbs.db
 __pycache__/
 *.pyc
+
+# Bundled Codex Windows binary is recreated by scripts/generate-codex-manifest.mjs
+assets/codex/
