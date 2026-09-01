@@ -83,3 +83,7 @@
 **尾句未播：**改由 GPT-Live init prompt 要求模型講完每句到最後（RX prompt 新增 "never leave the final part unspoken"）；停止時仍以有界 drain 完成字幕推進，未播部分維持回報。
 
 **移除的舊測試：**append RPC ack 相關的三個 echo 測試（已無此行為）；其餘 pacing 測試遷移為「零 appendSpeech＋字幕推進」契約。
+
+### 追記：字幕層同步簡化
+
+方案 A 後 pacing 只剩字幕用途，且其節奏是「預估語速」而非真實語音，反而使 RX 字幕落後原生語音。已定案：**RX 字幕與 TX 完全相同——transcript 事件到達即顯示**，無 deferred／pacer／speech-fallback 路徑。刪除 `adaptive-pacing-controller` 模組、controller 的 speechFallback/echo/drain 機器、renderer 的 pacedTargets；停止頁不再回報「未朗讀」（我們不朗讀）。`turn.done` 累積重報在 renderer 由 `mergeCaption` 前綴合併吸收（顯示等冪），逐字稿層保留 1 秒重複去重。

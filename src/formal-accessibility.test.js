@@ -142,17 +142,17 @@ test("shows automatic VoiceMeeter internal routing without exposing bus snapshot
   assert.doesNotMatch(renderer, /voicemeeter-routing.*Strip\[/);
 });
 
-test("renderer advances deferred RX target captions only when speech fallback dispatches", async () => {
+test("renderer renders RX target captions immediately with no pacing path", async () => {
   const renderer = await readFile(
     new URL("./renderer-entry.js", import.meta.url),
     "utf8",
   );
 
-  assert.match(renderer, /if \(deferred\) \{/);
-  assert.match(renderer, /event\.type === "speech-fallback"/);
-  assert.match(renderer, /advanceSpeechFallbackCaption\(event\)/);
-  assert.match(renderer, /if \(state === "unsent"\) \{/);
-  assert.match(renderer, /部分尾端翻譯未朗讀，字幕與逐字稿已保留。/);
+  assert.doesNotMatch(renderer, /deferred|pacedTargets|speech-fallback/);
+  assert.match(
+    renderer,
+    /function appendTranscript\(\{ direction, role, text, final = false \}\)/,
+  );
 });
 
 test("keeps saved-record paths concise, diagnostics current, and captions outside the main renderer", async () => {

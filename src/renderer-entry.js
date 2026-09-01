@@ -20,8 +20,6 @@ import { createStartupSession } from "./startup-session.js";
 import { VOICE_TRAINING_POLICY } from "./voice-training-policy.js";
 import { verifyVoiceMeeterRoute } from "./voicemeeter-route-health.js";
 import {
-  advancePacedTargetCaption,
-  bufferPacedTargetCaption,
   latestTranscriptPersistenceEvent,
   transcriptPersistencePresentation,
 } from "./renderer-state.js";
@@ -208,9 +206,6 @@ const ui = {
   captions: {
     tx: { source: "", target: "" },
     rx: { source: "", target: "" },
-  },
-  pacedTargets: {
-    rx: { pending: "", visible: "" },
   },
   mode: "meeting",
   muted: { tx: false, rx: false },
@@ -882,7 +877,6 @@ function resetLiveDisplay() {
     tx: { source: "", target: "" },
     rx: { source: "", target: "" },
   };
-  ui.pacedTargets = { rx: { pending: "", visible: "" } };
   ui.muted = { tx: false, rx: false };
   for (const direction of ["tx", "rx"]) {
     setChannelState(
@@ -1241,21 +1235,7 @@ function showBlocked(title, detail) {
   setAppState("blocked");
 }
 
-function appendTranscript({
-  deferred = false,
-  direction,
-  role,
-  text,
-  final = false,
-}) {
-  if (deferred) {
-    ui.pacedTargets[direction] = bufferPacedTargetCaption(
-      ui.pacedTargets[direction],
-      text,
-      final,
-    );
-    return;
-  }
+function appendTranscript({ direction, role, text, final = false }) {
   const key = captionKey(role);
   ui.captions[direction][key] = mergeCaption(
     ui.captions[direction][key],
@@ -1265,19 +1245,6 @@ function appendTranscript({
   renderCaptions();
 }
 
-function advanceSpeechFallbackCaption({ direction, characters, state }) {
-  if (direction !== "rx") return;
-  ui.pacedTargets.rx = advancePacedTargetCaption(
-    ui.pacedTargets.rx,
-    characters,
-  );
-  ui.captions.rx.target = ui.pacedTargets.rx.visible;
-  if (state === "unsent") {
-    elements["stopped-copy"].textContent =
-      "部分尾端翻譯未朗讀，字幕與逐字稿已保留。";
-  }
-  renderCaptions();
-}
 
 function renderDiagnostics(status = ui.channels) {
   const presentation = diagnosticsPresentation({
@@ -2831,10 +2798,6 @@ window.translive.onEvent(async (event) => {
         "無法套用 GPT‑Live WebRTC 回應。",
       );
     }
-    return;
-  }
-  if (event.type === "speech-fallback") {
-    advanceSpeechFallbackCaption(event);
     return;
   }
   if (event.type === "transcript") {

@@ -26,7 +26,6 @@ export function diagnosticEventLabel(type) {
       "global-audio": "Windows 系統音訊設定",
       "voicemeeter-routing": "VoiceMeeter 內部路由",
       "meeting-setup": "會議裝置設定",
-      pacing: "翻譯節奏調整",
       record: "紀錄已保存",
       summary: "摘要狀態更新",
       error: "錯誤",

@@ -12,7 +12,6 @@ const PACKAGED_PATHS = new Set([
   "package.json",
   "src",
   "src/account-controller.js",
-  "src/adaptive-pacing-controller.js",
   "src/audio-output.js",
   "src/codex-app-server.js",
   "src/device-recommendations.js",
