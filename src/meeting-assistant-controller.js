@@ -290,7 +290,10 @@ export class MeetingAssistantController {
     });
     evidence.recordBlockedAttempt("assistant-start", error);
     evidence.recordError("system", error, {});
-    evidence.finish(Date.now(), { reason: safeMessage(error), outcome: "blocked" });
+    evidence.finish(Date.now(), {
+      reason: safeMessage(error),
+      outcome: "blocked",
+    });
     try {
       await evidence.write(this.#evidenceDirectory);
     } catch {

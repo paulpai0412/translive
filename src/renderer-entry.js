@@ -1100,6 +1100,7 @@ async function createRealtimePeer({
             { once: true },
           );
           await audioOutput.attach(remoteStream);
+          await monitorOutput?.attach(remoteStream);
           recordMetric(direction, "output-audio", {});
         } catch (error) {
           window.translive.rendererError(
@@ -1171,7 +1172,9 @@ async function startTranslation() {
   let config;
   const startup = createStartupSession({
     directions:
-      ui.mode === "meeting" ? [...directionsForMode(), "qa"] : directionsForMode(),
+      ui.mode === "meeting"
+        ? [...directionsForMode(), "qa"]
+        : directionsForMode(),
     createPeer: async ({ direction, channel }) =>
       direction === "qa"
         ? createRealtimePeer({
@@ -1368,7 +1371,8 @@ async function startAssistant() {
       updateReadyMessage();
       return;
     }
-    if (config) window.translive.rendererBlocked(config, error?.message ?? "unknown");
+    if (config)
+      window.translive.rendererBlocked(config, error?.message ?? "unknown");
     showAssertiveError("無法建立會議助手連線，請檢查設定後再試。");
     showBlocked("無法建立會議助手連線", error?.message);
   } finally {

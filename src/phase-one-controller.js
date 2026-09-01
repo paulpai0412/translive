@@ -315,10 +315,12 @@ export class PhaseOneController {
       this.#throwIfStartupCanceled(context);
       // Install the active run before forwarding buffered SDP notifications to the renderer.
       this.#active = { context, run };
-      await this.#openQaVoiceIfConfigured(context);
       for (const notification of context.buffered.splice(0)) {
         this.#receiveNotification(context, notification);
       }
+      // QA voice opens only after tx/rx answers are on their way — delaying
+      // them behind the qa handshake lets codex close the transport.
+      await this.#openQaVoiceIfConfigured(context);
       if (run.allFailed()) {
         context.evidence.recordBlockedAttempt(
           "controller-start",
@@ -897,7 +899,10 @@ export class PhaseOneController {
       });
       // Feed the shared search index so assistant-mode Q&A can answer from
       // translation sessions too. Read-side concern: never fail the save.
-      if (this.#meetingIndex && typeof this.#records.readSession === "function") {
+      if (
+        this.#meetingIndex &&
+        typeof this.#records.readSession === "function"
+      ) {
         try {
           const record = await this.#records.readSession(metadata.id);
           this.#meetingIndex.indexSession({
