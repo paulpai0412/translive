@@ -1006,6 +1006,7 @@ async function createRealtimePeer({
   source,
   sink,
   playRemote = true,
+  monitorSink,
 }) {
   let stream;
   let peerConnection;
@@ -1020,7 +1021,7 @@ async function createRealtimePeer({
     : undefined;
   // Monitor path lets the local user hear what the assistant sends into the
   // meeting — sending into silence reads as "no response".
-  const monitorOutput = monitorSink
+  let monitorOutput = monitorSink
     ? new DirectionalAudioOutput({ sinkId: monitorSink.id })
     : undefined;
 
@@ -1042,7 +1043,12 @@ async function createRealtimePeer({
 
   try {
     await audioOutput?.prepare();
-    await monitorOutput?.prepare();
+    try {
+      await monitorOutput?.prepare();
+    } catch {
+      // Monitor headphones are best-effort feedback only.
+      monitorOutput = undefined;
+    }
     peerConnection = new RTCPeerConnection();
     if (source) {
       stream = await navigator.mediaDevices.getUserMedia({
@@ -1362,6 +1368,7 @@ async function startAssistant() {
       updateReadyMessage();
       return;
     }
+    if (config) window.translive.rendererBlocked(config, error?.message ?? "unknown");
     showAssertiveError("無法建立會議助手連線，請檢查設定後再試。");
     showBlocked("無法建立會議助手連線", error?.message);
   } finally {

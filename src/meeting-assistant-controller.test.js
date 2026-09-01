@@ -349,3 +349,14 @@ test("armed=false keeps the gate closed", async (t) => {
   assert.equal(answerCalls.length, 0);
   await controller.stop();
 });
+
+test("pre-context start failures still write blocked evidence", async (t) => {
+  const { controller, directory, cleanup } = await controllerFor();
+  t.after(cleanup);
+  const config = validConfig();
+  delete config.tx.sdp;
+  await assert.rejects(() => controller.start(config), /SDP/);
+  const { readdir } = await import("node:fs/promises");
+  const files = await readdir(join(directory, "evidence"));
+  assert.ok(files.some((name) => name.endsWith(".json")));
+});

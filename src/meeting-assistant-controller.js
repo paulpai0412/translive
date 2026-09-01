@@ -201,6 +201,10 @@ export class MeetingAssistantController {
           reason: safeMessage(error),
           outcome: "blocked",
         });
+      } else if (!context) {
+        // Pre-context failures (validation, runtime, client start) must still
+        // leave evidence — otherwise the failure is invisible.
+        await this.#recordBlockedAttempt(config, error);
       }
       this.#publish({ type: "blocked", message: safeMessage(error) });
       throw new Error(safeMessage(error));
@@ -274,6 +278,24 @@ export class MeetingAssistantController {
 
   async dispose() {
     await this.stop("app-quit");
+  }
+
+  async #recordBlockedAttempt(config, error) {
+    const evidence = new RunEvidence({
+      appVersion: this.#appVersion,
+      platform: config?.platform,
+      mode: "meeting-assistant",
+      routeProfile: config?.routeProfile,
+      model: MODEL,
+    });
+    evidence.recordBlockedAttempt("assistant-start", error);
+    evidence.recordError("system", error, {});
+    evidence.finish(Date.now(), { reason: safeMessage(error), outcome: "blocked" });
+    try {
+      await evidence.write(this.#evidenceDirectory);
+    } catch {
+      // Evidence persistence must not mask the original error.
+    }
   }
 
   #assertConfig(config) {
