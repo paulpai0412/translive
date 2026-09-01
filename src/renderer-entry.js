@@ -126,6 +126,8 @@ const elements = Object.fromEntries(
     "aggregate-summary-button",
     "assistant-answer-delivery",
     "assistant-wake-armed",
+    "assistant-wake-phrase",
+    "qa-hint",
     "qa-answer",
     "qa-approve",
     "qa-card",
@@ -2559,6 +2561,10 @@ elements["qa-reject"].addEventListener("click", () => {
   if (!ui.pendingAnswerId) return;
   window.translive.assistantReject(ui.pendingAnswerId).catch(() => {});
 });
+elements["assistant-wake-phrase"].addEventListener("change", () => {
+  updateWakeHint();
+  saveAssistantPreferences();
+});
 elements["assistant-wake-armed"].addEventListener("change", (event) => {
   window.translive.assistantSetWakeArmed(event.target.checked).catch(() => {});
   saveAssistantPreferences();
@@ -2572,10 +2578,18 @@ async function saveAssistantPreferences() {
     await window.translive.assistantPreferencesSave({
       answerDelivery: elements["assistant-answer-delivery"].value,
       wakeArmed: elements["assistant-wake-armed"].checked,
+      wakePhrase: elements["assistant-wake-phrase"].value,
     });
+    updateWakeHint();
   } catch {
     // Preference persistence is best-effort; the run keeps working.
   }
+}
+
+function updateWakeHint() {
+  const phrase =
+    elements["assistant-wake-phrase"].value.trim() || "translive";
+  elements["qa-hint"].textContent = `說「${phrase},…」即可提問`;
 }
 
 async function initializeAssistantPreferences() {
@@ -2583,6 +2597,8 @@ async function initializeAssistantPreferences() {
     const preferences = await window.translive.assistantPreferencesLoad();
     elements["assistant-answer-delivery"].value = preferences.answerDelivery;
     elements["assistant-wake-armed"].checked = preferences.wakeArmed;
+    elements["assistant-wake-phrase"].value = preferences.wakePhrase;
+    updateWakeHint();
   } catch {
     // Defaults in the markup already match the safe settings.
   }
@@ -2620,7 +2636,7 @@ elements["drawer-scrim"].addEventListener("click", () => {
   setSummaryConfirm(false);
 });
 elements["quick-setup-button"].addEventListener("click", () => {
-  if (!(["meeting", "assistant"].includes(ui.mode))) return;
+  if (!["meeting", "assistant"].includes(ui.mode)) return;
   setQuickSetup(true);
 });
 elements["close-quick-setup"].addEventListener("click", () =>

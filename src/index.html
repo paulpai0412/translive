@@ -117,8 +117,8 @@
             <strong>會議助手</strong><span>記錄會議 ＋ 喚醒問答</span>
           </button>
           <p class="assistant-mode-note">
-            此模式不翻譯：記錄雙方談話，會後自動匯整摘要。會議中可說「hey
-            translive,…」查詢本場與過去會議，或按「口播結論」。答案預設先在本機顯示，確認後才以
+            此模式不翻譯：記錄雙方談話，會後自動匯整摘要。會議中可說喚醒詞（預設「hey
+            translive」，可自訂）查詢本場與過去會議，或按「口播結論」。答案預設先在本機顯示，確認後才以
             AI 合成語音送入會議。
           </p>
         </div>
@@ -168,10 +168,20 @@
                 </select>
               </label>
               <label>
+                <span>自訂喚醒詞</span>
+                <input
+                  type="text"
+                  id="assistant-wake-phrase"
+                  value="translive"
+                  maxlength="40"
+                  placeholder="例如：小泥小泥"
+                />
+              </label>
+              <label>
                 <span>喚醒詞</span>
                 <span class="checkbox-row">
                   <input type="checkbox" id="assistant-wake-armed" checked />
-                  啟用「hey translive」語音喚醒
+                  啟用語音喚醒
                 </span>
               </label>
             </div>
@@ -447,7 +457,7 @@
             >
               口播結論
             </button>
-            <span class="qa-hint">說「hey translive,問題」即可提問</span>
+            <span class="qa-hint" id="qa-hint">說「hey translive,…」即可提問</span>
           </div>
           <article class="qa-card" id="qa-card" hidden>
             <p class="qa-question" id="qa-question"></p>

@@ -5,6 +5,8 @@ const MODE_DIRECTIONS = Object.freeze({
   meeting: DIRECTIONS,
   media: ["rx"],
   microphone: ["tx"],
+  // Assistant mode shares the meeting dual-channel capture layout.
+  assistant: DIRECTIONS,
 });
 const SOURCE_KIND = "audioinput";
 const SINK_KIND = "audiooutput";

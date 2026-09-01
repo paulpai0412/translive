@@ -150,6 +150,15 @@ function threadFor(client, index = 0) {
   return client.realtime[index].threadId;
 }
 
+test("starts with renderer-sent mode assistant", async (t) => {
+  const { client, controller, cleanup } = await controllerFor();
+  t.after(cleanup);
+  const result = await controller.start(validConfig({ mode: "assistant" }));
+  assert.ok(result.status);
+  assert.equal(client.realtime.length, 2);
+  await controller.stop();
+});
+
 test("starts without a headphone confirmation (no audio is routed there)", async (t) => {
   const { client, controller, cleanup } = await controllerFor();
   t.after(cleanup);
@@ -298,6 +307,20 @@ test("auto delivery speaks without approval", async (t) => {
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(client.speech.length, 1);
+  await controller.stop();
+});
+
+test("custom wake phrase from config activates the gate", async (t) => {
+  const { answerCalls, client, controller, cleanup } = await controllerFor();
+  t.after(cleanup);
+  await controller.start(validConfig({ wakePhrase: "小泥小泥" }));
+  const me = threadFor(client, 0);
+  client.emitTranscript(me, { text: "hey translive, 預算" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(answerCalls.length, 0);
+  client.emitTranscript(me, { text: "小泥小泥,預算" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(answerCalls.length, 1);
   await controller.stop();
 });
 

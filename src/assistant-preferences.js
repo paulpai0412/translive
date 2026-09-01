@@ -8,12 +8,18 @@ import { join } from "node:path";
 const DEFAULTS = Object.freeze({
   answerDelivery: "review",
   wakeArmed: true,
+  wakePhrase: "translive",
 });
 
 function normalize(value) {
+  const wakePhrase = String(value?.wakePhrase ?? "").trim();
   return {
     answerDelivery: value?.answerDelivery === "auto" ? "auto" : "review",
     wakeArmed: value?.wakeArmed !== false,
+    wakePhrase:
+      wakePhrase.length > 0 && wakePhrase.length <= 40
+        ? wakePhrase
+        : DEFAULTS.wakePhrase,
   };
 }
 

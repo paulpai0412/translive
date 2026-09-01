@@ -90,3 +90,49 @@ test("arming state can be toggled at runtime", () => {
     null,
   );
 });
+
+test("supports a custom Chinese wake phrase without a separator", () => {
+  const gate = new WakeGate({ armed: true, phrase: "小泥小泥" });
+  assert.deepEqual(
+    gate.onFinalTranscript({ source: "me", text: "小泥小泥,上次會議結論" }),
+    { type: "question", question: "上次會議結論" },
+  );
+  assert.deepEqual(
+    gate.onFinalTranscript({ source: "me", text: "小泥小泥預算是多少" }),
+    { type: "question", question: "預算是多少" },
+  );
+  assert.equal(
+    gate.onFinalTranscript({ source: "me", text: "hey translive, 預算" }),
+    null,
+  );
+});
+
+test("custom phrases are regex-escaped and trim whitespace", () => {
+  const gate = new WakeGate({ armed: true, phrase: " 小泥.小泥 " });
+  assert.deepEqual(
+    gate.onFinalTranscript({ source: "me", text: "小泥.小泥 結論" }),
+    { type: "question", question: "結論" },
+  );
+});
+
+test("setPhrase switches the active phrase at runtime", () => {
+  const gate = new WakeGate({ armed: true });
+  gate.setPhrase("小泥小泥");
+  assert.deepEqual(
+    gate.onFinalTranscript({ source: "me", text: "小泥小泥,測試" }),
+    { type: "question", question: "測試" },
+  );
+  gate.setPhrase("");
+  assert.deepEqual(
+    gate.onFinalTranscript({ source: "me", text: "hey translive, 回來了" }),
+    { type: "question", question: "回來了" },
+  );
+});
+
+test("speak-conclusions still works with a custom phrase", () => {
+  const gate = new WakeGate({ armed: true, phrase: "小泥小泥" });
+  assert.deepEqual(
+    gate.onFinalTranscript({ source: "me", text: "小泥小泥,口播結論" }),
+    { type: "command", command: "speak-conclusions" },
+  );
+});

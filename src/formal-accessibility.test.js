@@ -340,6 +340,8 @@ test("formal UI exposes the meeting assistant mode with reviewable answers", asy
   assert.match(html, /id="qa-reject"/);
   assert.match(html, /id="assistant-answer-delivery"/);
   assert.match(html, /id="assistant-wake-armed"/);
+  assert.match(html, /id="assistant-wake-phrase"[^>]*maxlength="40"/);
+  assert.match(html, /id="qa-hint"/);
 
   assert.match(renderer, /assistant: \["tx", "rx"\]/);
   assert.match(
@@ -353,6 +355,6 @@ test("formal UI exposes the meeting assistant mode with reviewable answers", asy
   assert.match(renderer, /ui\.passthrough\?\.setMuted\(muted\)/);
   assert.match(
     renderer,
-    /!\(\["meeting", "assistant"\]\.includes\(ui\.mode\)\)+\s*return;/,
+    /!\(?\["meeting", "assistant"\]\.includes\(ui\.mode\)/,
   );
 });

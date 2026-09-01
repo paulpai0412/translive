@@ -185,6 +185,7 @@ export class MeetingAssistantController {
       this.#wireQaVoice(context);
       this.#qa.setDelivery(config.answerDelivery ?? "review");
       this.#gate.setArmed(config.wakeArmed !== false);
+      this.#gate.setPhrase(config.wakePhrase);
       this.#active = context;
       for (const notification of context.buffered.splice(0)) {
         this.#receiveNotification(context, notification);
