@@ -34,10 +34,7 @@ test("applies mode routing at Start and restores quick setup before mode roles",
     source,
     /restoreTranslationAudioRouting[\s\S]{0,750}restoreMeetingDevices\(\)[\s\S]{0,450}windowsAudioDefaultsController\.restore\(\)/,
   );
-  assert.match(
-    source,
-    /restoreMeetingDevices: restoreTranslationAudioRouting/,
-  );
+  assert.match(source, /restoreMeetingDevices: restoreTranslationAudioRouting/);
 });
 
 test("preflight applies mode routing before the renderer route probe and failed startup restores it", async () => {
@@ -194,7 +191,9 @@ test("translation waits for automatic VoiceMeeter routing and exit restores it f
   const voiceMeeterRestore = source.indexOf(
     "voiceMeeterRoutingController?.restore()",
   );
-  const windowsRestore = source.indexOf("return restoreTranslationAudioRouting();");
+  const windowsRestore = source.indexOf(
+    "return restoreTranslationAudioRouting();",
+  );
   assert.ok(voiceMeeterRestore >= 0);
   assert.ok(windowsRestore > voiceMeeterRestore);
 });

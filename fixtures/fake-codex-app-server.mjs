@@ -27,7 +27,9 @@ function reject(id, message) {
 }
 
 function directionFor(params) {
-  if (/verbatim transcription machine for the local speaker/.test(params.prompt)) {
+  if (
+    /verbatim transcription machine for the local speaker/.test(params.prompt)
+  ) {
     return "tx";
   }
   if (/verbatim transcription machine for meeting audio/.test(params.prompt)) {

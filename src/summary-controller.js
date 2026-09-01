@@ -31,12 +31,20 @@ export class SummaryController {
   #publish;
   #records;
   #summaryService;
+  #meetingIndex;
 
-  constructor({ records, summaryService, now = Date.now, publish = () => {} }) {
+  constructor({
+    records,
+    summaryService,
+    now = Date.now,
+    publish = () => {},
+    meetingIndex,
+  }) {
     this.#records = records;
     this.#summaryService = summaryService;
     this.#now = now;
     this.#publish = publish;
+    this.#meetingIndex = meetingIndex;
   }
 
   async startSessionSummary({ sessionId, confirmed }) {
@@ -176,6 +184,19 @@ export class SummaryController {
           summaryId,
         });
         throw abortError();
+      }
+      if (kind === "session" && this.#meetingIndex) {
+        // Keep the search index's summary tier in sync for assistant Q&A.
+        try {
+          const record = await this.#records.readSession(summaryId);
+          this.#meetingIndex.indexSession({
+            metadata: record.metadata,
+            entries: record.entries,
+            summary: record.summary?.structured,
+          });
+        } catch {
+          // Indexing is a read-side concern; never fail the summary itself.
+        }
       }
       const result = { requestId, state: "completed", kind, summaryId };
       this.#publish({ type: "summary", ...result });

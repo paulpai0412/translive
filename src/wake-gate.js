@@ -17,10 +17,17 @@ function normalizePhrase(value) {
 }
 
 function phrasePattern(phrase) {
-  // Separator after the phrase is optional so Chinese wake words like
-  // 小泥小泥 work without a comma: 「小泥小泥預算多少」.
+  // Separators around the phrase are optional and punctuation-tolerant so
+  // real transcript variants work: "Hey, TransLive, ...", 小泥小泥預算多少.
+  // String concat keeps the \s escape out of template literals (autofix-safe).
+  const separators = "[，,：:\\s]";
   return new RegExp(
-    `^(?:hey |ok )?${escapeRegExp(phrase)}[，,\\s]*(.+)$`,
+    "^(?:hey|ok|嗨|嘿|喂)?" +
+      separators +
+      "*" +
+      escapeRegExp(phrase) +
+      separators +
+      "*(.+)$",
     "is",
   );
 }

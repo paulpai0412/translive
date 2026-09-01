@@ -225,7 +225,12 @@ export class MeetingAssistantController {
     active.run.answerApplied(direction);
     const status = active.run.status();
     const aggregate = active.run.aggregateStatus();
-    this.#publish({ type: "state", direction, state: status[direction], aggregate });
+    this.#publish({
+      type: "state",
+      direction,
+      state: status[direction],
+      aggregate,
+    });
     return { status, aggregate };
   }
 
@@ -325,7 +330,13 @@ export class MeetingAssistantController {
     const threadId = context.qaThreadId;
     this.#qa.setSpeaker(async (text) => {
       if (context.finalized) throw new Error("Meeting has already ended");
-      await context.client.appendSpeech(threadId, text);
+      // appendSpeech must never hang the review flow silently.
+      await Promise.race([
+        context.client.appendSpeech(threadId, text),
+        waitFor(10_000).then(() => {
+          throw new Error("QA speech timed out");
+        }),
+      ]);
     });
   }
 

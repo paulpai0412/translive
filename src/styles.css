@@ -1550,3 +1550,8 @@ body[data-mode="microphone"] #single-target-label::before {
   align-items: center;
   gap: 0.5rem;
 }
+
+/* Assistant mode has no translation, so target captions are meaningless */
+body[data-mode="assistant"] .meeting-captions .caption-group.target {
+  display: none;
+}

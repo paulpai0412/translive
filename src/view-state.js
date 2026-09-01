@@ -15,7 +15,8 @@ const MODE_LABELS = Object.freeze({
   assistant: "會議助手",
 });
 
-export function channelStateLabel(state) {
+export function channelStateLabel(state, mode) {
+  if (state === "live" && mode === "assistant") return "記錄中";
   return CHANNEL_LABELS[state] ?? "狀態未知";
 }
 
@@ -133,8 +134,9 @@ export function runStatePresentation({ appState, mode, status = {} }) {
     };
   }
 
+  const liveTitle = mode === "assistant" ? "記錄中" : "翻譯中";
   return {
-    title: appState === "live" ? "翻譯中" : modeLabel(mode),
+    title: appState === "live" ? liveTitle : modeLabel(mode),
     detail: "",
     level: "neutral",
   };

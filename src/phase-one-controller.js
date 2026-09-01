@@ -174,6 +174,7 @@ export class PhaseOneController {
   #evidenceDirectory;
   #inspectRuntime;
   #lastEvidence;
+  #meetingIndex;
   #publish;
   #records;
   #starting = false;
@@ -196,8 +197,10 @@ export class PhaseOneController {
       }),
     publish = () => {},
     records,
+    meetingIndex,
   }) {
     this.#appVersion = appVersion;
+    this.#meetingIndex = meetingIndex;
     this.#codexExecutable = codexExecutable;
     this.#codexVersion = codexVersion;
     this.#cwd = cwd;
@@ -766,6 +769,19 @@ export class PhaseOneController {
         record: metadata,
         path: metadata.path,
       });
+      // Feed the shared search index so assistant-mode Q&A can answer from
+      // translation sessions too. Read-side concern: never fail the save.
+      if (this.#meetingIndex && typeof this.#records.readSession === "function") {
+        try {
+          const record = await this.#records.readSession(metadata.id);
+          this.#meetingIndex.indexSession({
+            metadata: record.metadata,
+            entries: record.entries,
+          });
+        } catch {
+          // Indexing is rebuilt at startup; a transient miss is harmless.
+        }
+      }
       return metadata;
     } catch (error) {
       this.#publish({

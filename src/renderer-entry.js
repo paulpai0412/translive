@@ -816,6 +816,7 @@ function updateReadyMessage() {
     meeting: "會同時建立 TX 與 RX 翻譯連線。",
     media: "只建立 RX 翻譯連線，不使用麥克風。",
     microphone: "只建立 TX 翻譯連線，不使用耳機或 RX 來源。",
+    assistant: "記錄雙方談話，不翻譯；停止後自動匯整摘要。",
   }[ui.mode];
   const missing = ui.missingRecommendedDevices
     .map((slot) => SLOT_LABELS[slot])
@@ -828,10 +829,10 @@ function updateReadyMessage() {
 function setChannelState(direction, state) {
   ui.channels[direction] = state;
   const element = elements[`${direction}-state`];
-  if (element) element.textContent = channelStateLabel(state);
+  if (element) element.textContent = channelStateLabel(state, ui.mode);
   const singleDirection = activeSingleDirection();
   if (direction === singleDirection) {
-    elements["single-channel-state"].textContent = channelStateLabel(state);
+    elements["single-channel-state"].textContent = channelStateLabel(state, ui.mode);
   }
   const button = document.querySelector(
     `.mute-button[data-direction="${direction}"]`,
@@ -1322,6 +1323,26 @@ async function startAssistant() {
   } finally {
     if (ui.startup === startup) ui.startup = undefined;
   }
+}
+
+let qaNoticeTimer;
+function showQaNotice(message) {
+  const hint = elements["qa-hint"];
+  if (!hint) return;
+  clearTimeout(qaNoticeTimer);
+  const base = hint.dataset.base ?? hint.textContent;
+  hint.dataset.base = base;
+  hint.textContent = message;
+  qaNoticeTimer = setTimeout(() => {
+    hint.textContent = hint.dataset.base;
+  }, 8_000);
+}
+
+function setQaBusy(busy) {
+  const button = elements["speak-conclusions-button"];
+  if (!button) return;
+  button.disabled = busy || ["live", "degraded"].includes(ui.app) === false;
+  button.textContent = busy ? "執行中…" : "口播結論";
 }
 
 function showQaCard(answer) {
@@ -2547,15 +2568,23 @@ elements["blocked-action"].addEventListener("click", () => {
 });
 elements["start-button"].addEventListener("click", startTranslation);
 elements["speak-conclusions-button"].addEventListener("click", () => {
+  setQaBusy(true);
   window.translive.assistantSpeakConclusions().catch(() => {
+    setQaBusy(false);
     showAssertiveError("無法產生口播結論，請稍後再試。");
   });
 });
 elements["qa-approve"].addEventListener("click", () => {
   if (!ui.pendingAnswerId) return;
-  window.translive.assistantApprove(ui.pendingAnswerId).catch(() => {
-    showAssertiveError("無法送出語音回答。");
-  });
+  elements["qa-approve"].disabled = true;
+  elements["qa-approve"].textContent = "送出中…";
+  window.translive
+    .assistantApprove(ui.pendingAnswerId)
+    .catch(() => showQaNotice("語音送出失敗，請檢查連線後再試"))
+    .finally(() => {
+      elements["qa-approve"].textContent = "送入會議語音";
+      elements["qa-approve"].disabled = false;
+    });
 });
 elements["qa-reject"].addEventListener("click", () => {
   if (!ui.pendingAnswerId) return;
@@ -3024,11 +3053,16 @@ window.translive.onEvent(async (event) => {
   }
   if (event.type === "qa-sent" || event.type === "qa-rejected") {
     hideQaCard();
+    setQaBusy(false);
     return;
   }
   if (event.type === "qa-error") {
-    showQaCard({ question: "會議助手", text: event.message, citations: [] });
+    showQaNotice(event.message);
+    setQaBusy(false);
     return;
+  }
+  if (event.type === "qa-pending") {
+    setQaBusy(false);
   }
   if (event.type === "error") {
     if (event.direction) ui.active[event.direction]?.stop();

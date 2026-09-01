@@ -59,6 +59,7 @@ function controllerFor({
   codexArgs = [fixture],
   createClient,
   records,
+  meetingIndex,
 } = {}) {
   return new PhaseOneController({
     appVersion: "0.0.0-test",
@@ -71,6 +72,7 @@ function controllerFor({
     inspectRuntime,
     createClient,
     records,
+    meetingIndex,
   });
 }
 
@@ -167,25 +169,6 @@ class PromptClient extends EventEmitter {
 
   async stopRealtime() {}
   async close() {}
-}
-
-class MeetingItemClient extends PacingClient {
-  threadNumber = 0;
-  txThreadId;
-  rxThreadId;
-
-  async startEphemeralThread() {
-    this.threadNumber += 1;
-    return { id: `meeting-thread-${this.threadNumber}` };
-  }
-
-  async startRealtime(request) {
-    if (request.prompt.includes("one fixed target language")) {
-      this.rxThreadId = request.threadId;
-    } else {
-      this.txThreadId = request.threadId;
-    }
-  }
 }
 
 test("GPT-Live initialization permits translation only and sends complete short utterances", async () => {
@@ -784,4 +767,44 @@ test("RX target transcripts publish immediately like TX, with no pacing layer", 
   );
   assert.deepEqual(client.appendRequests, []);
   await controller.stop("user-stop");
+});
+
+test("indexes the transcript into the shared meeting index on save", async () => {
+  const { MeetingIndex } = await import("./meeting-index.js");
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-index-"),
+  );
+  const meetingIndex = new MeetingIndex();
+  const controller = controllerFor({
+    evidenceDirectory,
+    meetingIndex,
+    records: {
+      saveSession: async (record) => ({
+        ...record.metadata,
+        id: record.id,
+        path: "/safe/records/x",
+      }),
+      readSession: async (id) => ({
+        metadata: { id, mode: "meeting", startedAtMs: 1_700_000_000_000 },
+        entries: [
+          {
+            offsetMs: 1_000,
+            direction: "tx",
+            side: "source",
+            text: "索引預算會議內容",
+          },
+        ],
+      }),
+    },
+  });
+
+  await controller.start(
+    validConfig({ rx: { sdp: "fixture-chinese-target" } }),
+  );
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  await controller.stop("user-stop");
+
+  const hits = meetingIndex.search("索引預算");
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].tier, "transcript");
 });

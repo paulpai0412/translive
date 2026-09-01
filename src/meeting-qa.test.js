@@ -168,3 +168,19 @@ test("speakConclusions answers from the summary without searching", async () => 
   assert.ok(calls.answer[0].includes("rollout 改期到九月五號"));
   assert.ok(calls.answer[0].includes("Alice 更新時程"));
 });
+
+test("a failing speaker surfaces qa-error instead of hanging silently", async () => {
+  const { calls, qa } = qaFor({
+    speak: async () => {
+      throw new Error("appendSpeech exploded");
+    },
+  });
+  const result = await qa.ask("預算多少");
+  await qa.approveAnswer(result.answer.id);
+  assert.ok(calls.publish.some((e) => e.type === "qa-error"));
+  assert.deepEqual(
+    calls.audit.map((e) => e.outcome),
+    ["pending", "failed"],
+  );
+  assert.equal(qa.pending(), undefined);
+});

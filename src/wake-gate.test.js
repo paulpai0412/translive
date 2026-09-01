@@ -136,3 +136,31 @@ test("speak-conclusions still works with a custom phrase", () => {
     { type: "command", command: "speak-conclusions" },
   );
 });
+
+test("tolerates punctuation and casing inserted by real transcription", () => {
+  const gate = new WakeGate({ armed: true });
+  for (const text of [
+    "Hey, TransLive, 預算多少",
+    "hey translive: 預算多少",
+    "TRANSLIVE，預算多少",
+    "OK，TransLive 預算多少",
+  ]) {
+    assert.deepEqual(
+      gate.onFinalTranscript({ source: "me", text }),
+      { type: "question", question: "預算多少" },
+      text,
+    );
+  }
+});
+
+test("tolerates Chinese prefixes with custom phrases", () => {
+  const gate = new WakeGate({ armed: true, phrase: "小泥小泥" });
+  assert.deepEqual(
+    gate.onFinalTranscript({ source: "me", text: "嘿，小泥小泥，結論是什麼" }),
+    { type: "question", question: "結論是什麼" },
+  );
+  assert.deepEqual(
+    gate.onFinalTranscript({ source: "me", text: "喂 小泥小泥:結論" }),
+    { type: "question", question: "結論" },
+  );
+});

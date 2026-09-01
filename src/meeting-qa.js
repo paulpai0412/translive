@@ -153,7 +153,16 @@ export class MeetingQa {
   async approveAnswer(id) {
     const pending = this.#requirePending(id);
     this.#pending = undefined;
-    await this.#speak(pending.text);
+    try {
+      await this.#speak(pending.text);
+    } catch {
+      this.#record(pending, "failed");
+      this.#publish({
+        type: "qa-error",
+        message: "語音送出失敗，請檢查連線後再試",
+      });
+      return { state: "failed" };
+    }
     this.#record(pending, "sent");
     this.#publish({ type: "qa-sent", id: pending.id });
     return { state: "sent" };

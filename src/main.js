@@ -25,6 +25,7 @@ import { CodexTextTurn } from "./codex-text-turn.js";
 import { buildDiagnostics } from "./diagnostics-service.js";
 import { MeetingAssistantController } from "./meeting-assistant-controller.js";
 import { MeetingIndex } from "./meeting-index.js";
+import { rebuildMeetingIndexFromRecords } from "./meeting-index-rebuild.js";
 import { MeetingSetupController } from "./meeting-setup-controller.js";
 import { sanitizeMeetingSetupRequest } from "./meeting-setup-request.js";
 import { MeetingSetupStore } from "./meeting-setup-store.js";
@@ -779,6 +780,12 @@ if (isPrimaryInstance) {
         platform: process.platform,
       }),
     });
+    meetingIndex = new MeetingIndex({
+      databaseFile: join(recordsStore.directory(), "meeting-index.db"),
+    });
+    // Historical sessions (recorded before the assistant feature) become
+    // searchable only after a rebuild from the store.
+    rebuildMeetingIndexFromRecords(recordsStore, meetingIndex).catch(() => {});
     summaryController = new SummaryController({
       records: recordsStore,
       summaryService: new CodexSummaryService({
@@ -786,6 +793,7 @@ if (isPrimaryInstance) {
         cwd: app.getAppPath(),
       }),
       publish,
+      meetingIndex,
     });
     controller = new PhaseOneController({
       appVersion: app.getVersion(),
@@ -797,12 +805,10 @@ if (isPrimaryInstance) {
         join(app.getPath("userData"), ".translive-evidence"),
       publish,
       records: recordsStore,
+      meetingIndex,
     });
     assistantPreferences = new AssistantPreferences({
       directory: app.getPath("userData"),
-    });
-    meetingIndex = new MeetingIndex({
-      databaseFile: join(recordsStore.directory(), "meeting-index.db"),
     });
     assistantController = new MeetingAssistantController({
       appVersion: app.getVersion(),

@@ -154,3 +154,15 @@ test("音色頁在沒有設定檔時顯示空白導引", () => {
   assert.equal(voiceEmptyStateVisible(0), true);
   assert.equal(voiceEmptyStateVisible(2), false);
 });
+
+test("assistant mode labels live state as recording, not translating", () => {
+  assert.equal(channelStateLabel("live", "assistant"), "記錄中");
+  assert.equal(channelStateLabel("live"), "翻譯中");
+  assert.equal(channelStateLabel("live", "meeting"), "翻譯中");
+  const presentation = runStatePresentation({
+    appState: "live",
+    mode: "assistant",
+    status: { tx: "live", rx: "live" },
+  });
+  assert.equal(presentation.title, "記錄中");
+});
