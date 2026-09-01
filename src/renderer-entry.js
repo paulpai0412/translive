@@ -1048,7 +1048,20 @@ async function createRealtimePeer({
         peerConnection.addTrack(track, stream);
       }
     } else {
-      peerConnection.addTransceiver("audio", { direction: "recvonly" });
+      // QA voice: codex only emits standalone speech when the session has a
+      // real uplink track. A bare recvonly/trackless offer negotiates fine but
+      // appendSpeech then produces zero audio (probed on Windows 2026-09-01).
+      // Send a silent oscillator track instead.
+      const silentContext = new AudioContext();
+      const oscillator = silentContext.createOscillator();
+      const silentGain = silentContext.createGain();
+      silentGain.gain.value = 0;
+      const silentDestination = silentContext.createMediaStreamDestination();
+      oscillator.connect(silentGain);
+      silentGain.connect(silentDestination);
+      oscillator.start();
+      stream = silentDestination.stream;
+      peerConnection.addTrack(stream.getAudioTracks()[0], stream);
     }
     eventChannel = peerConnection.createDataChannel("oai-events");
 
