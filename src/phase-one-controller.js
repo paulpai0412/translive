@@ -9,6 +9,8 @@ import {
   validateDualChannelConfig,
 } from "./dual-channel-run.js";
 import { RunEvidence } from "./evidence.js";
+import { MeetingQa, QA_VOICE_PROMPT } from "./meeting-qa.js";
+import { WakeGate } from "./wake-gate.js";
 import { sanitizeText } from "./text-sanitizer.js";
 
 const PINNED_CODEX_VERSION = "0.145.0";
@@ -165,6 +167,7 @@ function meetingInstructions(platform, routeProfile) {
 
 export class PhaseOneController {
   #active;
+  #answer;
   #appVersion;
   #cancelStartRequested = false;
   #createClient;
@@ -173,9 +176,11 @@ export class PhaseOneController {
   #cwd;
   #evidenceDirectory;
   #inspectRuntime;
+  #gate = new WakeGate({ armed: true });
   #lastEvidence;
   #meetingIndex;
   #publish;
+  #qa;
   #records;
   #starting = false;
   #startingContext;
@@ -198,9 +203,11 @@ export class PhaseOneController {
     publish = () => {},
     records,
     meetingIndex,
+    answer,
   }) {
     this.#appVersion = appVersion;
     this.#meetingIndex = meetingIndex;
+    this.#answer = answer;
     this.#codexExecutable = codexExecutable;
     this.#codexVersion = codexVersion;
     this.#cwd = cwd;
@@ -209,6 +216,22 @@ export class PhaseOneController {
     this.#createClient = createClient;
     this.#publish = publish;
     this.#records = records;
+    if (typeof this.#answer === "function" && this.#meetingIndex) {
+      this.#qa = new MeetingQa({
+        index: this.#meetingIndex,
+        answer: this.#answer,
+        speak: () => {
+          throw new Error("QA voice is only available while a meeting runs");
+        },
+        publish: (event) => this.#qaPublish(event),
+        audit: (entry) => this.#qaAudit(entry),
+        currentSession: () => ({
+          id: this.#active?.context.evidence.snapshot().runId,
+          entries: this.#active?.context.transcriptEntries ?? [],
+          summary: undefined,
+        }),
+      });
+    }
   }
 
   async preflight(config) {
@@ -292,6 +315,7 @@ export class PhaseOneController {
       this.#throwIfStartupCanceled(context);
       // Install the active run before forwarding buffered SDP notifications to the renderer.
       this.#active = { context, run };
+      await this.#openQaVoiceIfConfigured(context);
       for (const notification of context.buffered.splice(0)) {
         this.#receiveNotification(context, notification);
       }
@@ -356,6 +380,42 @@ export class PhaseOneController {
       this.#cancelStartRequested = false;
       this.#starting = false;
     }
+  }
+
+  pendingAnswer() {
+    return this.#qa?.pending();
+  }
+
+  async approveAnswer(id) {
+    return this.#qa?.approveAnswer(id);
+  }
+
+  async rejectAnswer(id) {
+    return this.#qa?.rejectAnswer(id);
+  }
+
+  async speakConclusions() {
+    return this.#qa?.speakConclusions();
+  }
+
+  #qaPublish(event) {
+    if (event.type === "qa-pending") this.#gate.suspend();
+    if (["qa-sent", "qa-rejected", "qa-error"].includes(event.type)) {
+      this.#gate.resume();
+    }
+    this.#publish(event);
+  }
+
+  #qaAudit(entry) {
+    const context = this.#active?.context;
+    if (context) {
+      context.evidence.recordRealtimeNote("qa", {
+        kind: "assistant-answer",
+        detail: `${entry.delivery}:${entry.outcome}`,
+        text: entry.text,
+      });
+    }
+    this.#publish({ type: "qa-audit", entry });
   }
 
   status() {
@@ -500,6 +560,58 @@ export class PhaseOneController {
     }
   }
 
+  async #openQaVoiceIfConfigured(context) {
+    if (
+      !this.#qa ||
+      typeof context.config.qaSdp !== "string" ||
+      context.config.qaSdp.length === 0
+    ) {
+      return;
+    }
+    const thread = await context.client.startEphemeralThread();
+    context.threads.set(thread.id, "qa");
+    context.evidence.recordSession("qa", { threadId: thread.id });
+    await context.client.startRealtime({
+      threadId: thread.id,
+      model: MODEL,
+      version: "v3",
+      outputModality: "audio",
+      includeStartupContext: false,
+      clientManagedHandoffs: true,
+      delegationAckFiller: false,
+      prompt: QA_VOICE_PROMPT,
+      voice: VOICES.tx,
+      transport: { type: "webrtc", sdp: context.config.qaSdp },
+    });
+    context.qaThreadId = thread.id;
+    this.#qa.setSpeaker(async (text) => {
+      if (context.finalized) throw new Error("Meeting has already ended");
+      // appendSpeech must never hang the review flow silently.
+      await Promise.race([
+        context.client.appendSpeech(thread.id, text),
+        waitFor(10_000).then(() => {
+          throw new Error("QA speech timed out");
+        }),
+      ]);
+    });
+    this.#qa.setDelivery(context.config.answerDelivery ?? "review");
+    this.#gate.setArmed(context.config.wakeArmed !== false);
+    this.#gate.setPhrase(context.config.wakePhrase);
+  }
+
+  #handleWake(text) {
+    if (!this.#qa) return;
+    const trigger = this.#gate.onFinalTranscript({ source: "me", text });
+    if (!trigger) return;
+    const task =
+      trigger.type === "command" && trigger.command === "speak-conclusions"
+        ? this.#qa.speakConclusions()
+        : this.#qa.ask(trigger.question);
+    task.catch((error) =>
+      this.#publish({ type: "qa-error", message: safeMessage(error) }),
+    );
+  }
+
   async #openChannel(context, channel) {
     const thread = await context.client.startEphemeralThread();
     context.threads.set(thread.id, channel.direction);
@@ -567,6 +679,13 @@ export class PhaseOneController {
     if (notification.method === "thread/realtime/sdp") {
       this.#publish({ type: "sdp", direction, sdp: notification.params.sdp });
     }
+    if (direction === "qa") {
+      if (notification.method === "thread/realtime/sdp") {
+        // handled by the shared sdp branch below
+      } else {
+        return;
+      }
+    }
     const transcript = this.#normalizeTranscriptNotification(
       context,
       notification,
@@ -580,6 +699,13 @@ export class PhaseOneController {
         final: transcript.method === "thread/realtime/transcript/done",
       });
       this.#recordTranscript(context, direction, transcript, atMs);
+      if (
+        direction === "tx" &&
+        transcript.method === "thread/realtime/transcript/done" &&
+        transcript.params.role === "user"
+      ) {
+        this.#handleWake(transcript.params.text);
+      }
     }
     if (
       notification.method === "thread/realtime/error" ||

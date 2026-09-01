@@ -1018,6 +1018,11 @@ async function createRealtimePeer({
   const audioOutput = playRemote
     ? new DirectionalAudioOutput({ sinkId: sink.id })
     : undefined;
+  // Monitor path lets the local user hear what the assistant sends into the
+  // meeting — sending into silence reads as "no response".
+  const monitorOutput = monitorSink
+    ? new DirectionalAudioOutput({ sinkId: monitorSink.id })
+    : undefined;
 
   const cleanup = async () => {
     if (cleaned) return;
@@ -1032,10 +1037,12 @@ async function createRealtimePeer({
       peerConnection?.close();
     } catch {}
     await audioOutput?.close();
+    await monitorOutput?.close();
   };
 
   try {
     await audioOutput?.prepare();
+    await monitorOutput?.prepare();
     peerConnection = new RTCPeerConnection();
     if (source) {
       stream = await navigator.mediaDevices.getUserMedia({
@@ -1157,22 +1164,40 @@ async function startTranslation() {
     return;
   let config;
   const startup = createStartupSession({
-    directions: directionsForMode(),
+    directions:
+      ui.mode === "meeting" ? [...directionsForMode(), "qa"] : directionsForMode(),
     createPeer: async ({ direction, channel }) =>
-      createRealtimePeer({
-        direction,
-        source: { id: channel.sourceEndpointId },
-        sink: { id: channel.sinkEndpointId },
-      }),
+      direction === "qa"
+        ? createRealtimePeer({
+            direction: "qa",
+            source: null,
+            sink: { id: channel.sinkEndpointId },
+            monitorSink: { id: channel.monitorSinkEndpointId },
+          })
+        : createRealtimePeer({
+            direction,
+            source: { id: channel.sourceEndpointId },
+            sink: { id: channel.sinkEndpointId },
+          }),
     onPeerCreated: (direction, peer) => {
       ui.active[direction] = peer;
     },
-    startRuntime: (runtimeConfig) => window.translive.start(runtimeConfig),
+    startRuntime: (runtimeConfig) =>
+      window.translive.start({
+        ...runtimeConfig,
+        qaSdp: runtimeConfig.qa?.sdp,
+      }),
     cancelRuntime: () => window.translive.cancelStart(),
   });
   ui.startup = startup;
   try {
     config = routeConfig();
+    if (ui.mode === "meeting") {
+      config.qa = {
+        sinkEndpointId: config.tx.sinkEndpointId,
+        monitorSinkEndpointId: config.rx.sinkEndpointId,
+      };
+    }
     ui.persistenceEvent = undefined;
     setAppState("connecting");
     resetLiveDisplay();
@@ -1278,6 +1303,7 @@ async function startAssistant() {
           direction: "qa",
           source: null,
           sink: { id: channel.sinkEndpointId },
+          monitorSink: { id: channel.monitorSinkEndpointId },
         });
       }
       return createRealtimePeer({
@@ -1300,7 +1326,10 @@ async function startAssistant() {
   ui.startup = startup;
   try {
     config = routeConfig();
-    config.qa = { sinkEndpointId: config.tx.sinkEndpointId };
+    config.qa = {
+      sinkEndpointId: config.tx.sinkEndpointId,
+      monitorSinkEndpointId: config.rx.sinkEndpointId,
+    };
     ui.persistenceEvent = undefined;
     hideQaCard();
     setAppState("connecting");

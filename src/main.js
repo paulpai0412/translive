@@ -521,9 +521,10 @@ function registerIpc() {
     await requireVoiceMeeterRouting();
     activeMode = config.mode ?? "meeting";
     await applyTranslationAudioRouting(activeMode);
+    const assistantPrefs = await assistantPreferences.load();
     let result;
     try {
-      result = await controller.start(config);
+      result = await controller.start({ ...assistantPrefs, ...config });
     } catch (error) {
       await restoreTranslationAudioRouting();
       throw error;
@@ -808,6 +809,11 @@ if (isPrimaryInstance) {
       publish,
       records: recordsStore,
       meetingIndex,
+      answer: (prompt) =>
+        new CodexTextTurn({
+          codexExecutable: codexLaunch.executable,
+          cwd: app.getAppPath(),
+        }).run(prompt),
     });
     assistantPreferences = new AssistantPreferences({
       directory: app.getPath("userData"),

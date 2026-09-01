@@ -60,6 +60,7 @@ function controllerFor({
   createClient,
   records,
   meetingIndex,
+  answer,
 } = {}) {
   return new PhaseOneController({
     appVersion: "0.0.0-test",
@@ -73,6 +74,7 @@ function controllerFor({
     createClient,
     records,
     meetingIndex,
+    answer,
   });
 }
 
@@ -807,4 +809,81 @@ test("indexes the transcript into the shared meeting index on save", async () =>
   const hits = meetingIndex.search("索引預算");
   assert.equal(hits.length, 1);
   assert.equal(hits[0].tier, "transcript");
+});
+
+test("translation mode answers the wake phrase through the qa voice channel", async () => {
+  const { MeetingIndex } = await import("./meeting-index.js");
+  const { EventEmitter } = await import("node:events");
+  const evidenceDirectory = await mkdtemp(
+    join(tmpdir(), "translive-controller-wake-"),
+  );
+  const meetingIndex = new MeetingIndex();
+  meetingIndex.indexSession({
+    metadata: { id: "past-1", startedAtMs: 1 },
+    entries: [
+      {
+        offsetMs: 0,
+        direction: "tx",
+        side: "source",
+        text: "預算核定為十萬元",
+      },
+    ],
+  });
+  const answerCalls = [];
+  const published = [];
+
+  class WakeClient extends EventEmitter {
+    constructor() {
+      super();
+      this.realtime = [];
+      this.speech = [];
+      this.threadNumber = 0;
+    }
+    async start() {}
+    async startEphemeralThread() {
+      this.threadNumber += 1;
+      return { id: `wake-thread-${this.threadNumber}` };
+    }
+    async startRealtime(params) {
+      this.realtime.push(params);
+    }
+    async stopRealtime() {}
+    async appendSpeech(threadId, text) {
+      this.speech.push({ threadId, text });
+    }
+    async close() {}
+  }
+  const client = new WakeClient();
+  const controller = controllerFor({
+    evidenceDirectory,
+    createClient: () => client,
+    meetingIndex,
+    answer: async (prompt) => {
+      answerCalls.push(prompt);
+      return JSON.stringify({ text: "預算是十萬元。", citations: [] });
+    },
+    publish: (event) => published.push(event),
+  });
+
+  await controller.start(validConfig({ qaSdp: "v=0\r\nqa-offer" }));
+  // qa voice session is a third realtime session with the voice prompt
+  assert.equal(client.realtime.length, 3);
+  assert.match(client.realtime[2].prompt, /voice output channel/);
+
+  const txThreadId = client.realtime[0].threadId;
+  client.emit("notification", {
+    method: "thread/realtime/transcript/done",
+    params: { threadId: txThreadId, role: "user", text: "hey translive, 預算" },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(answerCalls.length, 1);
+  const pending = published.find((event) => event.type === "qa-pending");
+  assert.ok(pending);
+
+  await controller.approveAnswer(pending.answer.id);
+  assert.equal(client.speech.length, 1);
+  assert.equal(client.speech[0].text, "預算是十萬元。");
+  assert.equal(client.speech[0].threadId, client.realtime[2].threadId);
+
+  await controller.stop("user-stop");
 });

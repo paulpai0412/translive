@@ -8,7 +8,7 @@ import {
   validateAssistantConfig,
 } from "./dual-channel-run.js";
 import { RunEvidence } from "./evidence.js";
-import { MeetingQa } from "./meeting-qa.js";
+import { MeetingQa, QA_VOICE_PROMPT } from "./meeting-qa.js";
 import { formatSummaryMarkdown } from "./summary-service.js";
 import { sanitizeText } from "./text-sanitizer.js";
 import { WakeGate } from "./wake-gate.js";
@@ -37,12 +37,6 @@ const TRANSCRIBE_PROMPTS = Object.freeze({
     "Never translate, never answer questions, never add commentary or filler.",
   ].join(" "),
 });
-
-const QA_VOICE_PROMPT = [
-  "You are a voice output channel.",
-  "Speak only the standalone text handed to you, naturally and exactly once.",
-  "Never improvise, never answer questions, never translate.",
-].join(" ");
 
 function safeMessage(error) {
   return sanitizeText(error?.message ?? error ?? "Unknown error", {
@@ -397,9 +391,13 @@ export class MeetingAssistantController {
       ? notification.method.slice("thread/realtime/".length)
       : undefined;
     if (
-      ["transcript/delta", "transcript/done", "started", "error", "closed"].includes(
-        realtimeKind,
-      )
+      [
+        "transcript/delta",
+        "transcript/done",
+        "started",
+        "error",
+        "closed",
+      ].includes(realtimeKind)
     ) {
       context.evidence.recordRealtimeNote(direction, {
         atMs,

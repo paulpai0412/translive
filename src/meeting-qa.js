@@ -1,4 +1,12 @@
 const NO_EVIDENCE_TEXT = "我在已記錄的會議中找不到相關內容。";
+
+// System prompt for the dedicated voice-output realtime session shared by
+// assistant mode and translation mode wake answers.
+export const QA_VOICE_PROMPT = [
+  "You are a voice output channel.",
+  "Speak only the standalone text handed to you, naturally and exactly once.",
+  "Never improvise, never answer questions, never translate.",
+].join(" ");
 const DELIVERY_MODES = new Set(["review", "auto"]);
 
 function citationKey(citation) {
