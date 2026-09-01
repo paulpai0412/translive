@@ -363,7 +363,13 @@ export class MeetingAssistantController {
       // The assistant-role echo of a transcribe-only session is the model
       // repeating the input — never show or record it.
       if (role === "user") {
-        this.#publish({ type: "transcript", direction, role, text, final: true });
+        this.#publish({
+          type: "transcript",
+          direction,
+          role,
+          text,
+          final: true,
+        });
         this.#recordTranscript(context, direction, role, text, atMs);
         if (direction === "tx") this.#handleWake(context, text);
       }

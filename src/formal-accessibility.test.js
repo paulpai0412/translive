@@ -342,7 +342,10 @@ test("formal UI exposes the meeting assistant mode with reviewable answers", asy
   assert.match(html, /id="assistant-wake-armed"/);
 
   assert.match(renderer, /assistant: \["tx", "rx"\]/);
-  assert.match(renderer, /ui\.mode === "assistant"\) return startAssistant\(\)/);
+  assert.match(
+    renderer,
+    /ui\.mode === "assistant"\) return startAssistant\(\)/,
+  );
   assert.match(renderer, /window\.translive\.assistantStart\(/);
   assert.match(renderer, /event\.direction !== "qa"/);
   assert.match(renderer, /playRemote: false/);

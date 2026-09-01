@@ -84,8 +84,8 @@ CREATE VIRTUAL TABLE meeting_idx USING fts5(
 1. 喚醒觸發 → 問答 session 生成答案,**音訊緩衝在本機,不播**。
 2. 本機面板顯示答案文字 + 引用來源。
 3. 依設定 `answerDelivery` 送出:`review`(預設)等使用者按「送入會議語音」才播;`auto` 生成後立即播出。拒絕即丟棄,不留音訊。設定持久化於 assistant-preferences.json。
-5. AI-voice 揭露:首次啟用與每場開始前提示「AI 合成語音可能發言」(OpenAI TTS guide 要求)。
-6. 所有答案(含未送出)落 meeting record 的 `assistant-answer` audit entry。
+4. AI-voice 揭露:首次啟用與每場開始前提示「AI 合成語音可能發言」(OpenAI TTS guide 要求)。
+5. 所有答案(含未送出)落 meeting record 的 `assistant-answer` audit entry。
 
 ## 6. 明確不做
 

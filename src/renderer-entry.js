@@ -993,7 +993,12 @@ async function summarizeStats(peerConnection) {
   return stats;
 }
 
-async function createRealtimePeer({ direction, source, sink, playRemote = true }) {
+async function createRealtimePeer({
+  direction,
+  source,
+  sink,
+  playRemote = true,
+}) {
   let stream;
   let peerConnection;
   let eventChannel;
@@ -1050,23 +1055,25 @@ async function createRealtimePeer({ direction, source, sink, playRemote = true }
         );
       }
     });
-    if (audioOutput) peerConnection.addEventListener("track", async (event) => {
-      try {
-        const remoteStream = event.streams[0] || new MediaStream([event.track]);
-        event.track.addEventListener(
-          "unmute",
-          () => recordMetric(direction, "output-audio", {}),
-          { once: true },
-        );
-        await audioOutput.attach(remoteStream);
-        recordMetric(direction, "output-audio", {});
-      } catch (error) {
-        window.translive.rendererError(
-          direction,
-          `無法播放翻譯音訊：${error.message}`,
-        );
-      }
-    });
+    if (audioOutput)
+      peerConnection.addEventListener("track", async (event) => {
+        try {
+          const remoteStream =
+            event.streams[0] || new MediaStream([event.track]);
+          event.track.addEventListener(
+            "unmute",
+            () => recordMetric(direction, "output-audio", {}),
+            { once: true },
+          );
+          await audioOutput.attach(remoteStream);
+          recordMetric(direction, "output-audio", {});
+        } catch (error) {
+          window.translive.rendererError(
+            direction,
+            `無法播放翻譯音訊：${error.message}`,
+          );
+        }
+      });
 
     if (stream) stopInputProbe = createInputProbe(stream, direction);
     if (direction !== "qa")
@@ -1318,7 +1325,10 @@ function showQaCard(answer) {
   elements["qa-question"].textContent = answer.question ?? "會議助手";
   elements["qa-answer"].textContent = answer.text;
   elements["qa-citations"].textContent = (answer.citations ?? [])
-    .map((citation) => `來源 ${citation.sessionId} @ ${recordOffset(citation.offsetMs)}`)
+    .map(
+      (citation) =>
+        `來源 ${citation.sessionId} @ ${recordOffset(citation.offsetMs)}`,
+    )
     .join(" · ");
   const actionable = Boolean(answer.id);
   elements["qa-approve"].disabled = !actionable;
@@ -1387,7 +1397,6 @@ function appendTranscript({ direction, role, text, final = false }) {
   );
   renderCaptions();
 }
-
 
 function renderDiagnostics(status = ui.channels) {
   const presentation = diagnosticsPresentation({
