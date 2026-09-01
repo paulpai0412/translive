@@ -116,6 +116,11 @@
           >
             <strong>會議助手</strong><span>記錄會議 ＋ 喚醒問答</span>
           </button>
+          <p class="assistant-mode-note">
+            此模式不翻譯：記錄雙方談話，會後自動匯整摘要。會議中可說「hey
+            translive,…」查詢本場與過去會議，或按「口播結論」。答案預設先在本機顯示，確認後才以
+            AI 合成語音送入會議。
+          </p>
         </div>
 
         <div class="configuration">
@@ -154,12 +159,7 @@
 
           <section class="config-section" data-mode-show="assistant">
             <h2>會議助手</h2>
-            <p class="assistant-intro">
-              此模式不翻譯：記錄雙方談話，會後自動匯整摘要。會議中可說「hey
-              translive,…」查詢本場與過去會議，或按「口播結論」。答案預設先在本機顯示，確認後才以
-              AI 合成語音送入會議。
-            </p>
-            <div class="field-grid">
+            <div class="field-grid assistant-field-grid">
               <label>
                 <span>答案送出方式</span>
                 <select id="assistant-answer-delivery">

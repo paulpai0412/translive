@@ -351,4 +351,8 @@ test("formal UI exposes the meeting assistant mode with reviewable answers", asy
   assert.match(renderer, /playRemote: false/);
   assert.match(renderer, /direction: "recvonly"/);
   assert.match(renderer, /ui\.passthrough\?\.setMuted\(muted\)/);
+  assert.match(
+    renderer,
+    /!\(\["meeting", "assistant"\]\.includes\(ui\.mode\)\)+\s*return;/,
+  );
 });

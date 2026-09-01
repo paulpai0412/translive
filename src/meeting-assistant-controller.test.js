@@ -150,6 +150,17 @@ function threadFor(client, index = 0) {
   return client.realtime[index].threadId;
 }
 
+test("starts without a headphone confirmation (no audio is routed there)", async (t) => {
+  const { client, controller, cleanup } = await controllerFor();
+  t.after(cleanup);
+  const config = validConfig();
+  delete config.headphonesConfirmed;
+  const result = await controller.start(config);
+  assert.ok(result.status);
+  assert.equal(client.realtime.length, 2);
+  await controller.stop();
+});
+
 test("starts two transcribe-only realtime sessions", async (t) => {
   const { client, controller, cleanup } = await controllerFor();
   t.after(cleanup);

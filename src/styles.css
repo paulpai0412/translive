@@ -397,14 +397,18 @@ body[data-app-state="auth-waiting"] #account-login-cancel {
 .assistant-mode-option.is-active {
   background: var(--surface);
 }
-.assistant-intro {
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+.assistant-mode-note {
   color: var(--muted);
+  font-size: 12px;
   line-height: 1.7;
-  margin: 0 0 14px;
-  padding: 12px 14px;
+  margin: 8px 2px 0;
+}
+.assistant-field-grid {
+  grid-template-columns: 1fr;
+  max-width: 420px;
+}
+.assistant-field-grid select {
+  width: 100%;
 }
 .configuration {
   margin-top: 30px;

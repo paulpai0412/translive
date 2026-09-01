@@ -5,7 +5,7 @@ import {
 import { inspectCodexRuntime } from "./codex-runtime.js";
 import {
   startDualChannelRun,
-  validateDualChannelConfig,
+  validateAssistantConfig,
 } from "./dual-channel-run.js";
 import { RunEvidence } from "./evidence.js";
 import { MeetingQa } from "./meeting-qa.js";
@@ -176,6 +176,7 @@ export class MeetingAssistantController {
         evidence,
         onStateChange: (event) => this.#publish({ type: "state", ...event }),
         openChannel: async (channel) => this.#openChannel(context, channel),
+        validate: validateAssistantConfig,
       });
       context.run = run;
       if (typeof config.qaSdp === "string" && config.qaSdp.length > 0) {
@@ -250,7 +251,7 @@ export class MeetingAssistantController {
   }
 
   #assertConfig(config) {
-    validateDualChannelConfig({ ...config, mode: "meeting" });
+    validateAssistantConfig(config);
     for (const direction of ["tx", "rx"]) {
       if (
         typeof config?.[direction]?.sdp !== "string" ||

@@ -2620,7 +2620,7 @@ elements["drawer-scrim"].addEventListener("click", () => {
   setSummaryConfirm(false);
 });
 elements["quick-setup-button"].addEventListener("click", () => {
-  if (ui.mode !== "meeting") return;
+  if (!(["meeting", "assistant"].includes(ui.mode))) return;
   setQuickSetup(true);
 });
 elements["close-quick-setup"].addEventListener("click", () =>

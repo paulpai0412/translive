@@ -66,6 +66,52 @@ export function directionsForMode(mode = "meeting") {
   return directions;
 }
 
+// Assistant mode discards model audio, so the translation-only playout
+// constraints (physical headphones, explicit headphone confirmation) do not
+// apply. What still matters: a real microphone in, the meeting mix from
+// Cable-B, and answers egressing via Cable-A.
+export function validateAssistantConfig(config) {
+  for (const direction of ["tx", "rx"]) {
+    assertEndpoint(config?.[direction], direction);
+  }
+  const endpoints = [
+    config.tx.sourceEndpointId,
+    config.tx.sinkEndpointId,
+    config.rx.sourceEndpointId,
+    config.rx.sinkEndpointId,
+  ];
+  if (new Set(endpoints).size !== endpoints.length) {
+    throw new Error("Audio endpoints must be unique");
+  }
+  if (isVirtualEndpoint(config.tx.sourceEndpointName)) {
+    throw new Error(
+      "TX source must be a physical microphone, not a virtual endpoint",
+    );
+  }
+  const profile = config.routeProfile ?? "vb-cable";
+  if (profile === "vb-cable") {
+    if (!matchesCableRole(config.tx.sinkEndpointName, "a", "input")) {
+      throw new Error("TX sink must be the Cable-A Input playback endpoint");
+    }
+    if (!matchesCableRole(config.rx.sourceEndpointName, "b", "output")) {
+      throw new Error(
+        "RX source must be the Cable-B Output recording endpoint",
+      );
+    }
+    return;
+  }
+  if (profile === "voicemeeter") {
+    if (!matchesVoiceMeeterRole(config.tx.sinkEndpointName, "tx-sink")) {
+      throw new Error("TX sink must be the Voicemeeter AUX Input endpoint");
+    }
+    if (!matchesVoiceMeeterRole(config.rx.sourceEndpointName, "rx-source")) {
+      throw new Error("RX source must be the Voicemeeter Out B1 endpoint");
+    }
+    return;
+  }
+  throw new Error(`Unsupported route profile: ${profile}`);
+}
+
 export function validateDualChannelConfig(config) {
   const directions = directionsForMode(config.mode);
   directions.forEach((direction) =>
@@ -146,9 +192,15 @@ function aggregateStatus(states) {
 
 export async function startDualChannelRun(
   config,
-  { openChannel, evidence, onStateChange = () => {}, now = Date.now },
+  {
+    openChannel,
+    evidence,
+    onStateChange = () => {},
+    now = Date.now,
+    validate = validateDualChannelConfig,
+  },
 ) {
-  validateDualChannelConfig(config);
+  validate(config);
   const activeDirections = directionsForMode(config.mode);
 
   const states = Object.fromEntries(
