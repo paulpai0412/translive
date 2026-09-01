@@ -215,6 +215,20 @@ export class MeetingAssistantController {
     return this.#qa.pending();
   }
 
+  isActive() {
+    return this.#active !== undefined;
+  }
+
+  async answerApplied(direction) {
+    const active = this.#active;
+    if (!active) throw new Error("No meeting assistant run is active");
+    active.run.answerApplied(direction);
+    const status = active.run.status();
+    const aggregate = active.run.aggregateStatus();
+    this.#publish({ type: "state", direction, state: status[direction], aggregate });
+    return { status, aggregate };
+  }
+
   async approveAnswer(id) {
     const result = await this.#qa.approveAnswer(id);
     return result;

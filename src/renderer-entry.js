@@ -2587,8 +2587,7 @@ async function saveAssistantPreferences() {
 }
 
 function updateWakeHint() {
-  const phrase =
-    elements["assistant-wake-phrase"].value.trim() || "translive";
+  const phrase = elements["assistant-wake-phrase"].value.trim() || "translive";
   elements["qa-hint"].textContent = `說「${phrase},…」即可提問`;
 }
 

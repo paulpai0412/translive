@@ -214,3 +214,11 @@ test("early quit awaits global-audio startup and uses optional cleanup before re
   assert.match(source, /if \(!globalAudioRoutingStarted\) return undefined;/);
   assert.match(source, /return restoreTranslationAudioRouting\(\);/);
 });
+
+test("routes answer-applied to the controller that owns the live run", async () => {
+  const source = await mainSource();
+  assert.match(
+    source,
+    /assistantController\?\.isActive\(\)[\s\S]{0,140}?assistantController\.answerApplied\(direction\)[\s\S]{0,80}?controller\.answerApplied\(direction\)/,
+  );
+});

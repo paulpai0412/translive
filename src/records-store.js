@@ -14,7 +14,7 @@ import { sanitizeText } from "./text-sanitizer.js";
 
 const CONSENT_VERSION = 1;
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
-const MODES = new Set(["meeting", "media", "microphone"]);
+const MODES = new Set(["meeting", "media", "microphone", "meeting-assistant"]);
 const PLATFORMS = new Set(["teams", "zoom", "custom"]);
 const PACKAGE_SCHEMA_VERSION = 1;
 const PACKAGE_OVERHEAD_BYTES = 1_024;

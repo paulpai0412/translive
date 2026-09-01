@@ -150,6 +150,22 @@ function threadFor(client, index = 0) {
   return client.realtime[index].threadId;
 }
 
+test("answerApplied transitions the channel and reports aggregate", async (t) => {
+  const { controller, published, cleanup } = await controllerFor();
+  t.after(cleanup);
+  await controller.start(validConfig());
+  assert.equal(controller.isActive(), true);
+  const result = await controller.answerApplied("tx");
+  assert.ok(result.aggregate);
+  assert.ok(
+    published.some(
+      (event) => event.type === "state" && event.direction === "tx",
+    ),
+  );
+  await controller.stop();
+  assert.equal(controller.isActive(), false);
+});
+
 test("starts with renderer-sent mode assistant", async (t) => {
   const { client, controller, cleanup } = await controllerFor();
   t.after(cleanup);

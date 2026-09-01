@@ -60,7 +60,11 @@ test("normalizes unknown values back to safe defaults", async () => {
 test("wake phrase persists and falls back to translive when invalid", async () => {
   const { directory, prefs, cleanup } = await prefsFor();
   try {
-    await prefs.save({ answerDelivery: "review", wakeArmed: true, wakePhrase: "小泥小泥" });
+    await prefs.save({
+      answerDelivery: "review",
+      wakeArmed: true,
+      wakePhrase: "小泥小泥",
+    });
     const reloaded = new AssistantPreferences({ directory });
     assert.equal((await reloaded.load()).wakePhrase, "小泥小泥");
     const normalized = await prefs.save({ wakePhrase: "   " });

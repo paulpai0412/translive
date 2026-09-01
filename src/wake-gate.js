@@ -1,7 +1,10 @@
 const DEFAULT_PHRASE = "translive";
 
 const COMMAND_PATTERNS = Object.freeze([
-  { command: "speak-conclusions", pattern: /^(口播結論|播報結論|播結論|read (the )?(conclusions?|summary))$/i },
+  {
+    command: "speak-conclusions",
+    pattern: /^(口播結論|播報結論|播結論|read (the )?(conclusions?|summary))$/i,
+  },
 ]);
 
 function escapeRegExp(value) {
@@ -16,7 +19,10 @@ function normalizePhrase(value) {
 function phrasePattern(phrase) {
   // Separator after the phrase is optional so Chinese wake words like
   // 小泥小泥 work without a comma: 「小泥小泥預算多少」.
-  return new RegExp(`^(?:hey |ok )?${escapeRegExp(phrase)}[，,\\s]*(.+)$`, "is");
+  return new RegExp(
+    `^(?:hey |ok )?${escapeRegExp(phrase)}[，,\\s]*(.+)$`,
+    "is",
+  );
 }
 
 // Text-level wake gate. This is a cost/false-trigger gate, not a security

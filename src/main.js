@@ -536,7 +536,11 @@ function registerIpc() {
     return result;
   });
   ipcMain.handle("translive:answer-applied", async (_event, direction) =>
-    controller.answerApplied(direction),
+    // SDP answers belong to whichever mode owns the live run; routing to
+    // the wrong controller leaves the active one stuck at "connecting".
+    assistantController?.isActive()
+      ? assistantController.answerApplied(direction)
+      : controller.answerApplied(direction),
   );
   ipcMain.handle("translive:stop", async () => {
     const result = await translationLifecycle.stop("user-stop", {
