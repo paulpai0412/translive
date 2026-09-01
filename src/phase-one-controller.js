@@ -472,7 +472,7 @@ export class PhaseOneController {
 
   recordMetric({ direction, type, atMs, stats }) {
     const active = this.#active;
-    if (!active) return;
+    if (!active || !["tx", "rx"].includes(direction)) return;
     if (type === "input-audio") active.run.recordInputAudio(direction, atMs);
     if (type === "output-audio") active.run.recordOutputAudio(direction, atMs);
     if (type === "webrtc") active.run.recordWebRtcStats(direction, stats, atMs);

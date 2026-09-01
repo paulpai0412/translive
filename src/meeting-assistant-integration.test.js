@@ -136,7 +136,8 @@ test("assistant mode end-to-end over the real app-server transport", async (t) =
   const startedWait = Date.now();
   while (
     !published.some(
-      (entry) => entry.type === "summary" && ["saved", "failed"].includes(entry.state),
+      (entry) =>
+        entry.type === "summary" && ["saved", "failed"].includes(entry.state),
     ) &&
     Date.now() - startedWait < 10_000
   ) {

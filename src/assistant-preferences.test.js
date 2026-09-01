@@ -20,6 +20,7 @@ test("defaults to review delivery with wake armed", async () => {
   try {
     assert.deepEqual(await prefs.load(), {
       answerDelivery: "review",
+      autoSummary: true,
       wakeArmed: true,
       wakePhrase: "translive",
     });
@@ -31,10 +32,15 @@ test("defaults to review delivery with wake armed", async () => {
 test("persists and reloads explicit values", async () => {
   const { directory, prefs, cleanup } = await prefsFor();
   try {
-    await prefs.save({ answerDelivery: "auto", wakeArmed: false });
+    await prefs.save({
+      answerDelivery: "auto",
+      autoSummary: false,
+      wakeArmed: false,
+    });
     const reloaded = new AssistantPreferences({ directory });
     assert.deepEqual(await reloaded.load(), {
       answerDelivery: "auto",
+      autoSummary: false,
       wakeArmed: false,
       wakePhrase: "translive",
     });

@@ -44,3 +44,11 @@ test("text fingerprints are stable and distinguish content", () => {
     assert.notEqual(textFingerprint("你好。"), textFingerprint("你好"));
     assert.match(textFingerprint("任何文字"), /^[0-9a-f]{8}$/);
 });
+
+test("metric recording never throws for auxiliary channels like qa", () => {
+  const evidence = new RunEvidence({ appVersion: "t" });
+  evidence.recordInputAudio("qa", 1000);
+  evidence.recordOutputAudio("qa", 1200);
+  evidence.recordWebRtcStats("qa", { rttMs: 42 }, 1300);
+  evidence.recordTranscriptTimestamp("qa", "assistant", 1400);
+});

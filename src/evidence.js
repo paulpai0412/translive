@@ -184,13 +184,23 @@ export class RunEvidence {
   }
 
   recordInputAudio(direction, atMs = Date.now()) {
-    const timing = this.#data.timing[direction];
+    // Auxiliary channels (e.g. the assistant qa voice) get buckets lazily;
+    // evidence must never crash a live run.
+    const timing = (this.#data.timing[direction] ??= {
+      ttfaMs: [],
+      activityGapMs: [],
+      rttMs: [],
+    });
     timing.firstInputAudioAtMs ??= safeTime(atMs);
     timing.lastInputAudioAtMs = safeTime(atMs);
   }
 
   recordOutputAudio(direction, atMs = Date.now()) {
-    const timing = this.#data.timing[direction];
+    const timing = (this.#data.timing[direction] ??= {
+      ttfaMs: [],
+      activityGapMs: [],
+      rttMs: [],
+    });
     const timestamp = safeTime(atMs);
     timing.firstOutputAudioAtMs ??= timestamp;
     if (
@@ -210,7 +220,11 @@ export class RunEvidence {
   recordWebRtcStats(direction, stats, atMs = Date.now()) {
     const sample = numericStats(stats);
     if (Number.isFinite(sample.rttMs))
-      this.#data.timing[direction].rttMs.push(sample.rttMs);
+      (this.#data.timing[direction] ??= {
+        ttfaMs: [],
+        activityGapMs: [],
+        rttMs: [],
+      }).rttMs.push(sample.rttMs);
     if (Object.keys(sample).length > 0) {
       const timing = this.#data.timing[direction];
       timing.webrtc ??= [];

@@ -126,6 +126,8 @@ const elements = Object.fromEntries(
     "aggregate-summary-button",
     "assistant-answer-delivery",
     "assistant-wake-armed",
+    "auto-summary-enabled",
+    "stopped-back-home",
     "assistant-wake-phrase",
     "qa-hint",
     "qa-answer",
@@ -224,6 +226,7 @@ const ui = {
   passthrough: undefined,
   passthroughStream: undefined,
   pendingAnswerId: undefined,
+  autoSummary: true,
   audioDefaultsState: undefined,
   routingState: undefined,
   records: {
@@ -488,7 +491,8 @@ function applyTranscriptPersistence(event) {
   elements["live-save-status"].textContent = presentation.live;
   elements["stopped-copy"].textContent = presentation.stopped;
   elements["stopped-copy"].title = presentation.pathDetail ?? "";
-  elements["stopped-generate-summary"].hidden = !presentation.summary;
+  elements["stopped-generate-summary"].hidden =
+    !presentation.summary || ui.autoSummary;
 }
 
 function updateSavingStatus() {
@@ -1094,14 +1098,16 @@ async function createRealtimePeer({
         try {
           const remoteStream =
             event.streams[0] || new MediaStream([event.track]);
-          event.track.addEventListener(
-            "unmute",
-            () => recordMetric(direction, "output-audio", {}),
-            { once: true },
-          );
+          if (direction !== "qa") {
+            event.track.addEventListener(
+              "unmute",
+              () => recordMetric(direction, "output-audio", {}),
+              { once: true },
+            );
+          }
           await audioOutput.attach(remoteStream);
           await monitorOutput?.attach(remoteStream);
-          recordMetric(direction, "output-audio", {});
+          if (direction !== "qa") recordMetric(direction, "output-audio", {});
         } catch (error) {
           window.translive.rendererError(
             direction,
@@ -2645,6 +2651,10 @@ elements["qa-reject"].addEventListener("click", () => {
   if (!ui.pendingAnswerId) return;
   window.translive.assistantReject(ui.pendingAnswerId).catch(() => {});
 });
+elements["auto-summary-enabled"].addEventListener("change", () => {
+  ui.autoSummary = elements["auto-summary-enabled"].value === "on";
+  saveAssistantPreferences();
+});
 elements["assistant-wake-phrase"].addEventListener("change", () => {
   updateWakeHint();
   saveAssistantPreferences();
@@ -2661,6 +2671,7 @@ async function saveAssistantPreferences() {
   try {
     await window.translive.assistantPreferencesSave({
       answerDelivery: elements["assistant-answer-delivery"].value,
+      autoSummary: elements["auto-summary-enabled"].value === "on",
       wakeArmed: elements["assistant-wake-armed"].checked,
       wakePhrase: elements["assistant-wake-phrase"].value,
     });
@@ -2681,6 +2692,10 @@ async function initializeAssistantPreferences() {
     elements["assistant-answer-delivery"].value = preferences.answerDelivery;
     elements["assistant-wake-armed"].checked = preferences.wakeArmed;
     elements["assistant-wake-phrase"].value = preferences.wakePhrase;
+    elements["auto-summary-enabled"].value = preferences.autoSummary
+      ? "on"
+      : "off";
+    ui.autoSummary = preferences.autoSummary;
     updateWakeHint();
   } catch {
     // Defaults in the markup already match the safe settings.
@@ -2770,6 +2785,10 @@ elements["summary-confirm-action"].addEventListener(
 elements["stopped-open-records"].addEventListener("click", () =>
   setView("history"),
 );
+elements["stopped-back-home"].addEventListener("click", () => {
+  setAppState("ready");
+  updateReadyMessage();
+});
 elements["stopped-generate-summary"].addEventListener("click", () => {
   if (!ui.lastSavedRecord?.id) return;
   openSummaryConfirm({
@@ -3096,6 +3115,16 @@ window.translive.onEvent(async (event) => {
         "無法套用 GPT‑Live WebRTC 回應。",
       );
     }
+    return;
+  }
+  if (event.type === "summary" && !event.requestId && ui.app === "stopped") {
+    const copy = {
+      generating: "已停止。逐字稿已保存，摘要產生中…",
+      saved: "已停止。逐字稿與摘要已保存。",
+      failed: "已停止。逐字稿已保存，但摘要產生失敗,可從紀錄頁重試。",
+    };
+    elements["stopped-copy"].textContent =
+      copy[event.state] ?? "已停止。逐字稿已保存。";
     return;
   }
   if (event.type === "transcript") {

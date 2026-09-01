@@ -416,13 +416,21 @@ test("stop returns after the record saves; summary completes in background", asy
   assert.equal(stopResult.aggregate, "stopped");
   // stop() resolved while the summary was still pending
   assert.ok(
-    published.some((event) => event.type === "record" && event.state === "saved"),
+    published.some(
+      (event) => event.type === "record" && event.state === "saved",
+    ),
   );
-  assert.ok(!published.some((event) => event.type === "summary" && event.state === "saved"));
+  assert.ok(
+    !published.some(
+      (event) => event.type === "summary" && event.state === "saved",
+    ),
+  );
 
   resolveSummary();
   await new Promise((resolve) => setTimeout(resolve, 50));
   assert.ok(
-    published.some((event) => event.type === "summary" && event.state === "saved"),
+    published.some(
+      (event) => event.type === "summary" && event.state === "saved",
+    ),
   );
 });

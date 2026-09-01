@@ -28,7 +28,10 @@ export function summarizeSessionInBackground({
       sessions,
     });
     const sourceSessions = [
-      { id: sessionId, timestamps: saved.entries.map((entry) => entry.offsetMs) },
+      {
+        id: sessionId,
+        timestamps: saved.entries.map((entry) => entry.offsetMs),
+      },
     ];
     const markdown = formatSummaryMarkdown({
       kind: "session",
