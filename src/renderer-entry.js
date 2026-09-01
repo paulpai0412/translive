@@ -832,7 +832,10 @@ function setChannelState(direction, state) {
   if (element) element.textContent = channelStateLabel(state, ui.mode);
   const singleDirection = activeSingleDirection();
   if (direction === singleDirection) {
-    elements["single-channel-state"].textContent = channelStateLabel(state, ui.mode);
+    elements["single-channel-state"].textContent = channelStateLabel(
+      state,
+      ui.mode,
+    );
   }
   const button = document.querySelector(
     `.mute-button[data-direction="${direction}"]`,
@@ -1112,6 +1115,7 @@ async function createRealtimePeer({
 
     return {
       sdp: peerConnection.localDescription.sdp,
+      stream,
       setMuted(muted) {
         if (direction === "tx") {
           for (const track of stream?.getAudioTracks() ?? []) {
@@ -1303,15 +1307,13 @@ async function startAssistant() {
     resetLiveDisplay();
     const { result } = await startup.start(config);
     if (startup.isCanceled()) return;
-    ui.passthroughStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        deviceId: { exact: config.tx.sourceEndpointId },
-        autoGainControl: false,
-        echoCancellation: false,
-        noiseSuppression: false,
-      },
-      video: false,
-    });
+    // Single mic open: BT/HFP headsets often deliver silence to a second
+    // getUserMedia on the same device, so the passthrough shares the tx
+    // peer's stream instead of opening the mic again.
+    ui.passthroughStream = ui.active.tx?.stream;
+    if (!ui.passthroughStream) {
+      throw new Error("TX microphone stream is unavailable for passthrough");
+    }
     ui.passthrough = new DirectionalAudioOutput({
       sinkId: config.tx.sinkEndpointId,
     });

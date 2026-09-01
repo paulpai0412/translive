@@ -353,6 +353,7 @@ test("formal UI exposes the meeting assistant mode with reviewable answers", asy
   assert.match(renderer, /playRemote: false/);
   assert.match(renderer, /createMediaStreamDestination/);
   assert.match(renderer, /silentGain\.gain\.value = 0/);
+  assert.match(renderer, /ui\.passthroughStream = ui\.active\.tx\?\.stream/);
   assert.match(renderer, /ui\.passthrough\?\.setMuted\(muted\)/);
   assert.match(
     renderer,

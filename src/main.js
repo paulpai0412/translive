@@ -739,7 +739,9 @@ function registerIpc() {
     rendererControls?.acknowledge(acknowledgement ?? {}),
   );
   ipcMain.on("translive:metric", (_event, metric) =>
-    controller.recordMetric(metric),
+    assistantController?.isActive()
+      ? assistantController.recordMetric(metric)
+      : controller.recordMetric(metric),
   );
   ipcMain.on("translive:renderer-error", (_event, { direction, message }) =>
     controller.reportRendererError(direction, message),

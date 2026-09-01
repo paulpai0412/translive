@@ -270,6 +270,14 @@ export class MeetingAssistantController {
     return { status: { tx: "stopped", rx: "stopped" }, aggregate: "stopped" };
   }
 
+  recordMetric({ direction, type, atMs, stats }) {
+    const active = this.#active;
+    if (!active || !["tx", "rx"].includes(direction)) return;
+    if (type === "input-audio") active.run.recordInputAudio(direction, atMs);
+    if (type === "output-audio") active.run.recordOutputAudio(direction, atMs);
+    if (type === "webrtc") active.run.recordWebRtcStats(direction, stats, atMs);
+  }
+
   async dispose() {
     await this.stop("app-quit");
   }
@@ -383,6 +391,23 @@ export class MeetingAssistantController {
       return;
     }
     const atMs = Date.now();
+    const realtimeKind = String(notification.method ?? "").startsWith(
+      "thread/realtime/",
+    )
+      ? notification.method.slice("thread/realtime/".length)
+      : undefined;
+    if (
+      ["transcript/delta", "transcript/done", "started", "error", "closed"].includes(
+        realtimeKind,
+      )
+    ) {
+      context.evidence.recordRealtimeNote(direction, {
+        atMs,
+        kind: realtimeKind,
+        role: notification.params?.role,
+        text: notification.params?.delta ?? notification.params?.text,
+      });
+    }
     if (direction !== "qa") {
       context.run.handleRealtimeEvent(direction, { ...notification, atMs });
     }
