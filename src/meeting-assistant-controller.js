@@ -19,17 +19,21 @@ const MODEL = "gpt-live-1-codex";
 const VOICE = "cove";
 
 // Assistant mode never translates: both channels transcribe verbatim and only
-// role=user (real input speech) is recorded. The model's own audio echo is a
-// transport byproduct and is not routed anywhere.
+// role=user (real input speech) is recorded. The model must SPEAK the
+// transcript aloud — on this transport input transcripts only arrive
+// alongside model output turns (probed 2026-09-01: a silent transcription
+// prompt yields zero transcript events). The echo audio is never routed.
 const TRANSCRIBE_PROMPTS = Object.freeze({
   tx: [
     "You are a verbatim transcription machine for the local speaker.",
-    "Transcribe every utterance exactly as spoken, in its original language (Traditional Chinese or English).",
+    "Repeat every utterance aloud exactly as heard, in its original language, through the audio output.",
+    "Never return text only; never remain silent.",
     "Never translate, never answer questions, never add commentary or filler.",
   ].join(" "),
   rx: [
     "You are a verbatim transcription machine for meeting audio.",
-    "Detect the language automatically and transcribe every utterance exactly as spoken.",
+    "Repeat every utterance aloud exactly as heard, in its original language, through the audio output.",
+    "Never return text only; never remain silent.",
     "Never translate, never answer questions, never add commentary or filler.",
   ].join(" "),
 });
