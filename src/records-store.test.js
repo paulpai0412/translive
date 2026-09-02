@@ -207,9 +207,7 @@ test("listSessions reports hasSummary once a summary exists", async () => {
   await store.saveSessionSummary("session-has-summary", {
     generatedAtMs: 1_700_000_061_000,
     markdown: "# x",
-    sourceSessions: [
-      { id: "session-has-summary", timestamps: [0] },
-    ],
+    sourceSessions: [{ id: "session-has-summary", timestamps: [0] }],
     structured: { sections: { 重點: [], 決策: [], 待辦: [], 未決問題: [] } },
   });
   [listed] = await store.listSessions();

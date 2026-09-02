@@ -184,3 +184,47 @@ test("a failing speaker surfaces qa-error instead of hanging silently", async ()
   );
   assert.equal(qa.pending(), undefined);
 });
+
+test("ask searches the live meeting transcript, not just past meetings", async () => {
+  const { calls, qa } = qaFor({
+    index: { search: () => [] },
+    currentSession: () => ({
+      id: "live-1",
+      entries: [
+        { direction: "rx", text: "we will ship on October first", offsetMs: 42_000 },
+      ],
+    }),
+  });
+  const result = await qa.ask("when do we ship");
+  assert.equal(result.state, "pending");
+  assert.equal(calls.answer.length, 1);
+  assert.ok(calls.answer[0].includes("we will ship on October first"));
+  assert.ok(calls.answer[0].includes("live-1"));
+});
+
+test("recency questions get the current meeting tail without term matches", async () => {
+  const { calls, qa } = qaFor({
+    index: { search: () => [] },
+    currentSession: () => ({
+      id: "live-2",
+      entries: [
+        { direction: "tx", text: "預算是十萬元", offsetMs: 5_000 },
+        { direction: "rx", text: "rollout 九月五號", offsetMs: 9_000 },
+      ],
+    }),
+  });
+  const result = await qa.ask("我剛剛說什麼");
+  assert.equal(result.state, "pending");
+  assert.ok(calls.answer[0].includes("預算是十萬元"));
+  assert.ok(calls.answer[0].includes("rollout 九月五號"));
+});
+
+test("no index hit and no live content still answers honestly", async () => {
+  const { calls, qa } = qaFor({
+    index: { search: () => [] },
+    currentSession: () => ({ id: "live-3", entries: [] }),
+  });
+  const result = await qa.ask("上個月的決議是什麼");
+  assert.match(result.answer.text, /找不到/);
+  assert.equal(calls.answer.length, 0);
+});

@@ -229,11 +229,20 @@ export class PhaseOneController {
         },
         publish: (event) => this.#qaPublish(event),
         audit: (entry) => this.#qaAudit(entry),
-        currentSession: () => ({
-          id: this.#active?.context.evidence.snapshot().runId,
-          entries: this.#active?.context.transcriptEntries ?? [],
-          summary: undefined,
-        }),
+        currentSession: () => {
+          const context = this.#active?.context;
+          const startedAtMs = context?.evidence.snapshot().startedAtMs;
+          return {
+            id: context?.evidence.snapshot().runId,
+            entries: (context?.transcriptEntries ?? []).map((entry) => ({
+              ...entry,
+              offsetMs: Number.isFinite(startedAtMs)
+                ? Math.max(0, entry.atMs - startedAtMs)
+                : 0,
+            })),
+            summary: undefined,
+          };
+        },
       });
     }
   }

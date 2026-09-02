@@ -9,6 +9,26 @@ export const QA_VOICE_PROMPT = [
 ].join(" ");
 const DELIVERY_MODES = new Set(["review", "auto"]);
 
+const RECENCY_PATTERN = /(剛才|剛剛|最後|最近|這次|剛才說|last|recent|just now)/i;
+
+function searchTerms(query) {
+  const terms = [];
+  for (const token of String(query)
+    .split(/[\s,，。:：;；!！?？.．]+/)
+    .filter(Boolean)) {
+    if (/^[a-z0-9]+$/i.test(token)) {
+      if (token.length >= 2) terms.push(token.toLowerCase());
+      continue;
+    }
+    // CJK runs become overlapping bigrams so a phrase query can hit
+    // transcripts whose wording differs slightly.
+    for (let i = 0; i + 2 <= token.length; i++) {
+      terms.push(token.slice(i, i + 2));
+    }
+  }
+  return terms;
+}
+
 function citationKey(citation) {
   return `${citation?.sessionId}:${citation?.offsetMs}`;
 }
@@ -128,8 +148,34 @@ export class MeetingQa {
   async ask(question) {
     const text = String(question ?? "").trim();
     if (text.length === 0) throw new Error("Question is required");
-    const chunks = this.#index.search(text, { limit: 6 });
+    // The live meeting is not indexed until it ends — search its transcript
+    // directly, then fall back to past meetings.
+    const chunks = [
+      ...this.#currentMatches(text),
+      ...this.#index.search(text, { limit: 6 }),
+    ].slice(0, 6);
     return this.#compose(text, chunks);
+  }
+
+  #currentMatches(question) {
+    const session = this.#currentSession();
+    const entries = (Array.isArray(session?.entries) ? session.entries : [])
+      .filter((entry) => typeof entry?.text === "string" && entry.text.trim());
+    if (entries.length === 0) return [];
+    const toChunk = (entry) => ({
+      sessionId: session.id ?? "current",
+      tier: "transcript",
+      heading: "本場會議",
+      text: entry.text,
+      offsetMs: Number(entry.offsetMs ?? 0) || 0,
+    });
+    if (RECENCY_PATTERN.test(question)) return entries.slice(-5).map(toChunk);
+    const terms = searchTerms(question);
+    if (terms.length === 0) return [];
+    return entries
+      .filter((entry) => terms.some((term) => entry.text.includes(term)))
+      .slice(-4)
+      .map(toChunk);
   }
 
   async speakConclusions() {

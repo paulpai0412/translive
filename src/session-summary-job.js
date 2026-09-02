@@ -33,7 +33,12 @@ export function summarizeSessionInBackground({
       message,
     });
   };
-  publish({ type: "summary", state: "generating", sessionId, background: true });
+  publish({
+    type: "summary",
+    state: "generating",
+    sessionId,
+    background: true,
+  });
   const run = async () => {
     const saved = await records.readSession(sessionId);
     const sessions = [{ metadata: saved.metadata, entries: saved.entries }];

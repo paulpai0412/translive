@@ -373,9 +373,16 @@ export class MeetingAssistantController {
 
   #currentSession() {
     const context = this.#active;
+    const startedAtMs = context?.evidence.snapshot().startedAtMs;
+    const entries = (context?.transcriptEntries ?? []).map((entry) => ({
+      ...entry,
+      offsetMs: Number.isFinite(startedAtMs)
+        ? Math.max(0, entry.atMs - startedAtMs)
+        : 0,
+    }));
     return {
       id: context?.evidence.snapshot().runId,
-      entries: context?.transcriptEntries ?? [],
+      entries,
       summary: context?.summary,
     };
   }
