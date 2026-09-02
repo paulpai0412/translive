@@ -1,9 +1,18 @@
 import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import { summarizeSessionInBackground } from "./session-summary-job.js";
 
+let fallbackDirectory;
+function testFallbackDirectory() {
+  return fallbackDirectory;
+}
+
 function fixture(overrides = {}) {
+  const fallbackDirectory = testFallbackDirectory();
   const published = [];
   const indexed = [];
   const savedSummaries = [];
@@ -12,6 +21,7 @@ function fixture(overrides = {}) {
     indexed,
     savedSummaries,
     records: {
+      directory: () => overrides.directory ?? fallbackDirectory,
       readSession: async (id) => ({
         metadata: { id, mode: "meeting", startedAtMs: 1_000 },
         entries: [
@@ -52,7 +62,9 @@ test("publishes generating then saved, persists, and reindexes", async () => {
   assert.equal(f.published.at(-1).state, "saved");
 });
 
-test("a generation failure surfaces as failed and never throws", async () => {
+test("a generation failure surfaces as failed and never throws", async (t) => {
+  fallbackDirectory = await mkdtemp(join(tmpdir(), "summary-fail-"));
+  t.after(() => rm(fallbackDirectory, { recursive: true, force: true }));
   const f = fixture({
     summaryService: {
       generate: async () => {
@@ -70,4 +82,10 @@ test("a generation failure surfaces as failed and never throws", async () => {
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(f.published.at(-1).state, "failed");
+  const log = await readFile(
+    join(fallbackDirectory, "summary-failures.log"),
+    "utf8",
+  );
+  assert.match(log, /boom/);
+  assert.match(log, /session=s-1/);
 });

@@ -1,3 +1,6 @@
+import { appendFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { formatSummaryMarkdown } from "./summary-service.js";
 import { sanitizeText } from "./text-sanitizer.js";
 
@@ -12,14 +15,24 @@ export function summarizeSessionInBackground({
   sessionId,
   now = Date.now,
 }) {
-  const fail = (error) =>
+  const fail = (error) => {
+    const message = sanitizeText(error?.message ?? error, { maxLength: 500 });
+    // Background failures must leave a trace — the publish event is transient
+    // and the run's evidence file is already written by then.
+    const line = `${new Date().toISOString()} session=${sessionId} ${message}\n`;
+    void appendFile(
+      join(records.directory(), "summary-failures.log"),
+      line,
+      "utf8",
+    ).catch(() => {});
     publish({
       type: "summary",
       state: "failed",
       sessionId,
       background: true,
-      message: sanitizeText(error?.message ?? error, { maxLength: 500 }),
+      message,
     });
+  };
   publish({ type: "summary", state: "generating", sessionId, background: true });
   const run = async () => {
     const saved = await records.readSession(sessionId);
