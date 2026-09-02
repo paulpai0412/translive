@@ -9,7 +9,8 @@ export const QA_VOICE_PROMPT = [
 ].join(" ");
 const DELIVERY_MODES = new Set(["review", "auto"]);
 
-const RECENCY_PATTERN = /(剛才|剛剛|最後|最近|這次|剛才說|last|recent|just now)/i;
+const RECENCY_PATTERN =
+  /(剛才|剛剛|最後|最近|這次|剛才說|last|recent|just now)/i;
 
 function searchTerms(query) {
   const terms = [];
@@ -159,8 +160,9 @@ export class MeetingQa {
 
   #currentMatches(question) {
     const session = this.#currentSession();
-    const entries = (Array.isArray(session?.entries) ? session.entries : [])
-      .filter((entry) => typeof entry?.text === "string" && entry.text.trim());
+    const entries = (
+      Array.isArray(session?.entries) ? session.entries : []
+    ).filter((entry) => typeof entry?.text === "string" && entry.text.trim());
     if (entries.length === 0) return [];
     const toChunk = (entry) => ({
       sessionId: session.id ?? "current",

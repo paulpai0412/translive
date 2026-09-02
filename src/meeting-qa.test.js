@@ -191,7 +191,11 @@ test("ask searches the live meeting transcript, not just past meetings", async (
     currentSession: () => ({
       id: "live-1",
       entries: [
-        { direction: "rx", text: "we will ship on October first", offsetMs: 42_000 },
+        {
+          direction: "rx",
+          text: "we will ship on October first",
+          offsetMs: 42_000,
+        },
       ],
     }),
   });
