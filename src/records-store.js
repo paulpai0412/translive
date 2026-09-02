@@ -304,10 +304,10 @@ export class RecordsStore {
       "session",
     );
     return Promise.all(
-      sessions.map(async ({ id, metadata }) => {
+      sessions.map(async ({ manifest, metadata }) => {
         const summary = await this.#readPackage(
           this.#summariesDirectory(),
-          this.#sessionSummaryPackageId(id),
+          this.#sessionSummaryPackageId(manifest.id ?? metadata.id),
           "session-summary",
           { optional: true },
         );

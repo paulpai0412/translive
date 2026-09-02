@@ -187,3 +187,31 @@ test("rejects unsafe record identifiers and malformed transcript entries", async
     /transcript entry/i,
   );
 });
+
+test("listSessions reports hasSummary once a summary exists", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "translive-records-"));
+  const store = new RecordsStore({ directory });
+  await store.grantPlaintextConsent({ confirmed: true });
+  await store.saveSession({
+    id: "session-has-summary",
+    metadata: {
+      endedAtMs: 1_700_000_060_000,
+      mode: "meeting",
+      platform: "teams",
+      startedAtMs: 1_700_000_000_000,
+    },
+    entries: [entry({ text: "內容" })],
+  });
+  let [listed] = await store.listSessions();
+  assert.equal(listed.hasSummary, false);
+  await store.saveSessionSummary("session-has-summary", {
+    generatedAtMs: 1_700_000_061_000,
+    markdown: "# x",
+    sourceSessions: [
+      { id: "session-has-summary", timestamps: [0] },
+    ],
+    structured: { sections: { 重點: [], 決策: [], 待辦: [], 未決問題: [] } },
+  });
+  [listed] = await store.listSessions();
+  assert.equal(listed.hasSummary, true);
+});
