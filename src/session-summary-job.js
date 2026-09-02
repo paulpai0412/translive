@@ -17,9 +17,10 @@ export function summarizeSessionInBackground({
       type: "summary",
       state: "failed",
       sessionId,
+      background: true,
       message: sanitizeText(error?.message ?? error, { maxLength: 500 }),
     });
-  publish({ type: "summary", state: "generating", sessionId });
+  publish({ type: "summary", state: "generating", sessionId, background: true });
   const run = async () => {
     const saved = await records.readSession(sessionId);
     const sessions = [{ metadata: saved.metadata, entries: saved.entries }];
@@ -49,7 +50,7 @@ export function summarizeSessionInBackground({
       entries: saved.entries,
       summary: structured,
     });
-    publish({ type: "summary", state: "saved", sessionId });
+    publish({ type: "summary", state: "saved", sessionId, background: true });
   };
   void run().catch(fail);
 }

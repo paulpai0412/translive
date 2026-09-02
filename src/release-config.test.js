@@ -23,7 +23,7 @@ test("defines branded Windows release metadata", () => {
 test("packages only production runtime files and excludes secrets, evidence, and tests", () => {
   for (const path of [
     "package.json",
-      "src/device-recommendations.js",
+    "src/device-recommendations.js",
     "src/json-file-store.js",
     "src/mini-caption-window.js",
     "src/mini-caption.html",

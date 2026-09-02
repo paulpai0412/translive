@@ -42,6 +42,7 @@ test("publishes generating then saved, persists, and reindexes", async () => {
     sessionId: "s-1",
   });
   assert.equal(f.published[0].state, "generating");
+  assert.ok(f.published.every((e) => e.background === true));
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));

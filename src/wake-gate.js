@@ -68,7 +68,9 @@ export class WakeGate {
     this.#phrase = normalizePhrase(phrase ?? this.#phrase);
     this.#phraseNorm = scan(this.#phrase).normalized;
     this.#pattern = new RegExp(
-      "^(?:" + WAKE_PREFIXES.map(escapeRegExp).join("|") + ")?" +
+      "^(?:" +
+        WAKE_PREFIXES.map(escapeRegExp).join("|") +
+        ")?" +
         escapeRegExp(this.#phraseNorm),
       "i",
     );
@@ -92,8 +94,7 @@ export class WakeGate {
     const match = this.#pattern.exec(normalized);
     if (match) {
       const endNorm = match[0].length;
-      const cutOriginal =
-        endNorm === 0 ? 0 : (origIndex[endNorm - 1] ?? 0) + 1;
+      const cutOriginal = endNorm === 0 ? 0 : (origIndex[endNorm - 1] ?? 0) + 1;
       const question = raw.slice(cutOriginal).replace(SEPARATORS, "").trim();
       if (question.length === 0) {
         // Bare wake phrase: arm a short window so the question can arrive as

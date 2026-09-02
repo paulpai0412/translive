@@ -79,7 +79,11 @@ test("homophone drift still fires (小泥小泥 vs 小妮小妮)", () => {
 
 test("a bare wake phrase arms a short follow-up window for the question", () => {
   let now = 10_000;
-  const gate = new WakeGate({ armed: true, phrase: "小泥小泥", now: () => now });
+  const gate = new WakeGate({
+    armed: true,
+    phrase: "小泥小泥",
+    now: () => now,
+  });
   assert.equal(
     gate.onFinalTranscript({ source: "me", text: "小妮小妮" }),
     null,
@@ -93,7 +97,11 @@ test("a bare wake phrase arms a short follow-up window for the question", () => 
 
 test("the follow-up window expires", () => {
   let now = 10_000;
-  const gate = new WakeGate({ armed: true, phrase: "小泥小泥", now: () => now });
+  const gate = new WakeGate({
+    armed: true,
+    phrase: "小泥小泥",
+    now: () => now,
+  });
   gate.onFinalTranscript({ source: "me", text: "小妮小妮" });
   now += 6_000;
   assert.equal(
@@ -104,7 +112,11 @@ test("the follow-up window expires", () => {
 
 test("suspend clears an armed follow-up window", () => {
   const now = 10_000;
-  const gate = new WakeGate({ armed: true, phrase: "小泥小泥", now: () => now });
+  const gate = new WakeGate({
+    armed: true,
+    phrase: "小泥小泥",
+    now: () => now,
+  });
   gate.onFinalTranscript({ source: "me", text: "小妮小妮" });
   gate.suspend();
   gate.resume();

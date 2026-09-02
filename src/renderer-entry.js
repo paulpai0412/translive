@@ -2538,6 +2538,22 @@ async function confirmSummary() {
 }
 
 function handleSummaryEvent(event) {
+  // Background auto-summary events carry no requestId; they are not results
+  // of a manual request and must never surface the failure modal.
+  if (event.background || !event.requestId) {
+    if (ui.app === "stopped") {
+      const copy = {
+        generating: "已停止。逐字稿已保存，摘要產生中…",
+        saved: "已停止。逐字稿與摘要已保存。",
+        failed: "已停止。逐字稿已保存，但摘要產生失敗,可從紀錄頁重試。",
+      };
+      if (copy[event.state]) {
+        elements["stopped-copy"].textContent = copy[event.state];
+      }
+    }
+    if (event.state === "saved") void loadRecords();
+    return;
+  }
   if (event.state === "generating" || event.state === "canceling") return;
   if (ui.records.summaryRequest?.requestId !== event.requestId) return;
   ui.records.summaryRequest = undefined;
@@ -3115,16 +3131,6 @@ window.translive.onEvent(async (event) => {
         "無法套用 GPT‑Live WebRTC 回應。",
       );
     }
-    return;
-  }
-  if (event.type === "summary" && !event.requestId && ui.app === "stopped") {
-    const copy = {
-      generating: "已停止。逐字稿已保存，摘要產生中…",
-      saved: "已停止。逐字稿與摘要已保存。",
-      failed: "已停止。逐字稿已保存，但摘要產生失敗,可從紀錄頁重試。",
-    };
-    elements["stopped-copy"].textContent =
-      copy[event.state] ?? "已停止。逐字稿已保存。";
     return;
   }
   if (event.type === "transcript") {

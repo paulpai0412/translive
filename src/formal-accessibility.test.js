@@ -343,6 +343,7 @@ test("formal UI exposes the meeting assistant mode with reviewable answers", asy
   assert.match(html, /id="auto-summary-enabled"/);
   assert.match(html, /id="stopped-back-home"[^>]*>\s*返回主頁/);
   assert.match(renderer, /stopped-back-home.*setAppState\("ready"\)/s);
+  assert.match(renderer, /event\.background \|\| !event\.requestId/);
   assert.match(html, /id="assistant-wake-phrase"[^>]*maxlength="40"/);
   assert.match(html, /id="qa-hint"/);
 
